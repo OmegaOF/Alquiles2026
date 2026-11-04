@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, test, expect } from "vitest";
-import { App } from "../src/App";
+import { PhaseZero as App } from "../src/App";
 
 test("muestra inicio accesible y no simula funciones futuras", () => {
   render(<App />);
@@ -14,12 +14,10 @@ test("muestra inicio accesible y no simula funciones futuras", () => {
   );
 });
 test("comprueba la conexión real de la API al pulsar", async () => {
-  const fetcher = vi
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({ status: "ok", database: "ok" }),
-    });
+  const fetcher = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ status: "ok", database: "ok" }),
+  });
   vi.stubGlobal("fetch", fetcher);
   render(<App />);
   await userEvent.click(

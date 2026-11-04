@@ -1,13 +1,16 @@
-name: Validación de fase 0
+name: Validación del sistema
 on: [push, pull_request]
 jobs:
   checks:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
+      PHASE1_TEST_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_DATABASE: alquiles
+          MYSQL_DATABASE: alquiles_phase1_test
           MYSQL_USER: alquiles
           MYSQL_PASSWORD: local_only_change_me
           MYSQL_ROOT_PASSWORD: local_root_change_me
@@ -30,6 +33,16 @@ jobs:
       - run: bash scripts/check.sh
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
+      - name: Crear cuenta descartable para navegador
+        run: |
+          .venv/bin/python - <<'PYCODE'
+          import os, secrets, subprocess
+          password = secrets.token_urlsafe(24)
+          print("::add-mask::" + password)
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write("E2E_USERNAME=ci_admin\nE2E_PASSWORD=" + password + "\n")
+          subprocess.run(["../.venv/bin/python", "-m", "app.bootstrap", "--username", "ci_admin", "--full-name", "Administrador de pruebas", "--password-stdin"], cwd="backend", input=password + "\n", text=True, check=True)
+          PYCODE
       - name: Iniciar aplicaciones
         run: |
           (cd backend && ../.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1) &
