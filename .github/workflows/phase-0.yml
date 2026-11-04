@@ -1,0 +1,46 @@
+name: Validación de fase 0
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: alquiles
+          MYSQL_USER: alquiles
+          MYSQL_PASSWORD: local_only_change_me
+          MYSQL_ROOT_PASSWORD: local_root_change_me
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: cp .env.example .env
+      - run: bash scripts/install.sh
+      - run: bash scripts/check.sh
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Iniciar aplicaciones
+        run: |
+          (cd backend && ../.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1) &
+          (cd frontend && npm run dev > /tmp/frontend.log 2>&1) &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/v1/ready && curl -fsS http://127.0.0.1:5173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/backend.log /tmp/frontend.log
+          exit 1
+      - run: npm run test:e2e
+        working-directory: frontend
