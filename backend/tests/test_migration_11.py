@@ -58,7 +58,7 @@ def migration_db():
     finally:
         # No dejar a las pruebas de regresión ni a alembic check un esquema parcial.
         reset(engine)
-        migrate(url)
+        migrate(url, target="head")
         engine.dispose()
 
 

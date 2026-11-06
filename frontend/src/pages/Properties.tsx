@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Person, Property, Unit, User } from "../types";
 import { api } from "../api";
+import { stateNames } from "../tenancy";
+import type { Availability } from "../tenancy";
 import {
   Field,
   ErrorMessage,
@@ -26,6 +28,7 @@ export function Properties({
   const [selected, setSelected] = useState<number | null>(null);
   const [editing, setEditing] = useState<Partial<Property> | null>(null);
   const [notice, setNotice] = useState("");
+  const [availabilityVersion, setAvailabilityVersion] = useState(0);
   const general = user.role === "general_admin";
   const canEdit = general || user.role === "property_admin";
   const property = properties.find((p) => p.id === selected);
@@ -111,8 +114,13 @@ export function Properties({
             </>
           )}
         </div>
+        <PropertyAvailability
+          propertyId={property.id}
+          version={availabilityVersion}
+        />
         <Units
           property={property}
+          onChanged={() => setAvailabilityVersion((v) => v + 1)}
           canEdit={
             general ||
             user.role === "property_admin" ||
@@ -181,6 +189,71 @@ export function Properties({
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function PropertyAvailability({
+  propertyId,
+  version,
+}: {
+  propertyId: number;
+  version: number;
+}) {
+  const requestId = useRef(0);
+  const [data, setData] = useState<Availability | null>(null);
+  const [error, setError] = useState("");
+  async function load() {
+    const request = ++requestId.current;
+    setError("");
+    try {
+      const result = await api<Availability>(
+        `/properties/${propertyId}/availability`,
+      );
+      if (request === requestId.current) setData(result);
+    } catch (e) {
+      if (request === requestId.current) setError(errorText(e));
+    }
+  }
+  useEffect(() => {
+    setData(null);
+    void load();
+    return () => {
+      requestId.current++;
+    };
+  }, [propertyId, version]);
+  return (
+    <section className="panel">
+      <h2>Disponibilidad de hoy</h2>
+      <ErrorMessage message={error} />
+      {error && (
+        <button className="secondary" onClick={() => void load()}>
+          Volver a consultar disponibilidad
+        </button>
+      )}
+      {data?.whole && (
+        <>
+          <p>
+            <strong>Casa completa: {stateNames[data.whole.state]}</strong>.{" "}
+            {data.whole.reason}
+          </p>
+          <p>
+            Cuartos disponibles:{" "}
+            {data.units.filter((unit) => unit.state === "available").length} de{" "}
+            {data.units.length}.
+          </p>
+          <ul>
+            {data.units.map((unit) => (
+              <li key={unit.unit_id}>
+                {unit.label}: <strong>{stateNames[unit.state]}</strong>.{" "}
+                {unit.reason}
+              </li>
+            ))}
+          </ul>
+          <p>Para otras fechas, abre “Disponibilidad”.</p>
+        </>
+      )}
+      {!data && !error && <p role="status">Consultando disponibilidad…</p>}
     </section>
   );
 }
@@ -445,7 +518,7 @@ function PropertyForm({
         )}
         <p className="muted">
           Deshabilitar conserva la propiedad y su historial. La ocupación se
-          gestionará mediante contratos en la siguiente fase.
+          consulta en Contratos y Disponibilidad.
         </p>
         <FormActions saving={saving} onCancel={onCancel} />
       </form>
@@ -456,9 +529,11 @@ function PropertyForm({
 function Units({
   property,
   canEdit,
+  onChanged,
 }: {
   property: Property;
   canEdit: boolean;
+  onChanged: () => void;
 }) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [editing, setEditing] = useState<Partial<Unit> | null>(null);
@@ -506,6 +581,7 @@ function Units({
         },
       );
       await load();
+      onChanged();
       setEditing(null);
       setNotice("El cuarto o unidad se guardó correctamente.");
     } catch (e) {
@@ -586,8 +662,8 @@ function Units({
             </Field>
           </div>
           <p className="muted">
-            Estos estados no indican ocupación ni reserva. Los contratos se
-            implementarán en la siguiente fase.
+            La disponibilidad combina estos estados con los contratos y las
+            reservas.
           </p>
           <FormActions
             saving={saving}

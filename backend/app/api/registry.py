@@ -14,8 +14,12 @@ router = APIRouter(tags=["Propiedades y personas"])
 def persons(db: Session = Depends(get_db), user: User = Depends(current_user)):
     query = select(Person).order_by(Person.full_name, Person.id)
     if user.role != ADMIN:
-        ids = visible_properties(db, user).with_only_columns(Property.id)
-        query = query.where(Person.id.in_(select(PropertyOwner.person_id).where(PropertyOwner.property_id.in_(ids))))
+        from app.services.tenancy import contact_ids
+        ids = list(db.scalars(visible_properties(db, user).with_only_columns(Property.id)))
+        people = set()
+        for property_id in ids:
+            people.update(db.scalars(contact_ids(db, property_id)))
+        query = query.where(Person.id.in_(people))
     return [person_dict(p) for p in db.scalars(query)]
 
 @router.post("/persons", status_code=201)

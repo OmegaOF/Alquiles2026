@@ -5,6 +5,7 @@ import { roleNames } from "./types";
 import { Properties } from "./pages/Properties";
 import { People } from "./pages/People";
 import { Users } from "./pages/Users";
+import { Tenancy } from "./pages/Tenancy";
 import { ErrorMessage, Field, errorText } from "./components/Form";
 export { PhaseZero } from "./PhaseZero";
 
@@ -158,7 +159,15 @@ function Login({
   );
 }
 
-type Page = "home" | "properties" | "persons" | "users";
+type Page =
+  | "home"
+  | "properties"
+  | "persons"
+  | "users"
+  | "contracts"
+  | "reservations"
+  | "availability"
+  | "occupancy";
 function Workspace({
   user,
   onLogout,
@@ -227,6 +236,10 @@ function Workspace({
     ["home", "Inicio"],
     ["properties", "Propiedades"],
     ["persons", "Personas"],
+    ["contracts", "Contratos"],
+    ["reservations", "Reservas"],
+    ["availability", "Disponibilidad"],
+    ["occupancy", "Ocupantes e historial"],
   ];
   if (general) links.push(["users", "Usuarios y permisos"]);
   return (
@@ -294,6 +307,26 @@ function Workspace({
             />
           ) : page === "persons" ? (
             <People people={people} canEdit={general} refresh={refresh} />
+          ) : [
+              "contracts",
+              "reservations",
+              "availability",
+              "occupancy",
+            ].includes(page) ? (
+            <Tenancy
+              key={page}
+              view={
+                page as
+                  | "contracts"
+                  | "reservations"
+                  | "availability"
+                  | "occupancy"
+              }
+              user={user}
+              properties={properties}
+              people={people}
+              refreshPeople={refresh}
+            />
           ) : page === "users" && general ? (
             <Users
               users={users}
@@ -343,7 +376,8 @@ function Home({ user, properties }: { user: User; properties: Property[] }) {
           para consultar sus datos y cuartos.
         </p>
         <p>
-          Los contratos y la ocupación se incorporarán en la siguiente etapa.
+          Consulta contratos, reservas, disponibilidad y ocupantes desde el
+          menú. Los cobros y servicios se incorporarán en las siguientes etapas.
         </p>
       </div>
       <section className="connection" aria-labelledby="connection-title">
