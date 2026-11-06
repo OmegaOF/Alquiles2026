@@ -1,6 +1,6 @@
 # Mi Casa · Administración de propiedades
 
-Fase 1: personas, propietarios, propiedades, cuartos, usuarios y permisos. Backend FastAPI/SQLAlchemy/MySQL y frontend React 18/TypeScript, independientes de Pisco Ñawi y del sistema antiguo. No hay contratos, ocupación, alquileres, servicios, pagos ni recordatorios todavía.
+Fase 1.1: identidad normalizada sobre personas, propietarios, propiedades, cuartos, usuarios y permisos. Backend FastAPI/SQLAlchemy/MySQL y frontend React 18/TypeScript, independientes de Pisco Ñawi y del sistema antiguo. No hay contratos, ocupación, alquileres, servicios, pagos ni recordatorios todavía.
 
 ## Requisitos e instalación
 
@@ -20,7 +20,7 @@ cd backend
 
 El último comando pide y confirma una contraseña de **12 a 128 caracteres**, sin mostrarla. No existe una contraseña inicial predeterminada. Solo permite crear el primer administrador; después las cuentas se crean desde la interfaz. No pasar contraseñas como argumentos ni guardarlas en archivos versionados. `.env.example` solo contiene valores públicos para la base local de desarrollo; `.env` queda excluido de Git.
 
-**Bases existentes:** hacer respaldo y revisar `0002_phase1` antes de aplicarla. La validación de esta fase usó únicamente una base nueva descartable, no datos reales. No migrar bases de otros proyectos.
+**Bases existentes:** antes de aplicar 0003, detener escritores, hacer y verificar un respaldo y leer [migración y recuperación](docs/phase-1.1-migration.md). MySQL no revierte automáticamente todos los DDL. Revisar las migraciones antes de aplicarlas. La validación de esta fase usó únicamente una base nueva descartable, no datos reales. No migrar bases de otros proyectos.
 
 ## Arranque y navegador
 
@@ -46,7 +46,7 @@ Para un dominio de desarrollo remoto, añadir su origen exacto a `CORS_ORIGINS` 
 2. **Propiedades:** pulsa “Registrar propiedad”, completa nombre, dirección y ciudad, selecciona uno o varios propietarios. La participación es opcional; si se indica, la suma no puede superar 100%. Selecciona administradores autorizados si ya existen. Guarda y confirma.
 3. **Detalle:** pulsa “Ver propiedad”. Revisa sus dueños y usa “Editar propiedad”. Deshabilitar conserva sus datos e historial.
 4. **Cuartos:** en el detalle pulsa “Registrar cuarto”. El número debe ser único en esa casa. “Editar cuarto” permite cambiar descripción, habilitación y mantenimiento; estos estados no representan ocupación ni reserva.
-5. **Usuarios y permisos:** registra una cuenta, su rol y las propiedades autorizadas. Para el rol propietario, vincula una persona propietaria. Puedes cambiar permisos, contraseña o deshabilitar cuentas; los cambios sensibles terminan las sesiones anteriores. No se puede desactivar al último administrador general.
+5. **Usuarios y permisos:** elige una persona existente o “Registrar persona nueva” para crear su identidad junto con la cuenta; después define rol y propiedades autorizadas. El nombre se corrige en Personas y se actualiza en todas sus cuentas. El alias opcional identifica la cuenta y se mantiene independiente. Para el rol propietario, vincula una persona propietaria. Puedes cambiar permisos, contraseña o deshabilitar cuentas; los cambios sensibles terminan las sesiones anteriores. No se puede desactivar al último administrador general.
 6. **Inicio:** “Comprobar conexión” conserva la comprobación real de API y MySQL de fase 0.
 7. **Cerrar sesión:** confirma para salir. Una sesión dura como máximo ocho horas.
 
@@ -91,16 +91,20 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 # Si no está instalado: npx playwright install chromium; npm run test:e2e
 ```
 
+Las pruebas adicionales de migración requieren `PHASE11_MIGRATION_DATABASE_URL` con base descartable terminada en `_test`; pueden compartir la base CI solo cuando se ejecutan secuencialmente.
+
 La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La configuración de CI ejecuta estos pasos sobre MySQL descartable, sin credenciales de usuarios reales.
 
 ## Organización y migraciones
 
 - `backend/app/{models,schemas,services,api}`: persistencia, validación, reglas y rutas separadas.
 - `backend/app/core`: configuración, contraseñas y reloj UTC; `bootstrap.py`: primera cuenta.
-- `backend/migrations`: `0001_baseline` y `0002_phase1`.
+- `backend/migrations`: `0001_baseline`, `0002_phase1` y `0003_identity`.
 - `frontend/src/pages`: propiedades/cuarto, personas y usuarios; `components`: formularios comunes.
 - `backend/tests`, `frontend/tests`, `frontend/e2e`: automatización de validaciones.
-- `docs/phase-1.md`: entrega y evidencia; `docs/phase-1-plan.md`: alcance y aceptación.
+- `docs/phase-1.md`: entrega histórica de fase 1.
+- `docs/phase-1.1-normalization.md`: análisis individual de formas normales, claves, dependencias y diagrama.
+- `docs/phase-1.1-migration.md`: preservación de datos y recuperación; `docs/phase-1.1.md`: resultados de entrega.
 
 Desde backend: `../.venv/bin/alembic revision --autogenerate -m "descripción"`; revisar siempre el resultado antes de `upgrade head`. No usar `create_all` para actualizar bases de aplicación. `downgrade` de fase 1 elimina sus tablas y solo debe probarse en bases descartables.
 

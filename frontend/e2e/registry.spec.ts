@@ -5,9 +5,13 @@ test("iniciar sesión, cerrar sesión y rechazar credenciales incorrectas", asyn
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByLabel("Nombre de usuario", {exact: true})).toBeVisible();
+  await expect(
+    page.getByLabel("Nombre de usuario", { exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Nombre de usuario", {exact: true})).toBeFocused();
+  await expect(
+    page.getByLabel("Nombre de usuario", { exact: true }),
+  ).toBeFocused();
   await page
     .getByLabel("Nombre de usuario", { exact: true })
     .fill(credentials().username);
@@ -217,7 +221,10 @@ test("administrar una cuenta y asignar permisos desde React", async ({
     .getByRole("button", { name: "Registrar usuario", exact: true })
     .click();
   await page
-    .getByLabel("Nombre completo", { exact: true })
+    .getByRole("combobox", { name: /^Persona vinculada/ })
+    .selectOption("new");
+  await page
+    .getByRole("textbox", { name: /Nombre completo de la persona/ })
     .fill("Operador de prueba " + tag);
   await page
     .getByRole("textbox", { name: /Nombre de usuario/ })
@@ -243,12 +250,66 @@ test("administrar una cuenta y asignar permisos desde React", async ({
   await page
     .getByRole("button", { name: "Guardar cambios", exact: true })
     .click();
-  const row = page
-    .getByRole("article")
-    .filter({
-      has: page.getByRole("heading", { name: "Operador de prueba " + tag }),
-    });
+  const row = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "Operador de prueba " + tag }),
+  });
   await expect(
     row.getByText("Cuenta deshabilitada", { exact: true }),
+  ).toBeVisible();
+});
+
+test("el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias", async ({
+  page,
+}) => {
+  await authenticate(page);
+  page.on("dialog", (dialog) => dialog.accept());
+  const tag = Date.now() + "-" + Math.random().toString(16).slice(2, 6);
+  const original = "Persona compartida " + tag;
+  const corrected = "Persona corregida " + tag;
+  const identity = await (
+    await page.request.post(`${apiBase}/api/v1/persons`, {
+      data: { full_name: original },
+    })
+  ).json();
+  for (const suffix of ["a", "b"]) {
+    const result = await page.request.post(`${apiBase}/api/v1/users`, {
+      data: {
+        username: `identity_${suffix}_${tag}`,
+        person_id: identity.id,
+        display_name: "Alias " + suffix,
+        password: credentials().password,
+        role: "operator",
+      },
+    });
+    expect(result.ok()).toBe(true);
+  }
+  await page.goto("/");
+  await page.getByRole("button", { name: "Personas", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Editar a " + original, exact: true })
+    .click();
+  await page.getByLabel("Nombre completo", { exact: true }).fill(corrected);
+  await page
+    .getByRole("button", { name: "Guardar cambios", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: corrected, exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Usuarios y permisos", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: corrected, exact: true }),
+  ).toHaveCount(2);
+  const accounts = page
+    .getByRole("article")
+    .filter({
+      has: page.getByRole("heading", { name: corrected, exact: true }),
+    });
+  await expect(
+    accounts.getByText("Alias de la cuenta: Alias a", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    accounts.getByText("Alias de la cuenta: Alias b", { exact: true }),
   ).toBeVisible();
 });

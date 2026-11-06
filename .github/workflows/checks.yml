@@ -6,6 +6,8 @@ jobs:
     env:
       DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
       PHASE1_TEST_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
+      # Secuenciales: ambas suites usan únicamente la base CI descartable.
+      PHASE11_MIGRATION_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
     services:
       mysql:
         image: mysql:8.4

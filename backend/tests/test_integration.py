@@ -12,7 +12,7 @@ from app.models import entities as _entities
 def test_mysql_and_migration():
     assert get_engine().dialect.name == "mysql"
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_phase1"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0003_identity"
         assert set(inspect(connection).get_table_names()) == set(Base.metadata.tables) | {"alembic_version"}
     response = TestClient(app).get("/api/v1/ready")
     assert response.status_code == 200

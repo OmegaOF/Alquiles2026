@@ -11,7 +11,8 @@ const user: User = {
   username: "ana",
   full_name: "Ana Pérez",
   role: "general_admin",
-  person_id: null,
+  person_id: 1,
+  display_name: null,
   is_active: true,
   property_ids: [],
 };

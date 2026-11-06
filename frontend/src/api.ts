@@ -27,6 +27,7 @@ const fieldNames: Record<string, string> = {
   username: "usuario",
   password: "contraseña",
   full_name: "nombre completo",
+  display_name: "alias de la cuenta",
   document: "documento",
   email: "correo electrónico",
   phone: "teléfono",

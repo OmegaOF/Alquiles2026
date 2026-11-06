@@ -261,6 +261,11 @@ function Workspace({
         <header>
           <div>
             <strong>{user.full_name}</strong>
+            {user.display_name && (
+              <span className="role-label">
+                Alias de la cuenta: {user.display_name}
+              </span>
+            )}
             <span className="role-label">{roleNames[user.role]}</span>
           </div>
           <button

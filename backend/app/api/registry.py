@@ -6,7 +6,7 @@ from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.entities import AuthSession, Person, Property, PropertyOwner, Unit, User
 from app.schemas.registry import PersonCreate, PersonPatch, PropertyCreate, PropertyPatch, UnitCreate, UnitPatch, UserCreate, UserPatch
-from app.services.registry import ADMIN, apply_fields, commit, person_dict, property_dict, property_for_user, replace_access, replace_managers, replace_owners, require_admin, unit_dict, user_dict, validate_user_person, visible_properties, snapshot
+from app.services.registry import ADMIN, apply_fields, commit, person_dict, property_dict, property_for_user, replace_access, replace_managers, replace_owners, require_admin, unit_dict, user_dict, validate_user_person, visible_properties, snapshot, person_for_account, account_alias, record_audit
 
 router = APIRouter(tags=["Propiedades y personas"])
 
@@ -103,14 +103,17 @@ def update_unit(property_id: int, unit_id: int, data: UnitPatch, db: Session = D
 @router.get("/users")
 def users(db: Session = Depends(get_db), user: User = Depends(current_user)):
     require_admin(user)
-    return [user_dict(u) for u in db.scalars(select(User).order_by(User.full_name, User.id))]
+    return [user_dict(u) for u in db.scalars(select(User).join(User.person).order_by(Person.full_name, User.id))]
 
 @router.post("/users", status_code=201)
 def create_user(data: UserCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
     require_admin(user)
-    obj = User(**data.model_dump(exclude={"password", "property_ids"}), password_hash=hash_password(data.password))
+    person, created_person = person_for_account(db, data)
+    obj = User(**data.model_dump(exclude={"password", "property_ids", "full_name", "person_id", "display_name"}), person=person, display_name=account_alias(data, person), password_hash=hash_password(data.password))
     db.add(obj)
     validate_user_person(db, obj)
+    if created_person:
+        record_audit(db, user, "create", person, ["full_name", "is_owner"])
     replace_access(db, obj, data.property_ids)
     commit(db, user, "create", obj, list(data.model_fields_set))
     return user_dict(obj)
@@ -128,7 +131,14 @@ def update_user(user_id: int, data: UserPatch, db: Session = Depends(get_db), us
     was_admin = obj.role == ADMIN and obj.is_active
     if was_admin and len(admins) == 1 and (values.get("is_active") is False or ("role" in values and values["role"] != ADMIN)):
         raise HTTPException(409, "Debe conservar al menos un administrador general activo.")
-    apply_fields(obj, values, excluded={"password", "property_ids"})
+    if "person_id" in values:
+        person = db.get(Person, data.person_id)
+        if person is None:
+            raise HTTPException(422, "La persona seleccionada no existe.")
+        obj.person = person
+    apply_fields(obj, values, excluded={"password", "property_ids", "person_id", "full_name"})
+    if "full_name" in values and "display_name" not in values and data.full_name != obj.person.full_name:
+        obj.display_name = data.full_name
     validate_user_person(db, obj)
     if "password" in values:
         if data.password is None:

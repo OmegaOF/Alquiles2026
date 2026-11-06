@@ -43,3 +43,9 @@ Las personas se separan de cuentas y titularidades. PropertyOwner conserva copro
 Cookie HttpOnly SameSite=Strict, Secure fuera de development, token aleatorio cuyo hash queda en AuthSession, vencimiento de ocho horas. El servidor verifica sesión, usuario activo, rol y propiedad en cada operación. Cambiar contraseña, rol, persona o estado invalida sesiones. El frontend usa /api en el mismo origen mediante proxy; CORS autoriza orígenes exactos y las mutaciones rechazan otros Origin.
 
 AuditEvent registra actor, instante UTC, recurso, acción y valores anteriores/posteriores, incluidas titularidades y accesos. Nunca contiene contraseñas, hashes ni tokens. No hay eliminación física por API. El visor de auditoría y los contratos no pertenecen a esta fase.
+
+## Identidad normalizada en fase 1.1
+
+El nombre personal se almacena únicamente en `persons.full_name`. Toda cuenta tiene `users.person_id` obligatorio y puede conservar un `display_name` independiente como alias. El `full_name` de la API es una proyección de la persona, sin columna duplicada en users. Las personas pueden seguir existiendo sin cuentas y varias cuentas pueden vincularse a la misma persona.
+
+Se mantienen ocho tablas y los roles/alcances de fase 1. La ampliación de auditoría a MEDIUMTEXT resuelve capacidad y no se confunde con 3FN. La demostración individual de dependencias, claves, dominios y formas normales está en [phase-1.1-normalization.md](phase-1.1-normalization.md); la migración incremental y recuperación en [phase-1.1-migration.md](phase-1.1-migration.md). Las titularidades con vigencia y los roles por propiedad permanecen fuera de esta modificación.

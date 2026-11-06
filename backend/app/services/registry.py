@@ -35,7 +35,7 @@ def person_dict(person):
     return {k: getattr(person, k) for k in ("id", "full_name", "document", "phone", "whatsapp", "email", "address", "notes", "is_owner")}
 
 def user_dict(user):
-    return {**{k: getattr(user, k) for k in ("id", "username", "full_name", "role", "person_id", "is_active")}, "property_ids": sorted(a.property_id for a in user.accesses)}
+    return {**{k: getattr(user, k) for k in ("id", "username", "full_name", "display_name", "role", "person_id", "is_active")}, "property_ids": sorted(a.property_id for a in user.accesses)}
 
 def property_dict(obj):
     return {**{k: getattr(obj, k) for k in ("id", "name", "address", "zone", "city", "description", "is_active")}, "owners": [{"person_id": o.person_id, "share": str(o.share) if o.share is not None else None} for o in obj.owners], "manager_ids": sorted(a.user_id for a in obj.accesses if a.user.role == "property_admin")}
@@ -55,10 +55,14 @@ def snapshot(obj):
         return user_dict(obj)
     return {}
 
+def record_audit(db: Session, user: User | None, action: str, obj, fields: list[str], before=None):
+    """Agregar un evento a la transacción actual sin confirmarla por separado."""
+    db.flush()
+    db.add(AuditEvent(actor_id=user.id if user else None, action=action, entity_type=obj.__tablename__, entity_id=obj.id, details=json.dumps({"fields": sorted(k for k in fields if k != "password"), "password_changed": "password" in fields, "before": before, "after": snapshot(obj) if action not in {"login", "logout"} else None}, ensure_ascii=False)))
+
 def commit(db: Session, user: User | None, action: str, obj, fields: list[str], before=None):
     try:
-        db.flush()
-        db.add(AuditEvent(actor_id=user.id if user else None, action=action, entity_type=obj.__tablename__, entity_id=obj.id, details=json.dumps({"fields": sorted(k for k in fields if k != "password"), "password_changed": "password" in fields, "before": before, "after": snapshot(obj) if action not in {"login", "logout"} else None}, ensure_ascii=False)))
+        record_audit(db, user, action, obj, fields, before=before)
         db.commit()
         db.refresh(obj)
     except IntegrityError:
@@ -105,10 +109,32 @@ def replace_access(db, user, ids):
     db.flush()
     user.accesses.extend(PropertyAccess(property_id=id) for id in ids)
 
+def person_for_account(db: Session, data):
+    """Seleccionar identidad existente o crearla, sin modificar personas compartidas."""
+    if data.person_id is not None:
+        person = db.get(Person, data.person_id)
+        if person is None:
+            raise HTTPException(422, "La persona seleccionada no existe.")
+        return person, False
+    if data.role == "owner":
+        raise HTTPException(422, "Vincule una persona registrada como propietaria a esta cuenta.")
+    if data.full_name is None:
+        raise HTTPException(422, "Escriba el nombre completo para registrar a la persona.")
+    person = Person(full_name=data.full_name, is_owner=False)
+    db.add(person)
+    return person, True
+
+def account_alias(data, person: Person):
+    """El nombre legado distinto se conserva como alias si no se indicó uno explícito."""
+    if "display_name" in data.model_fields_set:
+        return data.display_name
+    if data.full_name is not None and data.full_name != person.full_name:
+        return data.full_name
+    return None
+
 def validate_user_person(db, user):
-    if user.person_id is not None and db.get(Person, user.person_id) is None:
-        raise HTTPException(422, "La persona seleccionada no existe.")
-    if user.role == "owner":
-        person = db.get(Person, user.person_id) if user.person_id else None
-        if person is None or not person.is_owner:
-            raise HTTPException(422, "Vincule una persona registrada como propietaria a esta cuenta.")
+    person = user.person
+    if person is None:
+        raise HTTPException(422, "La cuenta debe estar vinculada a una persona existente.")
+    if user.role == "owner" and not person.is_owner:
+        raise HTTPException(422, "Vincule una persona registrada como propietaria a esta cuenta.")

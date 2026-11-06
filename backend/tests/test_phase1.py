@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_db
-from app.models.entities import User, AuditEvent, AuthSession
+from app.models.entities import Person, User, AuditEvent, AuthSession
 from app.core.security import hash_password
 
 PASSWORD = secrets.token_urlsafe(20)
@@ -40,7 +40,7 @@ def db(request):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        admin = User(username='admin_test', full_name='Administración de pruebas', role='general_admin', password_hash=password_hash(), is_active=True)
+        admin = User(username='admin_test', person=Person(full_name='Administración de pruebas'), role='general_admin', password_hash=password_hash(), is_active=True)
         session.add(admin)
         session.commit()
     def override():
@@ -162,7 +162,7 @@ def test_manager_cannot_grant_access(admin):
 def test_origin_protection(admin):
     response = admin.post('/api/v1/persons', json={'full_name': 'Ataque'}, headers={'Origin': 'https://untrusted.example'})
     assert response.status_code == 403
-    assert admin.get('/api/v1/persons').json() == []
+    assert all(p['full_name'] != 'Ataque' for p in admin.get('/api/v1/persons').json())
 
 
 def test_user_deactivation_revokes_session(admin):
@@ -286,8 +286,10 @@ def test_duplicate_user_with_permissions_returns_conflict_and_rolls_back(admin):
     home = property_(admin, owner)
     first = user(admin, 'operator', property_ids=[home['id']])
     second = user(admin, 'operator')
+    before_people = len(admin.get('/api/v1/persons').json())
     create = admin.post('/api/v1/users', json={'username': first['username'], 'full_name': 'Duplicado', 'password': PASSWORD, 'role': 'operator', 'property_ids': [home['id']]})
     assert create.status_code == 409
+    assert len(admin.get('/api/v1/persons').json()) == before_people
     update = admin.patch(f"/api/v1/users/{second['id']}", json={'username': first['username'], 'full_name': 'No conservar este cambio', 'property_ids': [home['id']]})
     assert update.status_code == 409
     accounts = admin.get('/api/v1/users').json()
@@ -324,3 +326,97 @@ def test_manager_assignment_grants_only_selected_property(admin):
         assert other.get('/api/v1/auth/me').json()['property_ids'] == [assigned['id']]
         assert other.get(f"/api/v1/properties/{assigned['id']}").status_code == 200
         assert other.get(f"/api/v1/properties/{unrelated['id']}").status_code == 404
+
+
+def test_normalization_keys_and_stored_columns(db):
+    """Comprueba el esquema esperado; la demostración de FDs está en el informe."""
+    from sqlalchemy import inspect
+    metadata = inspect(db)
+    assert set(metadata.get_table_names()) >= {'persons', 'users', 'properties', 'property_owners', 'property_access', 'units', 'auth_sessions', 'audit_events'}
+    columns = {c['name']: c for c in metadata.get_columns('users')}
+    assert 'full_name' not in columns
+    assert 'display_name' in columns
+    assert not columns['person_id']['nullable']
+    assert metadata.get_pk_constraint('property_owners')['constrained_columns'] == ['property_id', 'person_id']
+    assert metadata.get_pk_constraint('property_access')['constrained_columns'] == ['property_id', 'user_id']
+    unique_units = {tuple(c['column_names']) for c in metadata.get_unique_constraints('units')}
+    assert ('property_id', 'code') in unique_units
+    assert ('person_id',) not in {tuple(c['column_names']) for c in metadata.get_unique_constraints('users')}
+
+
+def test_shared_person_name_has_one_source_and_account_aliases(admin):
+    identity = person(admin, 'Identidad compartida')
+    first = post(admin, '/users', {'username': 'first_identity', 'password': PASSWORD, 'role': 'operator', 'person_id': identity['id'], 'display_name': 'Turno mañana'})
+    second = post(admin, '/users', {'username': 'second_identity', 'password': PASSWORD, 'role': 'operator', 'person_id': identity['id'], 'display_name': 'Turno tarde'})
+    assert first['full_name'] == second['full_name'] == 'Identidad compartida'
+    assert admin.patch(f"/api/v1/persons/{identity['id']}", json={'full_name': 'Identidad corregida'}).status_code == 200
+    accounts = admin.get('/api/v1/users').json()
+    related = [u for u in accounts if u['person_id'] == identity['id']]
+    assert len(related) == 2
+    assert all(u['full_name'] == 'Identidad corregida' for u in related)
+    assert {u['display_name'] for u in related} == {'Turno mañana', 'Turno tarde'}
+    with TestClient(app) as other:
+        login_as(other, first)
+        assert other.get('/api/v1/auth/me').json()['full_name'] == 'Identidad corregida'
+    assert admin.patch(f"/api/v1/users/{first['id']}", json={'person_id': None}).status_code == 422
+
+
+def test_legacy_name_is_preserved_as_alias_without_renaming_person(admin):
+    identity = person(admin, 'Nombre personal canónico')
+    created = post(admin, '/users', {'username': 'legacy_label', 'full_name': 'Nombre anterior de la cuenta', 'password': PASSWORD, 'role': 'owner', 'person_id': identity['id']})
+    assert created['full_name'] == 'Nombre personal canónico'
+    assert created['display_name'] == 'Nombre anterior de la cuenta'
+    assert next(p for p in admin.get('/api/v1/persons').json() if p['id'] == identity['id'])['full_name'] == 'Nombre personal canónico'
+    response = admin.patch(f"/api/v1/users/{created['id']}", json={'display_name': None})
+    assert response.status_code == 200 and response.json()['display_name'] is None
+
+
+def test_creating_account_creates_person_without_merging_names(admin):
+    before = len(admin.get('/api/v1/persons').json())
+    first = post(admin, '/users', {'username': 'same_name_first', 'full_name': 'Nombre coincidente', 'password': PASSWORD, 'role': 'operator'})
+    second = post(admin, '/users', {'username': 'same_name_second', 'full_name': 'Nombre coincidente', 'password': PASSWORD, 'role': 'operator'})
+    assert first['person_id'] != second['person_id']
+    assert len(admin.get('/api/v1/persons').json()) == before + 2
+    assert first['display_name'] is None and second['display_name'] is None
+    assert admin.post('/api/v1/users', json={'username': 'owner_missing_identity', 'full_name': 'No titular', 'password': PASSWORD, 'role': 'owner'}).status_code == 422
+
+
+def test_direct_foreign_keys_and_roles_are_enforced(db):
+    from sqlalchemy.exc import IntegrityError, OperationalError
+    from sqlalchemy import text
+    from app.models.entities import Unit
+    with Session(db) as session:
+        session.add(Unit(property_id=987654321, code='FK', name='Huérfano', unit_type='cuarto'))
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+        identity = Person(full_name='Cuenta de integridad')
+        session.add(identity)
+        session.flush()
+        account = User(username='bad_role_sql', person_id=identity.id, role='unapproved_role', password_hash=password_hash(), is_active=True)
+        session.add(account)
+        # PyMySQL clasifica CHECK 3819 como OperationalError; la restricción debe fallar.
+        with pytest.raises((IntegrityError, OperationalError)) as rejected:
+            session.commit()
+        assert 'ck_user_role' in str(rejected.value.orig)
+        session.rollback()
+        with pytest.raises(IntegrityError):
+            session.execute(text("UPDATE users SET person_id = NULL WHERE username = 'admin_test'"))
+        session.rollback()
+
+
+def test_large_unicode_audit_preserves_full_before_after(admin, db):
+    import json
+    owner = person(admin)
+    home = property_(admin, owner)
+    first_text = '\U0001f4a7' * 5000
+    second_text = '\U0001f525' * 5000
+    unit = post(admin, f"/properties/{home['id']}/units", {'code': 'LARGE', 'name': 'Auditoría amplia', 'unit_type': 'cuarto', 'description': first_text, 'notes': first_text})
+    response = admin.patch(f"/api/v1/properties/{home['id']}/units/{unit['id']}", json={'description': second_text, 'notes': second_text})
+    assert response.status_code == 200
+    with Session(db) as session:
+        audit = session.scalar(select(AuditEvent).where(AuditEvent.entity_type == 'units', AuditEvent.entity_id == unit['id'], AuditEvent.action == 'update'))
+        assert len(audit.details.encode('utf-8')) > 65535
+        details = json.loads(audit.details)
+        assert details['before']['description'] == first_text
+        assert details['after']['notes'] == second_text

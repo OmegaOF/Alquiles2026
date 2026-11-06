@@ -9,7 +9,7 @@ from app.core.security import hash_password
 from app.db.session import get_engine
 from app.models.entities import User
 from app.schemas.registry import UserCreate
-from app.services.registry import commit
+from app.services.registry import commit, person_for_account, account_alias, record_audit
 
 def main():
     parser = argparse.ArgumentParser(description="Crear el primer administrador de Mi Casa")
@@ -30,9 +30,11 @@ def main():
             data = UserCreate(username=args.username, full_name=args.full_name, password=password, role="general_admin")
         except ValidationError:
             parser.error("Revise el usuario (3 a 80 caracteres), nombre y contraseña (12 a 128 caracteres).")
-        user = User(**data.model_dump(exclude={"password", "property_ids"}), password_hash=hash_password(data.password))
+        person, _ = person_for_account(db, data)
+        user = User(**data.model_dump(exclude={"password", "property_ids", "full_name", "person_id", "display_name"}), person=person, display_name=account_alias(data, person), password_hash=hash_password(data.password))
         db.add(user)
-        commit(db, None, "bootstrap", user, ["username", "role"])
+        record_audit(db, None, "create", person, ["full_name", "is_owner"])
+        commit(db, None, "bootstrap", user, ["username", "role", "person_id"])
         print("Administrador creado. Ya puede iniciar sesión.")
 
 if __name__ == "__main__":

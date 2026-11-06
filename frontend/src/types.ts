@@ -10,7 +10,8 @@ export interface User {
   username: string;
   full_name: string;
   role: Role;
-  person_id: number | null;
+  person_id: number;
+  display_name: string | null;
   is_active: boolean;
   property_ids: number[];
 }

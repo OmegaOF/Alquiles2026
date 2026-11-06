@@ -26,6 +26,7 @@ export function Users({
   const [editing, setEditing] = useState<Partial<User> | null>(null);
   const [role, setRole] = useState<Role>("operator");
   const [assigned, setAssigned] = useState<number[]>([]);
+  const [personChoice, setPersonChoice] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -33,6 +34,7 @@ export function Users({
     setEditing(user);
     setRole(user.role || "operator");
     setAssigned(user.property_ids || []);
+    setPersonChoice(user.person_id ? String(user.person_id) : "");
     setError("");
     setNotice("");
   }
@@ -40,6 +42,19 @@ export function Users({
     event.preventDefault();
     setError("");
     const data = new FormData(event.currentTarget);
+    const creatingPerson =
+      personChoice === "new" && !editing?.id && role !== "owner";
+    if (
+      !creatingPerson &&
+      !people.some(
+        (person) =>
+          String(person.id) === personChoice &&
+          (role !== "owner" || person.is_owner),
+      )
+    ) {
+      setError("Selecciona la persona a la que pertenece esta cuenta.");
+      return;
+    }
     if (
       !window.confirm(
         "¿Guardar esta cuenta y sus permisos? La persona podrá acceder a la información autorizada.",
@@ -49,15 +64,15 @@ export function Users({
     const password = String(data.get("password") || "");
     const body: Record<string, unknown> = {
       username: value(data, "username"),
-      full_name: value(data, "full_name"),
+      display_name: value(data, "display_name") || null,
       role,
-      person_id: value(data, "person_id")
-        ? Number(value(data, "person_id"))
-        : null,
+      person_id: personChoice === "new" ? null : Number(personChoice),
       is_active: data.has("is_active"),
       property_ids:
         role === "operator" || role === "property_admin" ? assigned : [],
     };
+    if (personChoice === "new" && !editing?.id)
+      body.full_name = value(data, "full_name");
     if (password) body.password = password;
     setSaving(true);
     try {
@@ -86,12 +101,71 @@ export function Users({
         <ErrorMessage message={error} />
         <form onSubmit={save} key={editing.id || "new"}>
           <div className="form-grid">
-            <Field label="Nombre completo">
-              <input
-                name="full_name"
-                defaultValue={editing.full_name}
-                maxLength={160}
+            <Field
+              label={
+                role === "owner" ? "Propietario vinculado" : "Persona vinculada"
+              }
+              hint={
+                role === "owner"
+                  ? "Selecciona al propietario. Su nombre y sus propiedades determinan el acceso."
+                  : "Cada cuenta pertenece a una persona. Selecciona su registro para mantener un único nombre."
+              }
+            >
+              <select
+                name="person_id"
+                value={personChoice}
                 required
+                onChange={(e) => setPersonChoice(e.target.value)}
+              >
+                <option value="">Seleccionar persona</option>
+                {people
+                  .filter((person) => role !== "owner" || person.is_owner)
+                  .map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.full_name}
+                    </option>
+                  ))}
+                {!editing.id && role !== "owner" && (
+                  <option value="new">Registrar persona nueva</option>
+                )}
+              </select>
+            </Field>
+            {personChoice === "new" && !editing.id && role !== "owner" ? (
+              <Field
+                label="Nombre completo de la persona"
+                hint="Se creará su registro en Personas junto con la cuenta. No se marcará como propietario."
+              >
+                <input
+                  name="full_name"
+                  minLength={2}
+                  maxLength={160}
+                  required
+                  autoComplete="off"
+                />
+              </Field>
+            ) : (
+              <Field
+                label="Nombre de la persona"
+                hint="Este nombre se mantiene en Personas. Para corregirlo, edita allí el registro; se actualizará también en sus cuentas."
+              >
+                <input
+                  value={
+                    people.find((person) => String(person.id) === personChoice)
+                      ?.full_name || ""
+                  }
+                  readOnly
+                  aria-readonly="true"
+                />
+              </Field>
+            )}
+            <Field
+              label="Alias de la cuenta (opcional)"
+              hint="Solo ayuda a identificar esta cuenta. No cambia el nombre ni la identidad de la persona."
+            >
+              <input
+                name="display_name"
+                defaultValue={editing.display_name || ""}
+                maxLength={160}
                 autoComplete="off"
               />
             </Field>
@@ -129,40 +203,24 @@ export function Users({
               <select
                 name="role"
                 value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
+                onChange={(e) => {
+                  const nextRole = e.target.value as Role;
+                  setRole(nextRole);
+                  if (
+                    nextRole === "owner" &&
+                    !people.some(
+                      (person) =>
+                        String(person.id) === personChoice && person.is_owner,
+                    )
+                  )
+                    setPersonChoice("");
+                }}
               >
                 {Object.entries(roleNames).map(([key, name]) => (
                   <option key={key} value={key}>
                     {name}
                   </option>
                 ))}
-              </select>
-            </Field>
-            <Field
-              label={
-                role === "owner"
-                  ? "Propietario vinculado"
-                  : "Persona vinculada (opcional)"
-              }
-              hint={
-                role === "owner"
-                  ? "El acceso se determina por las propiedades de esta persona."
-                  : "Permite relacionar la cuenta con una persona registrada."
-              }
-            >
-              <select
-                name="person_id"
-                defaultValue={editing.person_id || ""}
-                required={role === "owner"}
-              >
-                <option value="">Seleccionar persona</option>
-                {people
-                  .filter((p) => role !== "owner" || p.is_owner)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name}
-                    </option>
-                  ))}
               </select>
             </Field>
             <label className="check">
@@ -245,6 +303,7 @@ export function Users({
           <article key={u.id}>
             <div className="record-main">
               <h2>{u.full_name}</h2>
+              {u.display_name && <p>Alias de la cuenta: {u.display_name}</p>}
               <p>
                 Usuario: {u.username} · {roleNames[u.role]}
               </p>

@@ -102,7 +102,8 @@ class UnitPatch(UnitCreate):
 
 class UserCreate(Input):
     username: str = Field(min_length=3, max_length=80, pattern=r"^[A-Za-z0-9_.@-]+$")
-    full_name: str = Field(min_length=2, max_length=160)
+    full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    display_name: str | None = Field(default=None, max_length=160)
     password: str = Field(min_length=12, max_length=128)
     role: Role
     person_id: int | None = Field(default=None, gt=0)
@@ -114,6 +115,19 @@ class UserCreate(Input):
     def normalize_username(cls, value):
         return value.lower() if value else value
 
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value):
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_identity(self):
+        if self.person_id is None and self.full_name is None:
+            raise ValueError("Seleccione una persona o escriba el nombre completo para crearla.")
+        if self.role == "owner" and self.person_id is None:
+            raise ValueError("Las cuentas de propietario requieren una persona propietaria existente.")
+        return self
+
 class UserPatch(UserCreate):
     username: str | None = Field(default=None, min_length=3, max_length=80, pattern=r"^[A-Za-z0-9_.@-]+$")
     full_name: str | None = Field(default=None, min_length=2, max_length=160)
@@ -121,6 +135,14 @@ class UserPatch(UserCreate):
     role: Role | None = None
     is_active: bool | None = None
     property_ids: list[int] | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_identity(self):
+        if "person_id" in self.model_fields_set and self.person_id is None:
+            raise ValueError("La cuenta debe permanecer vinculada a una persona.")
+        if "full_name" in self.model_fields_set and self.full_name is None:
+            raise ValueError("El nombre completo no puede estar vacío.")
+        return self
 
 class LoginInput(Input):
     username: str = Field(min_length=1, max_length=80)
