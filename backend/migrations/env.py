@@ -5,6 +5,7 @@ from app.db.base import Base
 from app.models import entities  # noqa: F401: registrar modelos
 from app.models import tenancy  # noqa: F401: registrar contratos y reservas
 from app.models import utilities  # noqa: F401: registrar servicios y recibos
+from app.models import finances  # noqa: F401: registrar obligaciones y movimientos
 
 target_metadata = Base.metadata
 

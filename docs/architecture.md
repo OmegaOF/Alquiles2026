@@ -14,7 +14,7 @@ El arranque no depende de MySQL para atender `/health`; `/ready` consulta MySQL 
 
 ## Módulos y fases
 
-Propietarios/propiedades/unidades/usuarios/permisos implementados en fase 1 e identidad normalizada en 1.1. Contratos, reservas y ocupaciones implementados en fase 2. Servicios básicos, recibos y distribución implementados en fase 3. Pendientes: obligaciones y movimientos (fase 4); capital y devoluciones de anticréticos (fase 5); recordatorios y adaptador WhatsApp (fase 6); reportes ECharts/PDF (fase 7). No se instalan anticipadamente dependencias de gráficos, PDF ni mensajería.
+Propietarios/propiedades/unidades/usuarios/permisos implementados en fase 1 e identidad normalizada en 1.1. Contratos, reservas y ocupaciones implementados en fase 2. Servicios básicos, recibos y distribución implementados en fase 3. Obligaciones, pagos, garantías y gastos implementados en fase 4. Pendientes: capital y devoluciones de anticréticos (fase 5); recordatorios y adaptador WhatsApp (fase 6); reportes ECharts/PDF (fase 7). No se instalan anticipadamente dependencias de gráficos, PDF ni mensajería.
 
 Cada fase deberá declarar dependencias y aceptación antes de implementarse. Se detendrá para revisión del usuario antes de iniciar la siguiente.
 
@@ -69,3 +69,13 @@ Las operaciones comparten bloqueo de propiedad con fase 2 y verifican versiones 
 El nombre personal se almacena únicamente en `persons.full_name`. Toda cuenta tiene `users.person_id` obligatorio y puede conservar un `display_name` independiente como alias. El `full_name` de la API es una proyección de la persona, sin columna duplicada en users. Las personas pueden seguir existiendo sin cuentas y varias cuentas pueden vincularse a la misma persona.
 
 Se mantienen ocho tablas y los roles/alcances de fase 1. La ampliación de auditoría a MEDIUMTEXT resuelve capacidad y no se confunde con 3FN. La demostración individual de dependencias, claves, dominios y formas normales está en [phase-1.1-normalization.md](phase-1.1-normalization.md); la migración incremental y recuperación en [phase-1.1-migration.md](phase-1.1-migration.md). Las titularidades con vigencia y los roles por propiedad permanecen fuera de esta modificación.
+
+## Dinero y obligaciones en fase 4
+
+Dieciséis tablas nuevas llevan el esquema a 41 tablas de aplicación. Se separan contexto de titular/casa/moneda, obligaciones, ajustes, gastos, movimientos reales y aplicaciones. Entradas/anticipos, garantías, desembolsos y devoluciones usan subtipos del movimiento, sin repetir importes. Los saldos se derivan; no se guarda otra deuda acumulada cada mes.
+
+Los alquileres se generan con vista previa desde los periodos contractuales. Condiciones incompletas requieren decisión explícita. Los servicios proceden de responsabilidades confirmadas e importaciones versionadas; una corrección libera excesos hacia la misma fuente, sin modificar el dinero recibido. Un gasto de proveedor puede registrarse y pagarse antes del reparto; la importación posterior conserva ese gasto.
+
+Las operaciones económicas conservan clave idempotente, huella y resultado histórico; comparten bloqueo por propiedad con fases anteriores y utilizan lecturas actuales para saldos. Cantidades `DECIMAL(14,2)` y precisión de cálculo 48; dinero real, garantías y aplicaciones no se suman como nuevas entradas entre sí. Pagos directos de inquilinos al proveedor se distinguen de caja del propietario.
+
+`0006_finances` no modifica las migraciones 0001–0005. Datos, dependencias funcionales, restricciones, límites y recuperación: [phase-4.md](phase-4.md). HTTP: [phase-4-api.md](phase-4-api.md); evidencia real: [phase-4-tests.md](phase-4-tests.md). No existen procesos fiscales ni capital de anticrético en este módulo.

@@ -832,6 +832,15 @@ td {
   background: #edf2e8;
   border-radius: 8px;
 }
+.finance-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 22px;
+}
+.finance-values div { padding: 12px; border-bottom: 1px solid #d7dfd6; }
+.finance-values dt { margin-bottom: 8px; }
+.finance-values dd { margin: 0; font-weight: 700; font-size: 21px; }
+.finance-tabs button { flex-basis: 145px; }
 .panel {
   overflow-wrap: anywhere;
 }
