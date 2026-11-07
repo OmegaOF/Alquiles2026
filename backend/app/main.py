@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.registry import router as registry_router
+from app.api.tenancy import router as tenancy_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -26,6 +27,10 @@ async def security_headers(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
+    # Los validadores de negocio proporcionan mensajes fijos, sin repetir datos recibidos.
+    for error in exc.errors():
+        if error.get("type") == "value_error" and isinstance(error.get("ctx", {}).get("error"), ValueError):
+            return JSONResponse(status_code=422, content={"detail": str(error["ctx"]["error"])})
     return JSONResponse(status_code=422, content={"detail": "Revise los campos indicados: complete los obligatorios y respete el formato y longitud permitidos.", "fields": sorted({str(e["loc"][-1]) for e in exc.errors()})})
 
 @app.exception_handler(IntegrityError)
@@ -36,3 +41,4 @@ async def integrity_error(request: Request, exc: IntegrityError):
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(registry_router, prefix="/api/v1")
+app.include_router(tenancy_router, prefix="/api/v1")

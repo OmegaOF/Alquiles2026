@@ -144,7 +144,7 @@ export function People({
           <p className="muted">
             {canEdit
               ? "Un registro por persona, tenga o no una cuenta de acceso."
-              : "Propietarios de las propiedades que tienes autorizadas."}
+              : "Personas vinculadas a las propiedades que tienes autorizadas."}
           </p>
         </div>
         {canEdit && (
