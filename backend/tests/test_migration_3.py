@@ -53,7 +53,7 @@ def migration_db3():
         yield url, engine
     finally:
         reset(engine)
-        migrate(url)
+        migrate(url, target="head")
         engine.dispose()
 
 

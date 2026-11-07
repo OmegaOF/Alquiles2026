@@ -1,0 +1,23 @@
+
+> alquiles-frontend@0.1.0 test:e2e
+> playwright test finances.spec.ts
+
+
+Running 10 tests using 1 worker
+
+(node:87542) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [escritorio] › e2e/finances.spec.ts:168:1 › alquiler, pago parcial, sobrante explícito y aplicación posterior de anticipo (3.6s)
+  ✓   2 [escritorio] › e2e/finances.spec.ts:233:1 › garantía separada, aplicación autorizada, devolución y gasto pagado parcialmente (4.2s)
+  ✓   3 [escritorio] › e2e/finances.spec.ts:411:1 › recibo externo 300, pago al proveedor y recuperación real de 70 más 150 (3.0s)
+  ✓   4 [escritorio] › e2e/finances.spec.ts:476:1 › pago directo documentado del inquilino no inventa caja del propietario (2.2s)
+  ✓   5 [escritorio] › e2e/finances.spec.ts:516:1 › gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto al importar (3.4s)
+(node:88125) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   6 [movil] › e2e/finances.spec.ts:168:1 › alquiler, pago parcial, sobrante explícito y aplicación posterior de anticipo (3.7s)
+  ✓   7 [movil] › e2e/finances.spec.ts:233:1 › garantía separada, aplicación autorizada, devolución y gasto pagado parcialmente (4.2s)
+  ✓   8 [movil] › e2e/finances.spec.ts:411:1 › recibo externo 300, pago al proveedor y recuperación real de 70 más 150 (3.0s)
+  ✓   9 [movil] › e2e/finances.spec.ts:476:1 › pago directo documentado del inquilino no inventa caja del propietario (2.6s)
+  ✓  10 [movil] › e2e/finances.spec.ts:516:1 › gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto al importar (3.5s)
+
+  10 passed (34.9s)

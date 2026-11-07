@@ -1,8 +1,8 @@
 # Mi Casa · Administración de propiedades
 
-Fase 3: servicios básicos, suministros, medidores, recibos de proveedores y distribución de gastos, sobre los contratos, reservas e identidad normalizada de las fases anteriores. Backend FastAPI/SQLAlchemy/MySQL y frontend React 18/TypeScript, independientes de Pisco Ñawi y del sistema antiguo. Se conservan responsabilidades económicas e historial; pagos efectivos, deudas, capital anticrético y recordatorios se desarrollarán en sus fases correspondientes. No se emiten documentos comerciales o tributarios.
+Fase 4: importes por cobrar, pagos recibidos, deudas, anticipos, garantías, gastos y desembolsos reales, sobre los contratos y servicios de las fases anteriores. Backend FastAPI/SQLAlchemy/MySQL y frontend React 18/TypeScript, independientes de Pisco Ñawi y del sistema antiguo. Obligaciones, dinero real y aplicaciones se conservan separados y con historial. Capital anticrético y recordatorios siguen pendientes. No se emiten documentos comerciales o tributarios.
 
-Entrega, esquema 3FN, pruebas y capturas: [informe de fase 3](docs/phase-3.md), [resultados de pruebas](docs/phase-3-tests.md) y [API de fase 3](docs/phase-3-api.md). Entrega anterior: [fase 2](docs/phase-2.md).
+Entrega, esquema 3FN, pruebas y capturas: [informe de fase 4](docs/phase-4.md), [resultados de pruebas](docs/phase-4-tests.md) y [API de fase 4](docs/phase-4-api.md). Entrega anterior: [fase 3](docs/phase-3.md).
 
 ## Requisitos e instalación
 
@@ -22,7 +22,7 @@ cd backend
 
 El último comando pide y confirma una contraseña de **12 a 128 caracteres**, sin mostrarla. No existe una contraseña inicial predeterminada. Solo permite crear el primer administrador; después las cuentas se crean desde la interfaz. No pasar contraseñas como argumentos ni guardarlas en archivos versionados. `.env.example` solo contiene valores públicos para la base local de desarrollo; `.env` queda excluido de Git.
 
-**Bases existentes:** antes de aplicar migraciones, detener escritores, hacer y verificar un respaldo y leer [recuperación de 0003](docs/phase-1.1-migration.md), [migración 0004](docs/phase-2.md#migración-y-recuperación) y [migración 0005](docs/phase-3.md#migración-y-recuperación). MySQL no revierte automáticamente todos los DDL. Revisar las migraciones antes de aplicarlas. Las pruebas usaron únicamente bases descartables, nuevas y con datos ficticios representativos. No migrar bases de otros proyectos.
+**Bases existentes:** antes de aplicar migraciones, detener escritores, hacer y verificar un respaldo y leer [recuperación de 0003](docs/phase-1.1-migration.md), [migración 0004](docs/phase-2.md#migración-y-recuperación), [migración 0005](docs/phase-3.md#migración-y-recuperación) y [migración 0006](docs/phase-4.md#migración-y-recuperación). MySQL no revierte automáticamente todos los DDL. Revisar las migraciones antes de aplicarlas. Las pruebas usaron únicamente bases descartables, nuevas y con datos ficticios representativos. No migrar bases de otros proyectos.
 
 ## Arranque y navegador
 
@@ -57,6 +57,8 @@ Para un dominio de desarrollo remoto, añadir su origen exacto a `CORS_ORIGINS` 
 11. **Ocupantes e historial:** consulta las personas actuales y las estancias finalizadas, con cambios de fechas y personas. Los inquilinos pueden registrarse en los formularios sin cuentas de usuario.
 12. **Servicios básicos:** selecciona casa y registra suministros, sus cuartos o casa completa y responsables previstos. En **Medidores y lecturas** registra equipos, valores o reemplazos. Los servicios fijos pueden funcionar sin medidor.
 13. **Recibos y distribución:** copia un recibo existente del proveedor, elige método, calcula y revisa importes/días. Un administrador confirma; los casos ambiguos requieren resolución justificada. **Historial de servicios** conserva correcciones y repartos anteriores. Registrar o confirmar un reparto no registra un pago.
+14. **Pagos y gastos:** selecciona casa. En **Por cobrar**, genera alquileres con vista previa o importa repartos confirmados. En **Registrar pago**, selecciona titular, pagador real y conceptos que cubre. El sobrante requiere elección expresa; **Anticipos** permite aplicarlo después sin registrar otra entrada.
+15. **Garantías y gastos:** registra garantías separadas de renta; su aplicación/devolución exige autorización. Registra gastos y luego sus pagos reales, incluso parciales. **Recuperación de servicios** permite pagar un recibo antes de repartirlo y distingue el pago al proveedor de lo recibido después del inquilino. Consulta resumen por moneda e historial; instrucciones completas en el informe de fase 4.
 
 ## Permisos iniciales
 
@@ -99,11 +101,11 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 # Si no está instalado: npx playwright install chromium; npm run test:e2e
 ```
 
-Las pruebas adicionales de migración requieren `PHASE11_MIGRATION_DATABASE_URL`, `PHASE2_MIGRATION_DATABASE_URL` y `PHASE3_MIGRATION_DATABASE_URL`, con bases descartables terminadas en `_test`; pueden compartir una base de CI solo cuando se ejecutan secuencialmente. Para ejecutar todas las comprobaciones, configura las tres y `PHASE1_TEST_DATABASE_URL`; revisa que no aparezcan omisiones. No ejecutes pruebas que recrean tablas mientras utilizas el navegador contra la misma base.
+Las pruebas adicionales de migración requieren `PHASE11_MIGRATION_DATABASE_URL`, `PHASE2_MIGRATION_DATABASE_URL`, `PHASE3_MIGRATION_DATABASE_URL` y `PHASE4_MIGRATION_DATABASE_URL`, con bases descartables terminadas en `_test`; pueden compartir una base de CI solo cuando se ejecutan secuencialmente. Para ejecutar todas las comprobaciones, configura las cuatro y `PHASE1_TEST_DATABASE_URL`; revisa que no aparezcan omisiones. No ejecutes pruebas que recrean tablas mientras utilizas el navegador contra la misma base.
 
 Para regenerar las capturas de fase 2 con datos ficticios: `CAPTURE_PHASE2_SCREENSHOTS=1 npm run test:e2e -- tenancy.spec.ts` desde frontend, con las mismas credenciales temporales y Chromium configurados.
 
-Las capturas de fase 3 se regeneran con `CAPTURE_PHASE3_SCREENSHOTS=1 npm run test:e2e -- utilities.spec.ts`. La entrega final tiene 221 pruebas backend, 28 React y 28 recorridos de navegador aprobados; ver [registro completo](docs/phase-3-tests.md).
+Las capturas de fase 3 se regeneran con `CAPTURE_PHASE3_SCREENSHOTS=1 npm run test:e2e -- utilities.spec.ts`. Las de fase 4 usan `CAPTURE_PHASE4_SCREENSHOTS=1 npm run test:e2e -- finances.spec.ts`. La entrega de fase 4 tiene 276 pruebas backend, 34 React y 38 recorridos de navegador aprobados; ver [registro completo](docs/phase-4-tests.md).
 
 La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La configuración de CI ejecuta estos pasos sobre MySQL descartable, sin credenciales de usuarios reales.
 
@@ -111,7 +113,7 @@ La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La con
 
 - `backend/app/{models,schemas,services,api}`: persistencia, validación, reglas y rutas separadas.
 - `backend/app/core`: configuración, contraseñas y reloj UTC; `bootstrap.py`: primera cuenta.
-- `backend/migrations`: `0001_baseline`, `0002_phase1`, `0003_identity`, `0004_tenancy` y `0005_utilities`.
+- `backend/migrations`: `0001_baseline`, `0002_phase1`, `0003_identity`, `0004_tenancy`, `0005_utilities` y `0006_finances`.
 - `frontend/src/pages`: propiedades/cuarto, personas y usuarios; `components`: formularios comunes.
 - `backend/tests`, `frontend/tests`, `frontend/e2e`: automatización de validaciones.
 - `docs/phase-1.md`: entrega histórica de fase 1.
@@ -122,6 +124,8 @@ La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La con
 - `docs/phase-2.md`, `docs/phase-2-api.md`: entrega y operaciones de fase 2; `docs/screenshots/phase-2-*`: capturas.
 - `backend/app/{models,schemas,services,api}/utilities.py`, `services/utility_math.py`, `services/utility_distribution.py`: suministros, recibos y reparto exacto con historial.
 - `frontend/src/pages/utilities`: configuración, medidores, recibos, revisión y confirmación; `docs/phase-3*.md` y `docs/screenshots/phase-3-*`: entrega y capturas.
+- `backend/app/{models,schemas,services,api}/finances.py`, `services/finance_periods.py`: obligaciones, dinero y aplicaciones con trazabilidad.
+- `frontend/src/pages/Finances.tsx`, `pages/finances/Forms.tsx`: módulo económico; `docs/phase-4*.md` y `docs/screenshots/phase-4-*`: entrega.
 
 Desde backend: `../.venv/bin/alembic revision --autogenerate -m "descripción"`; revisar siempre el resultado antes de `upgrade head`. No usar `create_all` para actualizar bases de aplicación. `downgrade` de fase 1 elimina sus tablas y solo debe probarse en bases descartables.
 
@@ -129,4 +133,4 @@ Las dependencias están fijadas mediante `backend/requirements.lock` y `frontend
 
 ## Límites de despliegue
 
-El límite de intentos de acceso es de diez por IP y cinco minutos, en memoria por proceso. Para varios procesos o servidores requiere un almacén compartido o control en el proxy. La revisión integral de seguridad, recuperación de contraseña por canales externos y accesibilidad con usuarios mayores no se entregan como certificadas. No se implementan envíos ni servicios externos. La fase 4 requiere aprobación expresa.
+El límite de intentos de acceso es de diez por IP y cinco minutos, en memoria por proceso. Para varios procesos o servidores requiere un almacén compartido o control en el proxy. La revisión integral de seguridad, recuperación de contraseña por canales externos y accesibilidad con usuarios mayores no se entregan como certificadas. No se implementan envíos ni servicios externos. La fase 5 requiere aprobación expresa. Los excesos pagados a proveedores se distinguen como devoluciones pendientes; no se registran devoluciones externas automáticas.
