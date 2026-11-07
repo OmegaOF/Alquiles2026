@@ -319,7 +319,7 @@ export function Tenancy({
               <div className="table-scroll">
                 <table>
                   <caption>
-                    Periodos contractuales · no son facturas ni periodos de
+                    Periodos contractuales · no son recibos ni periodos de
                     servicios
                   </caption>
                   <thead>
@@ -387,7 +387,7 @@ export function Tenancy({
           </p>
           <p>Observaciones: {selected.notes || "Sin observaciones."}</p>
           <p className="permission-note">
-            Esta pantalla registra acuerdos. No crea deudas, facturas, pagos ni
+            Esta pantalla registra acuerdos. No crea deudas, recibos, pagos ni
             cargos adicionales de servicios.
           </p>
         </div>

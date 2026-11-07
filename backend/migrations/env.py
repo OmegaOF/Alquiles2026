@@ -4,6 +4,7 @@ from app.core.config import get_settings
 from app.db.base import Base
 from app.models import entities  # noqa: F401: registrar modelos
 from app.models import tenancy  # noqa: F401: registrar contratos y reservas
+from app.models import utilities  # noqa: F401: registrar servicios y recibos
 
 target_metadata = Base.metadata
 

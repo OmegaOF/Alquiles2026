@@ -14,7 +14,7 @@ El arranque no depende de MySQL para atender `/health`; `/ready` consulta MySQL 
 
 ## Módulos y fases
 
-Propietarios/propiedades/unidades/usuarios/permisos implementados en fase 1 e identidad normalizada en 1.1. Contratos, reservas y ocupaciones implementados en fase 2. Pendientes: servicios y distribución (fase 3); obligaciones y movimientos (fase 4); capital y devoluciones de anticréticos (fase 5); recordatorios y adaptador WhatsApp (fase 6); reportes ECharts/PDF (fase 7). No se instalan anticipadamente dependencias de gráficos, PDF ni mensajería.
+Propietarios/propiedades/unidades/usuarios/permisos implementados en fase 1 e identidad normalizada en 1.1. Contratos, reservas y ocupaciones implementados en fase 2. Servicios básicos, recibos y distribución implementados en fase 3. Pendientes: obligaciones y movimientos (fase 4); capital y devoluciones de anticréticos (fase 5); recordatorios y adaptador WhatsApp (fase 6); reportes ECharts/PDF (fase 7). No se instalan anticipadamente dependencias de gráficos, PDF ni mensajería.
 
 Cada fase deberá declarar dependencias y aceptación antes de implementarse. Se detendrá para revisión del usuario antes de iniciar la siguiente.
 
@@ -22,9 +22,9 @@ Cada fase deberá declarar dependencias y aceptación antes de implementarse. Se
 
 - Roles y autorización por propietario se validarán en el backend, con pruebas de acceso cruzado. Implementados en fase 1 mediante sesiones opacas y alcance por propiedad.
 - Dinero con Decimal y columnas Numeric; moneda explícita. Capital de anticrético separado de ingreso ordinario.
-- Fechas de ocupación y de factura independientes; reglas de conteo explícitas. Fechas de calendario sin conversión inadvertida de zona; instantes de auditoría en UTC.
+- Fechas de ocupación y de recibo independientes; reglas de conteo explícitas. Fechas de calendario sin conversión inadvertida de zona; instantes de auditoría en UTC.
 - Transacciones e idempotencia respaldada por restricciones únicas para operaciones económicas; auditoría de anulaciones y ajustes.
-- Repartos de servicios conservarán factura, versión confirmada y ajustes. Las ambigüedades requieren intervención manual.
+- Repartos de servicios conservan recibo, versión confirmada y ajustes. Las ambigüedades requieren intervención manual.
 - Integración WhatsApp inicial solo Click to Chat con consentimiento, vista previa y confirmación manual; ningún envío automático.
 - No hay dependencia del proyecto Pisco Ñawi ni de bases existentes. No se ha recibido su arquitectura detallada; se sigue la tecnología y separación especificadas por el usuario.
 
@@ -52,7 +52,17 @@ Cada contrato o reserva apunta exactamente a una casa completa **o** a una unida
 
 Todas las escrituras de contratos/reservas se serializan mediante el bloqueo de la fila de propiedad, compartido con las modificaciones de propiedad/unidad de fase 1. Las comprobaciones críticas usan `FOR UPDATE` para ver las últimas filas confirmadas incluso bajo REPEATABLE READ de MySQL. La conversión reserva→contrato utiliza una única transacción y `UNIQUE(source_reservation_id)`.
 
-La fase 2 conserva condiciones con `DECIMAL(14,2)` y deriva conteos/periodos; no crea facturas, deudas, pagos ni reparto de servicios. Reglas, estados, permisos, dependencias funcionales, migración y límites: [phase-2.md](phase-2.md) y [phase-2-api.md](phase-2-api.md).
+La fase 2 conserva condiciones con `DECIMAL(14,2)` y deriva conteos/periodos; no crea recibos, deudas, pagos ni reparto de servicios. Reglas, estados, permisos, dependencias funcionales, migración y límites: [phase-2.md](phase-2.md) y [phase-2-api.md](phase-2-api.md).
+
+## Servicios básicos y distribución en fase 3
+
+Doce tablas nuevas llevan el esquema a 25 tablas de aplicación. Se separan catálogo, suministro, medidor físico/lectura, configuración versionada, identidad/revisión del recibo, distribución, base por espacio y responsabilidades por persona/contrato. Una referencia con PK por recibo conserva la única distribución vigente. La migración `0005_utilities` no altera las cuatro anteriores.
+
+La secuencia es recibo externo → base por espacio → contratos históricos del periodo → condiciones → regla de 15 días → diferencia del propietario → revisión/confirmación. Diario y servicios incluidos siempre excluyen gastos adicionales al ocupante. La casa completa representa un espacio, sin duplicación entre cuartos. Personas-día y lecturas tienen reglas explícitas; los datos insuficientes o incompatibles obligan a revisión.
+
+Los importes usan `Decimal`, residuos de centavos deterministas y comprobación exacta de sumas. La persona responsable, el pagador previsto del proveedor y el beneficiario previsto de reintegros son decisiones independientes. No existen pagos efectivos, deudas ni emisión comercial/tributaria. No se deducen responsabilidades desde participaciones de copropiedad.
+
+Las operaciones comparten bloqueo de propiedad con fase 2 y verifican versiones y fuentes actuales antes de confirmar. Las correcciones crean revisiones/ajustes, conservando datos aprobados y evidencia histórica. Detalle de tablas, claves, dependencias funcionales y frontera del documento de evidencia: [phase-3.md](phase-3.md). Rutas y contratos HTTP: [phase-3-api.md](phase-3-api.md); validación real: [phase-3-tests.md](phase-3-tests.md).
 
 ## Identidad normalizada en fase 1.1
 

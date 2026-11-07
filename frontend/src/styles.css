@@ -801,6 +801,40 @@ td {
 .record-list .history-item {
   display: block;
 }
+.utility-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0 32px;
+}
+.utility-tabs button {
+  flex: 1 1 190px;
+}
+.utility-spaces {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+  margin: 24px 0;
+}
+.utility-space {
+  border: 1px solid #b3c1b7;
+  padding: 22px;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.utility-space h4 {
+  font-size: 21px;
+  margin: 0 0 16px;
+}
+.utility-total {
+  font-size: 19px;
+  padding: 18px;
+  background: #edf2e8;
+  border-radius: 8px;
+}
+.panel {
+  overflow-wrap: anywhere;
+}
 details summary {
   cursor: pointer;
   padding: 14px 0;

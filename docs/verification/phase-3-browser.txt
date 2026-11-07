@@ -1,0 +1,41 @@
+
+> alquiles-frontend@0.1.0 test:e2e
+> playwright test
+
+
+Running 28 tests using 1 worker
+
+(node:23847) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [escritorio] › e2e/connection.spec.ts:7:1 › inicio conecta React con FastAPI y MySQL sin desbordar la pantalla (644ms)
+  ✓   2 [escritorio] › e2e/connection.spec.ts:27:1 › un error permite reintentar y recuperar la conexión (545ms)
+  ✓   3 [escritorio] › e2e/registry.spec.ts:4:1 › iniciar sesión, cerrar sesión y rechazar credenciales incorrectas (620ms)
+  ✓   4 [escritorio] › e2e/registry.spec.ts:41:1 › registrar y editar persona, propiedad y cuartos desde React (1.4s)
+  ✓   5 [escritorio] › e2e/registry.spec.ts:117:1 › el propietario solo ve sus casas y no acciones de administración (585ms)
+  ✓   6 [escritorio] › e2e/registry.spec.ts:172:1 › la sesión funciona también al entrar por localhost (595ms)
+  ✓   7 [escritorio] › e2e/registry.spec.ts:192:1 › administrar una cuenta y asignar permisos desde React (954ms)
+  ✓   8 [escritorio] › e2e/registry.spec.ts:261:1 › el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias (746ms)
+  ✓   9 [escritorio] › e2e/tenancy.spec.ts:88:1 › contrato diario guiado, modificación, prórroga y disponibilidad por cuarto (1.9s)
+  ✓  10 [escritorio] › e2e/tenancy.spec.ts:188:1 › reserva desde React, persona sin cuenta, confirmación y conversión en contrato (1.7s)
+  ✓  11 [escritorio] › e2e/tenancy.spec.ts:258:1 › finalización anticipada conserva personas e historial y actualiza la vista de la casa (1.2s)
+  ✓  12 [escritorio] › e2e/utilities.spec.ts:122:1 › servicio, recibo externo, ejemplo 14/15 días y corrección con historial (2.0s)
+  ✓  13 [escritorio] › e2e/utilities.spec.ts:267:1 › lecturas válidas e inválidas, reemplazo y consumo de dos medidores (1.9s)
+  ✓  14 [escritorio] › e2e/utilities.spec.ts:365:1 › contratos sucesivos exigen revisión manual antes de confirmar (1.4s)
+(node:24504) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  15 [movil] › e2e/connection.spec.ts:7:1 › inicio conecta React con FastAPI y MySQL sin desbordar la pantalla (507ms)
+  ✓  16 [movil] › e2e/connection.spec.ts:27:1 › un error permite reintentar y recuperar la conexión (549ms)
+  ✓  17 [movil] › e2e/registry.spec.ts:4:1 › iniciar sesión, cerrar sesión y rechazar credenciales incorrectas (608ms)
+  ✓  18 [movil] › e2e/registry.spec.ts:41:1 › registrar y editar persona, propiedad y cuartos desde React (1.2s)
+  ✓  19 [movil] › e2e/registry.spec.ts:117:1 › el propietario solo ve sus casas y no acciones de administración (571ms)
+  ✓  20 [movil] › e2e/registry.spec.ts:172:1 › la sesión funciona también al entrar por localhost (621ms)
+  ✓  21 [movil] › e2e/registry.spec.ts:192:1 › administrar una cuenta y asignar permisos desde React (931ms)
+  ✓  22 [movil] › e2e/registry.spec.ts:261:1 › el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias (762ms)
+  ✓  23 [movil] › e2e/tenancy.spec.ts:88:1 › contrato diario guiado, modificación, prórroga y disponibilidad por cuarto (2.0s)
+  ✓  24 [movil] › e2e/tenancy.spec.ts:188:1 › reserva desde React, persona sin cuenta, confirmación y conversión en contrato (1.8s)
+  ✓  25 [movil] › e2e/tenancy.spec.ts:258:1 › finalización anticipada conserva personas e historial y actualiza la vista de la casa (1.2s)
+  ✓  26 [movil] › e2e/utilities.spec.ts:122:1 › servicio, recibo externo, ejemplo 14/15 días y corrección con historial (1.9s)
+  ✓  27 [movil] › e2e/utilities.spec.ts:267:1 › lecturas válidas e inválidas, reemplazo y consumo de dos medidores (1.8s)
+  ✓  28 [movil] › e2e/utilities.spec.ts:365:1 › contratos sucesivos exigen revisión manual antes de confirmar (1.3s)
+
+  28 passed (33.4s)

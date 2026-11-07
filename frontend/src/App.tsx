@@ -6,6 +6,7 @@ import { Properties } from "./pages/Properties";
 import { People } from "./pages/People";
 import { Users } from "./pages/Users";
 import { Tenancy } from "./pages/Tenancy";
+import { Utilities } from "./pages/Utilities";
 import { ErrorMessage, Field, errorText } from "./components/Form";
 export { PhaseZero } from "./PhaseZero";
 
@@ -167,7 +168,8 @@ type Page =
   | "contracts"
   | "reservations"
   | "availability"
-  | "occupancy";
+  | "occupancy"
+  | "utilities";
 function Workspace({
   user,
   onLogout,
@@ -240,6 +242,7 @@ function Workspace({
     ["reservations", "Reservas"],
     ["availability", "Disponibilidad"],
     ["occupancy", "Ocupantes e historial"],
+    ["utilities", "Servicios básicos"],
   ];
   if (general) links.push(["users", "Usuarios y permisos"]);
   return (
@@ -327,6 +330,8 @@ function Workspace({
               people={people}
               refreshPeople={refresh}
             />
+          ) : page === "utilities" ? (
+            <Utilities user={user} properties={properties} people={people} />
           ) : page === "users" && general ? (
             <Users
               users={users}

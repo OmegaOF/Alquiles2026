@@ -49,7 +49,18 @@ def db(request):
     app.dependency_overrides[get_db] = override
     yield engine
     app.dependency_overrides.pop(get_db, None)
-    Base.metadata.drop_all(engine)
+    if engine.dialect.name == 'sqlite':
+        # Solo limpieza del fixture: SQLite trata DROP de tablas con auto-FK
+        # RESTRICT como DELETE. Durante toda la prueba las FK siguen activas.
+        with engine.connect() as connection:
+            connection.exec_driver_sql('PRAGMA foreign_keys=OFF')
+            connection.commit()
+            Base.metadata.drop_all(connection)
+            connection.commit()
+            connection.exec_driver_sql('PRAGMA foreign_keys=ON')
+            connection.commit()
+    else:
+        Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     engine.dispose()
 
