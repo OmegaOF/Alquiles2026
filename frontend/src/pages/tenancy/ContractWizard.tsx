@@ -630,7 +630,7 @@ export function ContractWizard({
               </Field>
             </div>
             <p className="muted">
-              Los periodos del alquiler son independientes de las facturas de
+              Los periodos del alquiler son independientes de las recibos de
               agua, luz u otros servicios. No se calculan cobros de servicios en
               esta etapa.
             </p>

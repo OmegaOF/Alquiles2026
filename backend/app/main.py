@@ -7,6 +7,7 @@ from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.registry import router as registry_router
 from app.api.tenancy import router as tenancy_router
+from app.api.utilities import router as utilities_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -42,3 +43,4 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(registry_router, prefix="/api/v1")
 app.include_router(tenancy_router, prefix="/api/v1")
+app.include_router(utilities_router, prefix="/api/v1")
