@@ -1,0 +1,2 @@
+# Conservar los PDF de evidencia byte por byte y mostrarlos como binarios.
+docs/pdf/phase-7/*.pdf binary

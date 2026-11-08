@@ -1,0 +1,94 @@
+
+> alquiles-frontend@0.1.0 test:e2e
+> playwright test --reporter=line
+
+
+Running 78 tests using 1 worker
+
+(node:110082) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/78] [escritorio] › e2e/anticreticos.spec.ts:200:1 › capital acordado, entregas y devoluciones parciales sin ingresos ordinarios
+[2/78] [escritorio] › e2e/anticreticos.spec.ts:262:1 › titulares y responsables expresos, sin deducir importes de copropiedad
+[3/78] [escritorio] › e2e/anticreticos.spec.ts:367:1 › correcciones, condiciones históricas, prórroga y liquidación independiente
+[4/78] [escritorio] › e2e/anticreticos.spec.ts:472:1 › fin de ocupación y restitución no cancelan deuda de servicios
+[5/78] [escritorio] › e2e/anticreticos.spec.ts:568:1 › propietario consulta y operador solo prepara entregas en sus casas
+[6/78] [escritorio] › e2e/connection.spec.ts:7:1 › inicio conecta React con FastAPI y MySQL sin desbordar la pantalla
+[7/78] [escritorio] › e2e/connection.spec.ts:27:1 › un error permite reintentar y recuperar la conexión
+[8/78] [escritorio] › e2e/finances.spec.ts:168:1 › alquiler, pago parcial, sobrante explícito y aplicación posterior de anticipo
+[9/78] [escritorio] › e2e/finances.spec.ts:233:1 › garantía separada, aplicación autorizada, devolución y gasto pagado parcialmente
+[10/78] [escritorio] › e2e/finances.spec.ts:411:1 › recibo externo 300, pago al proveedor y recuperación real de 70 más 150
+[11/78] [escritorio] › e2e/finances.spec.ts:476:1 › pago directo documentado del inquilino no inventa caja del propietario
+[12/78] [escritorio] › e2e/finances.spec.ts:516:1 › gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto al importar
+[13/78] [escritorio] › e2e/registry.spec.ts:4:1 › iniciar sesión, cerrar sesión y rechazar credenciales incorrectas
+[14/78] [escritorio] › e2e/registry.spec.ts:41:1 › registrar y editar persona, propiedad y cuartos desde React
+[15/78] [escritorio] › e2e/registry.spec.ts:117:1 › el propietario solo ve sus casas y no acciones de administración
+[16/78] [escritorio] › e2e/registry.spec.ts:172:1 › la sesión funciona también al entrar por localhost
+[17/78] [escritorio] › e2e/registry.spec.ts:192:1 › administrar una cuenta y asignar permisos desde React
+[18/78] [escritorio] › e2e/registry.spec.ts:261:1 › el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
+[19/78] [escritorio] › e2e/reminders.spec.ts:197:1 › saldo parcial, vencimientos y atención no crean otra deuda
+[20/78] [escritorio] › e2e/reminders.spec.ts:243:1 › consentimiento expreso, edición, apertura, envío manual y corrección conservan historia
+[21/78] [escritorio] › e2e/reminders.spec.ts:355:1 › un cambio de saldo bloquea el texto viejo y permite prepararlo otra vez
+[22/78] [escritorio] › e2e/reminders.spec.ts:391:1 › servicios: obligación, pago al proveedor y recuperación parcial se distinguen
+[23/78] [escritorio] › e2e/reminders.spec.ts:480:1 › reportar un pago no mueve dinero; verificar vincula el ingreso existente
+[24/78] [escritorio] › e2e/reminders.spec.ts:542:1 › capital pendiente sigue visible después de finalizar la ocupación y desaparece al liquidar
+[25/78] [escritorio] › e2e/reminders.spec.ts:624:1 › preferencias, plantillas y contrato usan configuración de la casa
+[26/78] [escritorio] › e2e/reminders.spec.ts:679:1 › operador y propietario respetan permisos sin confirmar envíos ajenos ni verificar dinero
+[27/78] [escritorio] › e2e/reports.spec.ts:334:1 › dashboard, API y PDF concilian con monedas y capital separados
+[28/78] [escritorio] › e2e/reports.spec.ts:408:1 › diez reportes accesibles y capturas por tipo
+[29/78] [escritorio] › e2e/reports.spec.ts:464:1 › cambios consecutivos de filtros y gráficos no producen errores de ciclo de vida
+[30/78] [escritorio] › e2e/reports.spec.ts:487:1 › un pago posterior obliga a actualizar antes de descargar el PDF
+[31/78] [escritorio] › e2e/reports.spec.ts:512:1 › vacío, error recuperable, teclado y ausencia de desbordamiento
+[32/78] [escritorio] › e2e/reports.spec.ts:553:1 › operador no obtiene reportes ni PDF de otra propiedad
+[33/78] [escritorio] › e2e/reports.spec.ts:588:1 › lectura concurrente con un pago mantiene una instantánea conciliada en MySQL
+[34/78] [escritorio] › e2e/tenancy.spec.ts:88:1 › contrato diario guiado, modificación, prórroga y disponibilidad por cuarto
+[35/78] [escritorio] › e2e/tenancy.spec.ts:188:1 › reserva desde React, persona sin cuenta, confirmación y conversión en contrato
+[36/78] [escritorio] › e2e/tenancy.spec.ts:258:1 › finalización anticipada conserva personas e historial y actualiza la vista de la casa
+[37/78] [escritorio] › e2e/utilities.spec.ts:122:1 › servicio, recibo externo, ejemplo 14/15 días y corrección con historial
+[38/78] [escritorio] › e2e/utilities.spec.ts:267:1 › lecturas válidas e inválidas, reemplazo y consumo de dos medidores
+[39/78] [escritorio] › e2e/utilities.spec.ts:365:1 › contratos sucesivos exigen revisión manual antes de confirmar
+(node:117155) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[40/78] [movil] › e2e/anticreticos.spec.ts:200:1 › capital acordado, entregas y devoluciones parciales sin ingresos ordinarios
+[41/78] [movil] › e2e/anticreticos.spec.ts:262:1 › titulares y responsables expresos, sin deducir importes de copropiedad
+[42/78] [movil] › e2e/anticreticos.spec.ts:367:1 › correcciones, condiciones históricas, prórroga y liquidación independiente
+[43/78] [movil] › e2e/anticreticos.spec.ts:472:1 › fin de ocupación y restitución no cancelan deuda de servicios
+[44/78] [movil] › e2e/anticreticos.spec.ts:568:1 › propietario consulta y operador solo prepara entregas en sus casas
+[45/78] [movil] › e2e/connection.spec.ts:7:1 › inicio conecta React con FastAPI y MySQL sin desbordar la pantalla
+[46/78] [movil] › e2e/connection.spec.ts:27:1 › un error permite reintentar y recuperar la conexión
+[47/78] [movil] › e2e/finances.spec.ts:168:1 › alquiler, pago parcial, sobrante explícito y aplicación posterior de anticipo
+[48/78] [movil] › e2e/finances.spec.ts:233:1 › garantía separada, aplicación autorizada, devolución y gasto pagado parcialmente
+[49/78] [movil] › e2e/finances.spec.ts:411:1 › recibo externo 300, pago al proveedor y recuperación real de 70 más 150
+[50/78] [movil] › e2e/finances.spec.ts:476:1 › pago directo documentado del inquilino no inventa caja del propietario
+[51/78] [movil] › e2e/finances.spec.ts:516:1 › gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto al importar
+[52/78] [movil] › e2e/registry.spec.ts:4:1 › iniciar sesión, cerrar sesión y rechazar credenciales incorrectas
+[53/78] [movil] › e2e/registry.spec.ts:41:1 › registrar y editar persona, propiedad y cuartos desde React
+[54/78] [movil] › e2e/registry.spec.ts:117:1 › el propietario solo ve sus casas y no acciones de administración
+[55/78] [movil] › e2e/registry.spec.ts:172:1 › la sesión funciona también al entrar por localhost
+[56/78] [movil] › e2e/registry.spec.ts:192:1 › administrar una cuenta y asignar permisos desde React
+[57/78] [movil] › e2e/registry.spec.ts:261:1 › el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
+[58/78] [movil] › e2e/reminders.spec.ts:197:1 › saldo parcial, vencimientos y atención no crean otra deuda
+[59/78] [movil] › e2e/reminders.spec.ts:243:1 › consentimiento expreso, edición, apertura, envío manual y corrección conservan historia
+[60/78] [movil] › e2e/reminders.spec.ts:355:1 › un cambio de saldo bloquea el texto viejo y permite prepararlo otra vez
+[61/78] [movil] › e2e/reminders.spec.ts:391:1 › servicios: obligación, pago al proveedor y recuperación parcial se distinguen
+[62/78] [movil] › e2e/reminders.spec.ts:480:1 › reportar un pago no mueve dinero; verificar vincula el ingreso existente
+[63/78] [movil] › e2e/reminders.spec.ts:542:1 › capital pendiente sigue visible después de finalizar la ocupación y desaparece al liquidar
+[64/78] [movil] › e2e/reminders.spec.ts:624:1 › preferencias, plantillas y contrato usan configuración de la casa
+[65/78] [movil] › e2e/reminders.spec.ts:679:1 › operador y propietario respetan permisos sin confirmar envíos ajenos ni verificar dinero
+[66/78] [movil] › e2e/reports.spec.ts:334:1 › dashboard, API y PDF concilian con monedas y capital separados
+[67/78] [movil] › e2e/reports.spec.ts:408:1 › diez reportes accesibles y capturas por tipo
+[68/78] [movil] › e2e/reports.spec.ts:464:1 › cambios consecutivos de filtros y gráficos no producen errores de ciclo de vida
+[69/78] [movil] › e2e/reports.spec.ts:487:1 › un pago posterior obliga a actualizar antes de descargar el PDF
+[70/78] [movil] › e2e/reports.spec.ts:512:1 › vacío, error recuperable, teclado y ausencia de desbordamiento
+[71/78] [movil] › e2e/reports.spec.ts:553:1 › operador no obtiene reportes ni PDF de otra propiedad
+[72/78] [movil] › e2e/reports.spec.ts:588:1 › lectura concurrente con un pago mantiene una instantánea conciliada en MySQL
+[73/78] [movil] › e2e/tenancy.spec.ts:88:1 › contrato diario guiado, modificación, prórroga y disponibilidad por cuarto
+[74/78] [movil] › e2e/tenancy.spec.ts:188:1 › reserva desde React, persona sin cuenta, confirmación y conversión en contrato
+[75/78] [movil] › e2e/tenancy.spec.ts:258:1 › finalización anticipada conserva personas e historial y actualiza la vista de la casa
+[76/78] [movil] › e2e/utilities.spec.ts:122:1 › servicio, recibo externo, ejemplo 14/15 días y corrección con historial
+[77/78] [movil] › e2e/utilities.spec.ts:267:1 › lecturas válidas e inválidas, reemplazo y consumo de dos medidores
+[78/78] [movil] › e2e/utilities.spec.ts:365:1 › contratos sucesivos exigen revisión manual antes de confirmar
+  78 passed (12.4m)

@@ -11,6 +11,7 @@ from app.api.utilities import router as utilities_router
 from app.api.finances import router as finances_router
 from app.api.anticreticos import router as anticreticos_router
 from app.api.reminders import router as reminders_router
+from app.api.reports import router as reports_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -50,3 +51,4 @@ app.include_router(utilities_router, prefix="/api/v1")
 app.include_router(finances_router, prefix="/api/v1")
 app.include_router(anticreticos_router, prefix="/api/v1")
 app.include_router(reminders_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")

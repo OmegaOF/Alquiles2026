@@ -34,11 +34,19 @@ from app.services.tenancy import (
     check_version,
 )
 from app.services.finance_periods import cents, rent_preview
+from app.services.money_rules import obligation_measure, expense_measure
 
 ZERO = Decimal("0.00")
 
 
 def rows(db, model, **filters):
+    snapshot = db.info.get("phase7_locked_facts")
+    if snapshot is not None and model in snapshot.data:
+        return [
+            row
+            for row in snapshot.all(model)
+            if all(getattr(row, key) == value for key, value in filters.items())
+        ]
     return u.rows(
         db,
         select(model)
@@ -145,35 +153,24 @@ def applications(db, **filters):
 
 def obligation_values(db, obj):
     adjustments = rows(db, m.FinanceAdjustment, obligation_id=obj.id)
-    total = obj.original_amount + sum((a.delta for a in adjustments), ZERO)
     applied = applications(db, obligation_id=obj.id)
-    paid = sum((a.amount for a in applied), ZERO)
-    due = next(
-        (a.new_due_on for a in reversed(adjustments) if a.new_due_on), obj.due_on
+    return obligation_measure(
+        obj.original_amount, adjustments, applied, obj.due_on, obj.period_end
     )
-    end = next(
-        (a.new_period_end for a in reversed(adjustments) if a.new_period_end),
-        obj.period_end,
-    )
-    return total, paid, total - paid, due, end
 
 
 def expense_values(db, obj):
-    total = (
-        ZERO
-        if obj.void_operation_id
-        else obj.original_amount
-        + sum(
-            (a.delta for a in rows(db, m.FinanceExpenseAdjustment, expense_id=obj.id)),
-            ZERO,
-        )
-    )
+    adjustments = rows(db, m.FinanceExpenseAdjustment, expense_id=obj.id)
     payments = [
         u.fresh(db, m.FinanceMovement, p.movement_id)
         for p in rows(db, m.FinanceDisbursement, expense_id=obj.id)
     ]
-    paid = sum((p.amount for p in payments if p.void_operation_id is None), ZERO)
-    return total, paid, max(total - paid, ZERO)
+    return expense_measure(
+        obj.original_amount,
+        obj.void_operation_id,
+        adjustments,
+        [p for p in payments if p.void_operation_id is None],
+    )
 
 
 def movement_account(db, id):

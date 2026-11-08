@@ -1,0 +1,26 @@
+{
+  "verified_at_utc": "2026-11-08T21:02:22.640927+00:00",
+  "database_scope": "MySQL E2E descartable, sin filas en el inventario",
+  "mysql": "8.4.13",
+  "alembic_revision": "0008_reminders",
+  "application_tables": 63,
+  "new_tables": 0,
+  "foreign_keys": 153,
+  "audit_table_sections": 63,
+  "mermaid_entities": 63,
+  "historical_migrations_intact": 8,
+  "columns_types_nullability_defaults_and_constraints_match": true,
+  "compared_fields": [
+    "columns",
+    "primary_key",
+    "candidate_keys_enforced",
+    "nullable_unique",
+    "foreign_keys",
+    "unique_constraints",
+    "checks",
+    "indexes"
+  ],
+  "ignored_ddl_difference": "Contadores AUTO_INCREMENT derivados de las pruebas; no cambian relaciones, columnas ni restricciones.",
+  "mismatches": [],
+  "alembic_check_exit_code": 0
+}

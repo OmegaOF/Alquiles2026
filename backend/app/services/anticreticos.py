@@ -16,6 +16,7 @@ from app.models.tenancy import Contract
 from app.models.entities import Unit
 from app.services import finances as f
 from app.services import utilities as u
+from app.services.money_rules import capital_pending as capital_balance
 from app.services.tenancy import (
     lock_property,
     target_property,
@@ -107,7 +108,9 @@ def books(db, contract_id, exclude_movement=None, exclude_adjustment=None):
             if adj.kind == "reassignment":
                 cells[key]["principal_reassigned"] += line.delta
     for key, value in cells.items():
-        value["pending"] = value["received"] + value["adjustments"] - value["returned"]
+        value["pending"] = capital_balance(
+            value["received"], value["returned"], value["adjustments"]
+        )
     totals = {
         key: sum((cell[key] for cell in cells.values()), ZERO)
         for key in ["received", "returned", "adjustments", "pending"]

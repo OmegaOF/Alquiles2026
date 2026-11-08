@@ -114,6 +114,8 @@ Para regenerar las capturas de anticréticos: `CAPTURE_PHASE5_SCREENSHOTS=1 npm 
 
 Las capturas de recordatorios se generan con `CAPTURE_PHASE6_SCREENSHOTS=1 npm run test:e2e -- reminders.spec.ts`; ver [resultados de fase 6](docs/phase-6-tests.md). Cada E2E prepara sus catálogos explícitamente, incluso después de fixtures que reconstruyen tablas.
 
+La fase 7 incorpora **Resumen general**, diez tipos de **Reportes**, siete gráficos y **Exportar PDF**, con cifras separadas por moneda y fecha de corte. [Entrega y guía desde el navegador](docs/phase-7.md), [API](docs/phase-7-api.md), [auditoría de las 63 tablas](docs/phase-7-normalization.md) y [pruebas/evidencias](docs/phase-7-tests.md). `reports.spec.ts` genera capturas de escritorio/móvil y ejemplos PDF exclusivamente con datos ficticios. No hay tablas nuevas ni migración 0009: las proyecciones y exportaciones se calculan sobre los hechos existentes sin guardar saldos duplicados.
+
 La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La configuración de CI ejecuta estos pasos sobre MySQL descartable, sin credenciales de usuarios reales.
 
 ## Organización y migraciones
