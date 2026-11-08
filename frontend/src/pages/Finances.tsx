@@ -42,12 +42,14 @@ export function Finances({
   people,
   initialPropertyId,
   onCapital,
+  onReminders,
 }: {
   user: User;
   properties: Property[];
   people: Person[];
   initialPropertyId?: number;
   onCapital?: (propertyId: number) => void;
+  onReminders?: (propertyId: number) => void;
 }) {
   const [propertyId, setPropertyId] = useState(
       initialPropertyId || properties[0]?.id || 0,
@@ -434,6 +436,14 @@ export function Finances({
           {tab === "summary" && (
             <>
               <h2>Resumen económico</h2>
+              {onReminders && (
+                <button
+                  className="secondary"
+                  onClick={() => onReminders(propertyId)}
+                >
+                  Ver recordatorios y pagos reportados de esta casa
+                </button>
+              )}
               {onCapital && (
                 <button
                   className="secondary"

@@ -580,7 +580,10 @@ def test_capital_cannot_be_applied_refunded_or_voided_as_ordinary_funds(admin, a
 
 
 def test_phase5_has_no_fiscal_legal_or_messaging_routes():
-    routes = {route.path.lower() for route in app.routes if hasattr(route, "path")}
+    from app.api.anticreticos import router
+    # El módulo de fase 5 conserva su alcance. Fase 6 incorpora recordatorios
+    # en su propio router; esta comprobación histórica no los prohíbe globalmente.
+    routes = {route.path.lower() for route in router.routes if hasattr(route, "path")}
     assert not any(
         any(
             word in path

@@ -1,0 +1,36 @@
+Verificación final local de fase 6
+Fecha America/La_Paz: 2026-11-08T12:00:41-04:00
+Commit de código y pruebas verificado: 685616ad087039800404d32b6c54df197a316ffa
+Base main con fase 5: e078aaf64da189657d6435939309fb0f2e0b75ae
+Rama: phase-6-reminders-whatsapp
+
+Backend: 441 passed en una sola ejecución completa; 0 failed; 0 errors; 0 skipped; 1734.384 s.
+Concurrencia fase 6: 9/9 aprobadas sobre MySQL real, con conexiones independientes.
+Migración 0008: 3/3; 14 tablas añadidas, 49 anteriores conservadas, 63 de aplicación en total.
+Migraciones 0001–0007 intactas; alembic check sin operaciones pendientes.
+React: 54/54. Playwright: 64/64 (32 escritorio, 32 móvil).
+TypeScript y compilación: exit 0.
+24 capturas versionadas comprobadas; no regeneradas durante esta revisión.
+API E2E: sin errores 500, interbloqueos ni trazas.
+WhatsApp: consentimiento vigente, enlaces oficiales y confirmación manual; sin envío externo real.
+Código y pruebas sin modificaciones; únicamente se actualizan documentación y evidencias.
+
+Registros íntegros y manifiesto: docs/phase-6-verification/
+SHA-256 de 141 archivos de código/configuración/pruebas:
+cb88b2534ca2ca969794c7a065c65858a57a47249c4519cca587a8777dbc150c
+
+Backend por archivo:
+tests.test_anticreticos: 60
+tests.test_finances: 52
+tests.test_health: 5
+tests.test_integration: 1
+tests.test_migration_11: 8
+tests.test_migration_2: 3
+tests.test_migration_3: 3
+tests.test_migration_4: 3
+tests.test_migration_5: 3
+tests.test_migration_6: 3
+tests.test_phase1: 52
+tests.test_reminders: 99
+tests.test_tenancy: 72
+tests.test_utilities: 77

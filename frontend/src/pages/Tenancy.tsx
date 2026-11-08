@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { Person, Property, User } from "../types";
 import { Field, ErrorMessage, errorText } from "../components/Form";
@@ -24,6 +24,7 @@ type Props = {
   people: Person[];
   refreshPeople: () => Promise<void>;
   onCapital?: (contract: Contract) => void;
+  initialContractId?: number;
 };
 export function Tenancy({
   view,
@@ -32,9 +33,11 @@ export function Tenancy({
   people,
   refreshPeople,
   onCapital,
+  initialContractId,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>([]),
     [reservations, setReservations] = useState<Reservation[]>([]);
+  const handledInitial = useRef<number | null>(null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -101,6 +104,15 @@ export function Tenancy({
       setError(errorText(e));
     }
   }
+  useEffect(() => {
+    if (initialContractId && handledInitial.current !== initialContractId) {
+      const target = contracts.find((c) => c.id === initialContractId);
+      if (target) {
+        handledInitial.current = initialContractId;
+        void detail(target);
+      }
+    }
+  }, [initialContractId, contracts]);
   async function saved(contract: Contract) {
     await load();
     await refreshPeople();

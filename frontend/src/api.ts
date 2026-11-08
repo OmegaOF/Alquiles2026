@@ -106,6 +106,20 @@ const fieldNames: Record<string, string> = {
   allocations: "partes del capital y sus responsables",
   effective_on: "fecha efectiva del acuerdo",
   delta: "cambio autorizado de la responsabilidad",
+  expected_fingerprint: "datos actualizados del aviso; vuelve a consultarlo",
+  expected_proposal_fingerprint:
+    "datos revisados del mensaje; vuelve a generar el texto",
+  lead_days: "días previos al vencimiento",
+  snooze_days: "plazo máximo para posponer",
+  recipient_user_ids: "destinatarios internos autorizados",
+  purpose: "tipo de comunicación autorizado",
+  number: "número internacional",
+  accepted_on: "fecha de aceptación",
+  explicitly_accepted: "aceptación expresa de la persona",
+  recipient_id: "destinatario del aviso",
+  reporting_person_id: "persona que informa el pago",
+  reported_on: "fecha comunicada del pago",
+  authorization_operation_id: "comprobación reciente de la apertura",
 };
 export async function api<T>(
   path: string,

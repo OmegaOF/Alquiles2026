@@ -12,6 +12,7 @@ jobs:
       PHASE3_MIGRATION_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
       PHASE4_MIGRATION_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
       PHASE5_MIGRATION_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
+      PHASE6_MIGRATION_DATABASE_URL: mysql+pymysql://alquiles:local_only_change_me@127.0.0.1:3306/alquiles_phase1_test?charset=utf8mb4
     services:
       mysql:
         image: mysql:8.4

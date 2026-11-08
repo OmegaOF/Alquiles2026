@@ -1,0 +1,2 @@
+Comando: frontend/node_modules/.bin/tsc --noEmit -p frontend/tsconfig.json
+Salida original vacía; proceso terminado con código 0.

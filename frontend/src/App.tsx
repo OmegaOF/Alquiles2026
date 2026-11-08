@@ -10,6 +10,8 @@ import { Utilities } from "./pages/Utilities";
 import { Finances } from "./pages/Finances";
 import { Anticreticos } from "./pages/Anticreticos";
 import type { CapitalTarget } from "./anticreticos";
+import { Reminders } from "./pages/Reminders";
+import type { ReminderTarget } from "./reminders";
 import { ErrorMessage, Field, errorText } from "./components/Form";
 export { PhaseZero } from "./PhaseZero";
 
@@ -174,7 +176,8 @@ type Page =
   | "occupancy"
   | "utilities"
   | "finances"
-  | "anticreticos";
+  | "anticreticos"
+  | "reminders";
 function Workspace({
   user,
   onLogout,
@@ -189,6 +192,11 @@ function Workspace({
     null,
   );
   const [financeTarget, setFinanceTarget] = useState<number | null>(null);
+  const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(
+    null,
+  );
+  const [contractTarget, setContractTarget] = useState<number | null>(null);
+  const [utilityTarget, setUtilityTarget] = useState<number | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -254,6 +262,7 @@ function Workspace({
     ["utilities", "Servicios básicos"],
     ["finances", "Pagos y gastos"],
     ["anticreticos", "Anticréticos"],
+    ["reminders", "Recordatorios"],
   ];
   if (general) links.push(["users", "Usuarios y permisos"]);
   return (
@@ -275,6 +284,9 @@ function Workspace({
               onClick={() => {
                 if (id === "anticreticos") setCapitalTarget(null);
                 if (id === "finances") setFinanceTarget(null);
+                if (id === "reminders") setReminderTarget(null);
+                if (id === "contracts") setContractTarget(null);
+                if (id === "utilities") setUtilityTarget(null);
                 setPage(id);
               }}
             >
@@ -344,6 +356,7 @@ function Workspace({
               properties={properties}
               people={people}
               refreshPeople={refresh}
+              initialContractId={contractTarget || undefined}
               onCapital={(contract) => {
                 setCapitalTarget({
                   propertyId: contract.resolved_property_id,
@@ -353,13 +366,22 @@ function Workspace({
               }}
             />
           ) : page === "utilities" ? (
-            <Utilities user={user} properties={properties} people={people} />
+            <Utilities
+              user={user}
+              properties={properties}
+              people={people}
+              initialPropertyId={utilityTarget || undefined}
+            />
           ) : page === "finances" ? (
             <Finances
               user={user}
               properties={properties}
               people={people}
               initialPropertyId={financeTarget || undefined}
+              onReminders={(propertyId) => {
+                setReminderTarget({ propertyId });
+                setPage("reminders");
+              }}
               onCapital={(propertyId) => {
                 setCapitalTarget({ propertyId });
                 setPage("anticreticos");
@@ -375,6 +397,30 @@ function Workspace({
               onFinances={(propertyId) => {
                 setFinanceTarget(propertyId);
                 setPage("finances");
+              }}
+            />
+          ) : page === "reminders" ? (
+            <Reminders
+              user={user}
+              properties={properties}
+              initialTarget={reminderTarget}
+              onOrigin={(propertyId, origin) => {
+                if (origin.module === "anticreticos") {
+                  setCapitalTarget({
+                    propertyId,
+                    contractId: origin.contract_id,
+                  });
+                  setPage("anticreticos");
+                } else if (origin.module === "contracts") {
+                  setContractTarget(origin.contract_id || null);
+                  setPage("contracts");
+                } else if (origin.module === "utilities") {
+                  setUtilityTarget(propertyId);
+                  setPage("utilities");
+                } else {
+                  setFinanceTarget(propertyId);
+                  setPage("finances");
+                }
               }}
             />
           ) : page === "users" && general ? (
