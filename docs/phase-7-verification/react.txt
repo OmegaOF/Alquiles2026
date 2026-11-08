@@ -1,0 +1,12 @@
+
+> alquiles-frontend@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.12 /workspace/Alquiles2026/frontend
+
+
+ Test Files  11 passed (11)
+      Tests  65 passed (65)
+   Start at  20:48:23
+   Duration  10.91s (transform 2.35s, setup 2.45s, import 4.87s, tests 13.23s, environment 7.43s)

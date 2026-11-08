@@ -1,0 +1,139 @@
+.reports-page {
+  min-width: 0;
+}
+.report-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
+  gap: 12px 22px;
+}
+.report-filter input,
+.report-filter select {
+  width: 100%;
+  min-width: 0;
+}
+.report-quick,
+.report-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+}
+.report-quick button {
+  min-height: 48px;
+}
+.report-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+.report-card {
+  background: #fff;
+  border: 1px solid #ccdcd3;
+  border-radius: 14px;
+  padding: 22px;
+  border-top: 4px solid #548b74;
+  overflow-wrap: anywhere;
+}
+.report-card span {
+  display: block;
+  font-size: 17px;
+}
+.report-card strong {
+  display: block;
+  font-size: 26px;
+  line-height: 1.4;
+  margin-top: 12px;
+  color: #174c43;
+}
+.report-period {
+  font-weight: 650;
+}
+.report-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 215px), 1fr));
+  gap: 10px 22px;
+}
+.report-values div {
+  border-bottom: 1px solid #e0e7df;
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+.report-values dt {
+  font-size: 16px;
+  color: #486158;
+}
+.report-values dd {
+  font-size: 18px;
+  font-weight: 650;
+  margin: 4px 0;
+}
+.report-record {
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #d4dfd4;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+.report-record h3,
+.report-chart h3 {
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+.report-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 18px;
+}
+.report-chart {
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 20px;
+}
+.report-chart p {
+  font-size: 16px;
+}
+.echart {
+  height: 320px;
+  width: 100%;
+}
+.report-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.report-scroll th,
+.report-scroll td {
+  padding: 10px;
+  font-size: 16px;
+  white-space: normal;
+  min-width: 95px;
+}
+.reports-page summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: 10px 0;
+  min-height: 48px;
+}
+.reports-page details {
+  margin: 16px 0;
+}
+@media (max-width: 600px) {
+  .report-card {
+    padding: 18px;
+  }
+  .report-card strong {
+    font-size: 24px;
+  }
+  .report-record,
+  .report-chart {
+    padding: 16px;
+  }
+  .report-quick button {
+    width: 100%;
+  }
+  .report-export {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

@@ -12,6 +12,7 @@ import { Anticreticos } from "./pages/Anticreticos";
 import type { CapitalTarget } from "./anticreticos";
 import { Reminders } from "./pages/Reminders";
 import type { ReminderTarget } from "./reminders";
+import { Reports } from "./pages/Reports";
 import { ErrorMessage, Field, errorText } from "./components/Form";
 export { PhaseZero } from "./PhaseZero";
 
@@ -167,6 +168,7 @@ function Login({
 
 type Page =
   | "home"
+  | "dashboard"
   | "properties"
   | "persons"
   | "users"
@@ -177,7 +179,8 @@ type Page =
   | "utilities"
   | "finances"
   | "anticreticos"
-  | "reminders";
+  | "reminders"
+  | "reports";
 function Workspace({
   user,
   onLogout,
@@ -252,6 +255,8 @@ function Workspace({
     }
   }
   const links: [Page, string][] = [
+    ["dashboard", "Resumen general"],
+    ["reports", "Reportes"],
     ["home", "Inicio"],
     ["properties", "Propiedades"],
     ["persons", "Personas"],
@@ -327,6 +332,8 @@ function Workspace({
             <button className="secondary" onClick={() => void load()}>
               Volver a cargar
             </button>
+          ) : page === "dashboard" || page === "reports" ? (
+            <Reports key={page} view={page === "dashboard" ? "dashboard" : "reports"} />
           ) : page === "properties" ? (
             <Properties
               properties={properties}
@@ -472,8 +479,8 @@ function Home({ user, properties }: { user: User; properties: Property[] }) {
           para consultar sus datos y cuartos.
         </p>
         <p>
-          Consulta contratos, reservas, disponibilidad y ocupantes desde el
-          menú. Los cobros y servicios se incorporarán en las siguientes etapas.
+          Consulta contratos, servicios, pagos, anticréticos y recordatorios desde
+          el menú. Resumen general y Reportes reúnen las cifras de tus propiedades.
         </p>
       </div>
       <section className="connection" aria-labelledby="connection-title">

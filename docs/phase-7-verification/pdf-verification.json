@@ -1,0 +1,231 @@
+{
+  "verified_at_utc": "2026-11-08T21:01:46.833069+00:00",
+  "scope": "Datos ficticios en MySQL E2E descartable; consultas autenticadas, sin movimientos económicos.",
+  "pdfs": [
+    {
+      "file": "docs/pdf/phase-7/capital-ejemplo.pdf",
+      "sha256": "9c66477c9d1c2ebe887473a2008616feb50fd853386d81324e527c8c66ba04b6",
+      "pages": 10,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "capital",
+      "fingerprint": "d68d7ba09ea748d69f31b48330f80261a86b92bcb504f650dda4c523c6b182f3",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    },
+    {
+      "file": "docs/pdf/phase-7/contracts-ejemplo.pdf",
+      "sha256": "e31256ee0f88ec8a0dbfbe04cb7bb443c888f9f1824c128f8d6f63c8e39adc6d",
+      "pages": 13,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "contracts",
+      "fingerprint": "a5e1d0049e0631812dce289f3daf4a48627496cc8cf86b394fe4b70152074215",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    },
+    {
+      "file": "docs/pdf/phase-7/economico-escritorio.pdf",
+      "sha256": "33a331f441daf68fba910a75045812db9d7573bde80bf0e5f1f4805d37989434",
+      "pages": 11,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "economic",
+      "fingerprint": "cb2ab8612e4757a240f3450fdc69ca9429be92856d8438ca1b0db752a0b283fa",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    },
+    {
+      "file": "docs/pdf/phase-7/economico-movil.pdf",
+      "sha256": "c31ccc428fcdafb725d2d446e23f3c7ad8c212a1565a2f225dde430c2d2d00b9",
+      "pages": 11,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "economic",
+      "fingerprint": "3b434aeee67f3882a05eb8d923e53bb6c2dae5a01af5fa09939bba41aa4fd410",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    },
+    {
+      "file": "docs/pdf/phase-7/owners-ejemplo.pdf",
+      "sha256": "48ee6c428989f2e3c67b84c598ee6b32ae1be69327e7b5b2f2c4e64de7e97f17",
+      "pages": 16,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "owners",
+      "fingerprint": "0cd5ac81d6129e799f08401df207c1c7415e7ec3345b2b8a796d245bec35254a",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    },
+    {
+      "file": "docs/pdf/phase-7/properties-ejemplo.pdf",
+      "sha256": "fda88f90e51e0ae61f5618cd086eb51f679b5baf8413c3879826ebd8a35abd2a",
+      "pages": 13,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "properties",
+      "fingerprint": "804ee42e9c99b61a399b6b10d7651a32e81d766f5c9fe1bb74ee678ccdbcffc1",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    },
+    {
+      "file": "docs/pdf/phase-7/services-ejemplo.pdf",
+      "sha256": "846aed039c8eaa004eb33b9f0637d06d75ded74b2ec34f05239288ab125a11fe",
+      "pages": 10,
+      "paper": "A4",
+      "every_page_numbered": true,
+      "live_report_kind": "services",
+      "fingerprint": "c376c49779c4b1590c3dc16ed1590cd8c415e72e4986d44bac23486f549b5400",
+      "live_report_fingerprint_matches": true,
+      "exact_label_amount_currency_pairs": 68
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "docs/screenshots/phase-7/escritorio-capital.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "3d87b51849e8acb15f310ee5ab0e719fc62ac3404fdaa7159087cf69253b37a2"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-collections.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "f77c75094ddcb9cf0f901b3c10eaa34a923178604f6b1d46e8c9d352a74f7fba"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-comparison.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "4e64e4eef4def81ec6f2d6b35e86f05e508614c08fe8d37f4f50e3208fe4cfb0"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-contracts.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "a20f0c52a4aacdad731c2d20787ea338138060b5864c758ed589cbf7749cb82a"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-economic.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "a40db875a0aef747640bb77177ee48b0944b8c68306e9d2ff47d4826d9b8ba40"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-expenses.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "52df76076f5624d9ebb05a8f0b2435c071e634d4f2d20950cb4d79a6fea56de7"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-graficos.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "79dd1a913b8c39137f731dd7d514d96f64fb807d89e997c30fd4b8d3a3c6bcb8"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-owners.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "7e37aa070173ad8217103564a2f9f8518027e272c6229da98061ff375d244a48"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-properties.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "d9def0d93706c029b0577e7f99b58e745a144e3e118f70894039de667bfefa8b"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-resumen.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "7acd69a9d85c1439dc90154f47d9f401b005f48493c77ac3dd2d7440ad97d866"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-services.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "c64d496d170f2b8cdeff0c9e3602c64d170e06876bbaf7209e895ba4b9b716fb"
+    },
+    {
+      "file": "docs/screenshots/phase-7/escritorio-units.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "65ef1ab13e164c487cda614591ef193c2e28b00346147063b88ab0a53c4fd6be"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-capital.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "e04a2dd69bbad0679ac16835b40b9a75bf4a596fb04d38083d424dcbad68fe26"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-collections.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "7303abbe70da561793e62f16f39a50a002000fe8d49f401286f2342e6458ddd6"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-comparison.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "5eb43fd742ea8605a577b5defb82fbd2b2f018c71b6f1c502f85f2be1ac1f284"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-contracts.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "fe88c6ef6af6ab0e3fa25ec089f55b930e14806ef46420a00980247af96ca78b"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-economic.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "8c6888c2e24472a216453baefd054fe126af4b029c8c94e20aa6a36b8057522f"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-expenses.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "893910236052a242ed1a4d7f45b2e5834b7a5236f1f8aca3020a5c79e84124e7"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-graficos.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "a7a59915ba624bbeabcb50762e28db055561679e97b8a2b47a40c8eb3fe90ff7"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-owners.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "2709b9cfcf93110c9bc23b6980c7bdad7ee20f7e9d0aa791e956e0d38bf6868a"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-properties.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "7b35e5e27d61956e90147ec12225577378cbcb5459e7201db96acc5cef23dd25"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-resumen.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "18c614b03571905abd6c8b50e3ec7a4308358f9661dc9b4bdc99c6e8a1c6f610"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-services.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "635a7d5b61112c0da55013a8254d95b7cd8827744989f959f4c180f9aa3614d8"
+    },
+    {
+      "file": "docs/screenshots/phase-7/movil-units.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "be21c9d0d3affe33650f74622e9f8942bb88c95d45d406fb28627ef2658928fc"
+    }
+  ],
+  "total_exact_pairs": 476,
+  "regression": "La prueba de conciliación comprueba el eje y la altura visible de la aplicación mínima después de dibujar el PDF."
+}

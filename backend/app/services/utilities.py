@@ -36,6 +36,11 @@ def rows(db, query, locked=False):
 
 
 def fresh(db, model, id):
+    snapshot = db.info.get("phase7_locked_facts")
+    if snapshot is not None:
+        cached = snapshot.get(model, id)
+        if cached is not None:
+            return cached
     return db.scalar(
         select(model)
         .where(model.id == id)

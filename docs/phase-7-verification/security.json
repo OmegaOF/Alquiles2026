@@ -1,0 +1,19 @@
+{
+  "verified_at_utc": "2026-11-08T21:15:08.206883+00:00",
+  "candidate_files_checked": 361,
+  "findings": [],
+  "reviewed_public_examples": [
+    {
+      "file": ".env.example",
+      "reason": "Valores públicos de MySQL local/CI ya presentes en la base; archivo intacto. No son las credenciales privadas aleatorias de la verificación."
+    },
+    {
+      "file": ".github/workflows/checks.yml",
+      "reason": "Valores públicos de MySQL local/CI ya presentes en la base; archivo intacto. No son las credenciales privadas aleatorias de la verificación."
+    }
+  ],
+  "local_private_env_ignored": true,
+  "private_env_in_candidates": false,
+  "method": "Archivos versionados y nuevos no ignorados, incluidos binarios y evidencias; patrones de claves privadas/GitHub/AWS y comparación con valores privados configurados de 16 caracteres o más, sin imprimirlos.",
+  "scope": "Escaneo de publicación local; no sustituye una auditoría de seguridad ni certifica ausencia de todo secreto posible."
+}

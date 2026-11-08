@@ -1,0 +1,16 @@
+
+> alquiles-frontend@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 643 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                           0.48 kB │ gzip:   0.31 kB
+dist/assets/index-Dgs6WpDv.css           12.74 kB │ gzip:   3.46 kB
+dist/assets/ReportChart-DvLP7P1p.js       2.65 kB │ gzip:   1.36 kB
+dist/assets/chart-renderer-D9Y6fLVw.js  183.40 kB │ gzip:  62.43 kB
+dist/assets/echarts-DSDjv0Tr.js         358.37 kB │ gzip: 121.39 kB
+dist/assets/index-Cp1u4TkA.js           399.30 kB │ gzip: 111.79 kB
+✓ built in 5.35s

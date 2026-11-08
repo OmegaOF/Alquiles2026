@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "alquiles-backend"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["fastapi==0.162.0", "uvicorn==0.54.0", "SQLAlchemy==2.1.8", "alembic==1.20.1", "pydantic-settings==2.16.2", "PyMySQL[rsa]==1.2.3", "phonenumberslite==9.0.43"]
+dependencies = ["fastapi==0.162.0", "uvicorn==0.54.0", "SQLAlchemy==2.1.8", "alembic==1.20.1", "pydantic-settings==2.16.2", "PyMySQL[rsa]==1.2.3", "phonenumberslite==9.0.43", "reportlab==4.4.7"]
 
 [project.optional-dependencies]
-test = ["pytest==8.3.5", "httpx==0.28.1"]
+test = ["pytest==8.3.5", "httpx==0.28.1", "pypdf==6.2.0"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
