@@ -61,6 +61,17 @@ async function setup(
   const method =
     catalog.methods.find((m: { name: string }) => m.name === "Efectivo") ||
     (await post(page, "/finances/catalogs/methods", { name: "Efectivo" }));
+  // Las pruebas de migración anteriores pueden reconstruir las tablas sin los
+  // catálogos iniciales. Cada E2E debe preparar sus dependencias explícitas.
+  if (
+    !catalog.categories.some(
+      (c: { name: string }) => c.name === "Servicios básicos",
+    )
+  ) {
+    await post(page, "/finances/catalogs/categories", {
+      name: "Servicios básicos",
+    });
+  }
   return {
     owner,
     house,
