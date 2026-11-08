@@ -1,8 +1,8 @@
 # Mi Casa · Administración de propiedades
 
-Fase 5: anticréticos con condiciones versionadas, titulares y responsables explícitos, entregas, restituciones parciales y correcciones con historial. Se conserva la gestión de propiedades, contratos, servicios, deudas, garantías y gastos de las fases anteriores. Backend FastAPI/SQLAlchemy/MySQL y frontend React 18/TypeScript, independientes de Pisco Ñawi y del sistema antiguo. Capital anticrético, dinero ordinario y obligaciones se conservan separados. Recordatorios pendientes. No se emiten documentos comerciales o tributarios.
+Fase 6: recordatorios basados en saldos vigentes, consentimiento y WhatsApp mediante enlaces oficiales con envío manual. Se conservan los anticréticos con condiciones versionadas, titulares y responsables explícitos, entregas, restituciones parciales y correcciones con historial. Se conserva la gestión de propiedades, contratos, servicios, deudas, garantías y gastos de las fases anteriores. Backend FastAPI/SQLAlchemy/MySQL y frontend React 18/TypeScript, independientes de Pisco Ñawi y del sistema antiguo. Capital anticrético, dinero ordinario y obligaciones se conservan separados. No hay envío automático externo. No se emiten documentos comerciales o tributarios.
 
-Entrega, esquema 3FN, pruebas y capturas: [informe de fase 5](docs/phase-5.md), [resultados de pruebas](docs/phase-5-tests.md) y [API de fase 5](docs/phase-5-api.md). Entrega anterior: [fase 4](docs/phase-4.md).
+Entrega, esquema 3FN, pruebas y capturas: [informe de fase 6](docs/phase-6.md), [resultados de pruebas](docs/phase-6-tests.md) y [API de fase 6](docs/phase-6-api.md). Entrega anterior: [fase 5](docs/phase-5.md).
 
 ## Requisitos e instalación
 
@@ -22,7 +22,7 @@ cd backend
 
 El último comando pide y confirma una contraseña de **12 a 128 caracteres**, sin mostrarla. No existe una contraseña inicial predeterminada. Solo permite crear el primer administrador; después las cuentas se crean desde la interfaz. No pasar contraseñas como argumentos ni guardarlas en archivos versionados. `.env.example` solo contiene valores públicos para la base local de desarrollo; `.env` queda excluido de Git.
 
-**Bases existentes:** antes de aplicar migraciones, detener escritores, hacer y verificar un respaldo y leer [recuperación de 0003](docs/phase-1.1-migration.md), [migración 0004](docs/phase-2.md#migración-y-recuperación), [migración 0005](docs/phase-3.md#migración-y-recuperación), [migración 0006](docs/phase-4.md#migración-y-recuperación) y [migración 0007](docs/phase-5.md#migración-y-recuperación). MySQL no revierte automáticamente todos los DDL. Revisar las migraciones antes de aplicarlas. Las pruebas usaron únicamente bases descartables, nuevas y con datos ficticios representativos. No migrar bases de otros proyectos.
+**Bases existentes:** antes de aplicar migraciones, detener escritores, hacer y verificar un respaldo y leer [recuperación de 0003](docs/phase-1.1-migration.md), [migración 0004](docs/phase-2.md#migración-y-recuperación), [migración 0005](docs/phase-3.md#migración-y-recuperación), [migración 0006](docs/phase-4.md#migración-y-recuperación) y [migración 0007](docs/phase-5.md#migración-y-recuperación) y [migración 0008](docs/phase-6.md#migración-y-recuperación). MySQL no revierte automáticamente todos los DDL. Revisar las migraciones antes de aplicarlas. Las pruebas usaron únicamente bases descartables, nuevas y con datos ficticios representativos. No migrar bases de otros proyectos.
 
 ## Arranque y navegador
 
@@ -60,6 +60,8 @@ Para un dominio de desarrollo remoto, añadir su origen exacto a `CORS_ORIGINS` 
 14. **Pagos y gastos:** selecciona casa. En **Por cobrar**, genera alquileres con vista previa o importa repartos confirmados. En **Registrar pago**, selecciona titular, pagador real y conceptos que cubre. El sobrante requiere elección expresa; **Anticipos** permite aplicarlo después sin registrar otra entrada.
 15. **Garantías y gastos:** registra garantías separadas de renta; su aplicación/devolución exige autorización. Registra gastos y luego sus pagos reales, incluso parciales. **Recuperación de servicios** permite pagar un recibo antes de repartirlo y distingue el pago al proveedor de lo recibido después del inquilino. Consulta resumen por moneda e historial; instrucciones completas en el informe de fase 4.
 16. **Anticréticos:** selecciona casa y un contrato anticrético existente. Completa capital acordado, fechas, titulares, beneficiarios y responsables con importes expresos. Guarda condiciones y registra después cada entrega real. Para devolver, revisa pagador, receptor y pendiente antes/después. Consulta historial, cierre, servicios y resumen; el capital nunca es alquiler, anticipo ni garantía. [Guía completa](docs/phase-5.md#probar-desde-el-navegador).
+
+17. **Recordatorios:** elige casa, filtra y abre el aviso para revisar saldo real y fecha. Revisar/posponer no paga deudas. Gestiona aceptación expresa en **Consentimientos**, prepara y edita el mensaje y pulsa **Abrir WhatsApp**. Tú realizas el envío y luego lo confirmas manualmente; una apertura no prueba envío, entrega ni lectura. Los pagos reportados se verifican vinculando un ingreso real existente. [Guía y límites](docs/phase-6.md#probar-desde-el-navegador-del-entorno).
 
 ## Permisos iniciales
 
@@ -102,7 +104,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 # Si no está instalado: npx playwright install chromium; npm run test:e2e
 ```
 
-Las pruebas adicionales de migración requieren `PHASE11_MIGRATION_DATABASE_URL`, `PHASE2_MIGRATION_DATABASE_URL`, `PHASE3_MIGRATION_DATABASE_URL`, `PHASE4_MIGRATION_DATABASE_URL` y `PHASE5_MIGRATION_DATABASE_URL`, con bases descartables terminadas en `_test`; pueden compartir una base de CI solo cuando se ejecutan secuencialmente. Para ejecutar todas las comprobaciones, configura las cinco y `PHASE1_TEST_DATABASE_URL`; revisa que no aparezcan omisiones. No ejecutes pruebas que recrean tablas mientras utilizas el navegador contra la misma base.
+Las pruebas adicionales de migración requieren `PHASE11_MIGRATION_DATABASE_URL`, `PHASE2_MIGRATION_DATABASE_URL`, `PHASE3_MIGRATION_DATABASE_URL`, `PHASE4_MIGRATION_DATABASE_URL`, `PHASE5_MIGRATION_DATABASE_URL` y `PHASE6_MIGRATION_DATABASE_URL`, con bases descartables terminadas en `_test`; pueden compartir una base de CI solo cuando se ejecutan secuencialmente. Para ejecutar todas las comprobaciones, configura las seis y `PHASE1_TEST_DATABASE_URL`; revisa que no aparezcan omisiones. No ejecutes pruebas que recrean tablas mientras utilizas el navegador contra la misma base.
 
 Para regenerar las capturas de fase 2 con datos ficticios: `CAPTURE_PHASE2_SCREENSHOTS=1 npm run test:e2e -- tenancy.spec.ts` desde frontend, con las mismas credenciales temporales y Chromium configurados.
 
@@ -110,13 +112,15 @@ Las capturas de fase 3 se regeneran con `CAPTURE_PHASE3_SCREENSHOTS=1 npm run te
 
 Para regenerar las capturas de anticréticos: `CAPTURE_PHASE5_SCREENSHOTS=1 npm run test:e2e -- anticreticos.spec.ts`, con las mismas credenciales temporales y Chromium configurados. La entrega y resultados definitivos están en [fase 5](docs/phase-5-tests.md).
 
+Las capturas de recordatorios se generan con `CAPTURE_PHASE6_SCREENSHOTS=1 npm run test:e2e -- reminders.spec.ts`; ver [resultados de fase 6](docs/phase-6-tests.md). Cada E2E prepara sus catálogos explícitamente, incluso después de fixtures que reconstruyen tablas.
+
 La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La configuración de CI ejecuta estos pasos sobre MySQL descartable, sin credenciales de usuarios reales.
 
 ## Organización y migraciones
 
 - `backend/app/{models,schemas,services,api}`: persistencia, validación, reglas y rutas separadas.
 - `backend/app/core`: configuración, contraseñas y reloj UTC; `bootstrap.py`: primera cuenta.
-- `backend/migrations`: `0001_baseline`, `0002_phase1`, `0003_identity`, `0004_tenancy`, `0005_utilities`, `0006_finances` y `0007_anticreticos`.
+- `backend/migrations`: `0001_baseline`, `0002_phase1`, `0003_identity`, `0004_tenancy`, `0005_utilities`, `0006_finances`, `0007_anticreticos` y `0008_reminders`.
 - `frontend/src/pages`: propiedades/cuarto, personas y usuarios; `components`: formularios comunes.
 - `backend/tests`, `frontend/tests`, `frontend/e2e`: automatización de validaciones.
 - `docs/phase-1.md`: entrega histórica de fase 1.
@@ -131,10 +135,12 @@ La suite usa 1440 px y 390 px; también verifica sesión desde localhost. La con
 - `frontend/src/pages/Finances.tsx`, `pages/finances/Forms.tsx`: módulo económico; `docs/phase-4*.md` y `docs/screenshots/phase-4-*`: entrega.
 - `backend/app/{models,schemas,services,api}/anticreticos.py`, `frontend/src/pages/Anticreticos.tsx`, `pages/anticreticos`: capital, condiciones y restituciones; `docs/phase-5*.md` y `docs/screenshots/phase-5-*`: entrega.
 
+- `backend/app/{models,schemas,api}/reminders.py`, `services/reminder_*.py`, `services/reminders.py`, `services/reported_payments.py`, `frontend/src/pages/Reminders.tsx` y `pages/reminders`: avisos, consentimiento, comunicación asistida e información de pagos sin caja duplicada; `docs/phase-6*.md`: entrega.
+
 Desde backend: `../.venv/bin/alembic revision --autogenerate -m "descripción"`; revisar siempre el resultado antes de `upgrade head`. No usar `create_all` para actualizar bases de aplicación. `downgrade` de fase 1 elimina sus tablas y solo debe probarse en bases descartables.
 
 Las dependencias están fijadas mediante `backend/requirements.lock` y `frontend/package-lock.json`. No se añadieron dependencias para la autenticación: PBKDF2-SHA256 (600.000 iteraciones y sal aleatoria), tokens de sesión opacos y hashes en base de datos.
 
 ## Límites de despliegue
 
-El límite de intentos de acceso es de diez por IP y cinco minutos, en memoria por proceso. Para varios procesos o servidores requiere un almacén compartido o control en el proxy. La revisión integral de seguridad, recuperación de contraseña por canales externos y accesibilidad con usuarios mayores no se entregan como certificadas. No se implementan envíos ni servicios externos. La fase 5 requiere aprobación expresa. Los excesos pagados a proveedores se distinguen como devoluciones pendientes; no se registran devoluciones externas automáticas.
+El límite de intentos de acceso es de diez por IP y cinco minutos, en memoria por proceso. Para varios procesos o servidores requiere un almacén compartido o control en el proxy. La revisión integral de seguridad, recuperación de contraseña por canales externos y accesibilidad con usuarios mayores no se entregan como certificadas. El sistema no realiza envíos automáticos ni se conecta a proveedores de mensajería. La publicación e integración de fase 6 requieren aprobación expresa. Los excesos pagados a proveedores se distinguen como devoluciones pendientes; no se registran devoluciones externas automáticas.

@@ -15,12 +15,16 @@ export function Utilities({
   user,
   properties,
   people,
+  initialPropertyId,
 }: {
   user: User;
   properties: Property[];
   people: Person[];
+  initialPropertyId?: number;
 }) {
-  const [propertyId, setPropertyId] = useState(properties[0]?.id || 0),
+  const [propertyId, setPropertyId] = useState(
+      initialPropertyId || properties[0]?.id || 0,
+    ),
     [tab, setTab] = useState("services"),
     [accounts, setAccounts] = useState<ServiceAccount[]>([]),
     [types, setTypes] = useState<UtilityType[]>([]),

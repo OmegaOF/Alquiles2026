@@ -17,7 +17,7 @@ from app.models.entities import Unit
 from app.services import finances as f
 from app.services import utilities as u
 from app.services.tenancy import (
-    read_property,
+    lock_property,
     target_property,
     validate_people,
     retain_contacts,
@@ -518,7 +518,7 @@ def finance_context(db, link):
 
 
 def detail(db, user, property_id, id):
-    read_property(db, user, property_id)
+    lock_property(db, user, property_id)
     c, terms, revision = context(db, user, property_id, id)
     book = books(db, id)
     issues = review_issues(db, revision)
@@ -657,7 +657,7 @@ def contracts(db, property_id):
 
 
 def summary(db, user, property_id, details=None):
-    read_property(db, user, property_id)
+    lock_property(db, user, property_id)
     details = (
         details
         if details is not None
@@ -689,7 +689,7 @@ def summary(db, user, property_id, details=None):
 
 
 def listing(db, user, property_id):
-    read_property(db, user, property_id)
+    lock_property(db, user, property_id)
     items = [detail(db, user, property_id, c.id) for c in contracts(db, property_id)]
     return {
         "items": items,
