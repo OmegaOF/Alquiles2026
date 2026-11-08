@@ -1,29 +1,22 @@
-Verificación local de fase 6
-Registro UTC: 2026-11-08T05:21:09+00:00
-Base Git: e078aaf64da189657d6435939309fb0f2e0b75ae
+Verificación final local de fase 6
+Fecha America/La_Paz: 2026-11-08T12:00:41-04:00
+Commit de código y pruebas verificado: 685616ad087039800404d32b6c54df197a316ffa
+Base main con fase 5: e078aaf64da189657d6435939309fb0f2e0b75ae
 Rama: phase-6-reminders-whatsapp
 
-Backend: 441 casos distintos verificados; 0 casos pendientes; 0 omitidos.
-Pasada completa: 438 passed, 3 failed (BrokenBarrierError de instrumentación); 561.151 s.
-Corrección de barrera y repetición íntegra final del módulo: 102 passed, 0 failed; 118.904 s.
-Los tres casos inicialmente fallidos están entre esos 102; no se suman duplicados.
-Incluye 205 casos parametrizados expresamente con MySQL y 23 pruebas de migración.
-Alembic check: No new upgrade operations detected.
-React/Vitest: 54 passed.
-TypeScript: tsc --noEmit, exit 0.
-Producción: vite build aprobado.
-Playwright completo: 64 passed (32 escritorio, 32 móvil).
-Playwright fase 6: 16 recorridos dentro de los 64, sin sumarlos otra vez.
-Capturas: 24 (12 escritorio, 12 móvil), sin desbordamiento horizontal.
-API E2E final: sin errores 500, interbloqueos ni trazas.
-E2E: base exclusiva descartable, preparada vacía con revisión 0008;
-     solo administrador temporal antes de pruebas, catálogos preparados por E2E.
-Migración: 0008_reminders, 14 tablas nuevas, 49 anteriores conservadas.
-Migraciones 0001-0007: bytes idénticos a la base Git.
-WhatsApp: enlaces interceptados localmente; ningún envío externo real.
+Backend: 441 passed en una sola ejecución completa; 0 failed; 0 errors; 0 skipped; 1734.384 s.
+Concurrencia fase 6: 9/9 aprobadas sobre MySQL real, con conexiones independientes.
+Migración 0008: 3/3; 14 tablas añadidas, 49 anteriores conservadas, 63 de aplicación en total.
+Migraciones 0001–0007 intactas; alembic check sin operaciones pendientes.
+React: 54/54. Playwright: 64/64 (32 escritorio, 32 móvil).
+TypeScript y compilación: exit 0.
+24 capturas versionadas comprobadas; no regeneradas durante esta revisión.
+API E2E: sin errores 500, interbloqueos ni trazas.
+WhatsApp: consentimiento vigente, enlaces oficiales y confirmación manual; sin envío externo real.
+Código y pruebas sin modificaciones; únicamente se actualizan documentación y evidencias.
 
-SHA-256 de 141 archivos de código/configuración/pruebas,
-ordenados por ruta y concatenados como ruta + NUL + contenido + NUL:
+Registros íntegros y manifiesto: docs/phase-6-verification/
+SHA-256 de 141 archivos de código/configuración/pruebas:
 cb88b2534ca2ca969794c7a065c65858a57a47249c4519cca587a8777dbc150c
 
 Backend por archivo:

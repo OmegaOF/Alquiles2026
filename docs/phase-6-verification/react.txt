@@ -1,0 +1,76 @@
+
+> alquiles-frontend@0.1.0 test
+> vitest run --reporter=verbose
+
+
+ RUN  v4.1.12 /workspace/Alquiles2026/frontend
+
+ ✓ tests/Tenancy.test.tsx > historial descarta una respuesta tardía de la casa consultada anteriormente 732ms
+ ✓ tests/Tenancy.test.tsx > registro diario recorre ocho pasos y conserva servicios, personas y moneda sin generar pagos 1309ms
+ ✓ tests/Reminders.test.tsx > el centro muestra el saldo parcial vigente y la fecha de Bolivia enviada por el servidor 890ms
+ ✓ tests/Reminders.test.tsx > revisar un aviso conserva la versión y huella del origen sin llamar a pagos 565ms
+ ✓ tests/Tenancy.test.tsx > contrato mensual guarda el periodo, primer cobro y vencimiento elegidos 1311ms
+ ✓ tests/Reminders.test.tsx > el propietario consulta y atiende sus avisos sin controles para preparar mensajes 247ms
+stderr | tests/UserIdentity.test.tsx > registrar persona nueva junto con una cuenta envía un solo nombre personal
+Warning: A component is changing a controlled input to be uncontrolled. This is likely caused by the value changing from a defined to undefined, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://reactjs.org/link/controlled-components
+    at input
+    at label
+    at Field (/workspace/Alquiles2026/frontend/src/components/Form.tsx:8:3)
+    at div
+    at form
+    at section
+    at Users (/workspace/Alquiles2026/frontend/src/pages/Users.tsx:14:3)
+
+ ✓ tests/UserIdentity.test.tsx > crear cuenta de una persona existente no duplica su nombre y guarda alias aparte 1331ms
+ ✓ tests/Reminders.test.tsx > la aceptación no se preselecciona ni se deduce de un teléfono extranjero guardado 438ms
+ ✓ tests/Reminders.test.tsx > operadores y propietarios no reciben formularios para otorgar consentimiento 36ms
+ ✓ tests/Reminders.test.tsx > sin consentimiento se muestra el error y no existe enlace ni apertura 73ms
+ ✓ tests/Reminders.test.tsx > el mensaje editado se guarda como preparación sin abrir WhatsApp ni confirmar envío 136ms
+ ✓ tests/UserIdentity.test.tsx > registrar persona nueva junto con una cuenta envía un solo nombre personal 358ms
+ ✓ tests/Reminders.test.tsx > una ventana bloqueada no registra autorización ni apertura 184ms
+ ✓ tests/UserIdentity.test.tsx > propietario debe vincularse a una persona propietaria existente 275ms
+ ✓ tests/Reminders.test.tsx > abrir registra solamente apertura y la confirmación manual necesita otra acción 258ms
+ ✓ tests/Tenancy.test.tsx > vencimiento mensual personalizado utiliza el acuerdo escrito sin imponer un día 1327ms
+ ✓ tests/Reminders.test.tsx > un saldo cambiado bloquea la apertura y permite generar explícitamente el texto actual 247ms
+ ✓ tests/UserIdentity.test.tsx > editar alias no cambia el nombre ni permite desconectar la persona 411ms
+ ✓ tests/Tenancy.test.tsx > operador prepara borradores y no puede escoger un contrato vigente 283ms
+ ✓ tests/Tenancy.test.tsx > propietario consulta contratos sin acciones de registro 16ms
+ ✓ tests/Tenancy.test.tsx > disponibilidad identifica cada espacio con texto y permite consultar fechas 101ms
+ ✓ tests/Reminders.test.tsx > un reintento tras respuesta perdida conserva la solicitud original y su versión 446ms
+ ✓ tests/Reminders.test.tsx > una dirección ajena al dominio oficial se rechaza antes de registrar apertura 145ms
+ ✓ tests/UserIdentity.test.tsx > editar nombre en Personas actualiza la cuenta y conserva su alias 958ms
+ ✓ tests/Anticreticos.test.tsx > un contrato anterior no inventa capital, fechas ni repartos desde los propietarios 88ms
+ ✓ tests/Anticreticos.test.tsx > capital acordado guarda solo condiciones y asignaciones expresas, con ambas versiones 196ms
+ ✓ tests/Anticreticos.test.tsx > devolución muestra antes y después exactos, titular, pagador y beneficiario antes de confirmar 142ms
+ ✓ tests/Anticreticos.test.tsx > cancelar la confirmación no registra una devolución 105ms
+ ✓ tests/Anticreticos.test.tsx > el reintento tras conflicto conserva la misma clave y muestra el mensaje del servidor 112ms
+ ✓ tests/Anticreticos.test.tsx > propietario consulta capital sin botones para modificar, devolver ni anular 104ms
+ ✓ tests/Anticreticos.test.tsx > operador puede abrir entrega pero no devolución ni ajustes sensibles 44ms
+ ✓ tests/Anticreticos.test.tsx > resumen separa monedas y vencimientos son una consulta sin mensajes 120ms
+ ✓ tests/Finances.test.tsx > centavos exactos no convierten dinero a punto flotante 6ms
+ ✓ tests/PhaseOne.test.tsx > inicio de sesión conserva la contraseña exacta y usa cookies 514ms
+ ✓ tests/PhaseOne.test.tsx > propietario no ve acciones para registrar ni gestionar usuarios 138ms
+ ✓ tests/PhaseOne.test.tsx > administrador de propiedades edita sin enviar campos de permisos 175ms
+ ✓ tests/Finances.test.tsx > pago guiado conserva pagador distinto y aplicaciones explícitas sin reparto automático 821ms
+ ✓ tests/PhaseOne.test.tsx > registro de persona no obliga a tener teléfono, correo ni cuenta 167ms
+ ✓ tests/PhaseOne.test.tsx > cancelar confirmación no modifica personas 128ms
+ ✓ tests/Finances.test.tsx > un reintento de formulario conserva el identificador de la operación 453ms
+ ✓ tests/Finances.test.tsx > registrar gasto separa el registro del desembolso 14ms
+ ✓ tests/Finances.test.tsx > propietario consulta resumen y deudas sin controles de gestión 106ms
+ ✓ tests/Finances.test.tsx > resumen mantiene distintas monedas separadas 39ms
+ ✓ tests/ApiErrors.test.tsx > los errores de validación identifican el campo sin revelar entradas 6ms
+ ✓ tests/App.test.tsx > muestra inicio accesible y no simula funciones futuras 111ms
+ ✓ tests/App.test.tsx > comprueba la conexión real de la API al pulsar 80ms
+ ✓ tests/App.test.tsx > permite reintentar tras un error sin mostrar datos técnicos 36ms
+ ✓ tests/Utilities.test.tsx > recibo registra importes y fechas reales sin enviar campos de pago 1017ms
+ ✓ tests/Utilities.test.tsx > porcentajes y responsabilidades muestran controles separados y no infieren copropiedad 33ms
+ ✓ tests/Utilities.test.tsx > propietario consulta servicios sin acciones para registrarlos o cambiarlos 18ms
+ ✓ tests/Utilities.test.tsx > reparto ambiguo muestra el motivo y bloquea confirmación hasta resolver 75ms
+ ✓ tests/Utilities.test.tsx > operador puede ver el cálculo pero no confirmar ni revisar importes manualmente 54ms
+ ✓ tests/Utilities.test.tsx > reparto confirmado conserva el resumen sin botones para modificar su resultado 56ms
+ ✓ tests/Utilities.test.tsx > presentación monetaria exacta conserva centavos grandes y redondea sin float 2ms
+
+ Test Files  9 passed (9)
+      Tests  54 passed (54)
+   Start at  15:30:57
+   Duration  14.82s (transform 3.27s, setup 3.48s, import 5.74s, tests 17.08s, environment 11.66s)

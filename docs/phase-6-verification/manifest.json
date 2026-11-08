@@ -1,0 +1,265 @@
+{
+  "source_commit": "685616ad087039800404d32b6c54df197a316ffa",
+  "branch": "phase-6-reminders-whatsapp",
+  "main_base": "e078aaf64da189657d6435939309fb0f2e0b75ae",
+  "source_sha256": "cb88b2534ca2ca969794c7a065c65858a57a47249c4519cca587a8777dbc150c",
+  "source_files": 141,
+  "captures": [
+    {
+      "path": "docs/screenshots/phase-6/escritorio-alquileres.png",
+      "sha256": "2a8e3a76d00959efe160b854348c478bd1788d1e8f890d85d6a88ac44c276350",
+      "width": 1440,
+      "height": 1879
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-anticreticos.png",
+      "sha256": "aaab513982fa1235f58111a157bc742e7fa5fcf9529153f0dee50585f437375d",
+      "width": 1440,
+      "height": 2330
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-consentimientos.png",
+      "sha256": "16cc0c7f97376e18067eeac321aa2f3523e4ad81adf36848e36801a1d6fc5bfd",
+      "width": 1440,
+      "height": 2518
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-contratos.png",
+      "sha256": "243ad091586683b65ca8d42a25040830c52dede244035a0ea4377e5fa97d0a35",
+      "width": 1440,
+      "height": 1854
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-historial.png",
+      "sha256": "45cee8fcaf59f505e10f55cfddcfef848b9fd0b7d5f1f9f0a146d976187be0eb",
+      "width": 1440,
+      "height": 2203
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-pagos-reportados.png",
+      "sha256": "ab1411547f0beeea77825499f0e79d9daab0fc3ac9118fe0b059337a8ca3eb1b",
+      "width": 1440,
+      "height": 1529
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-preferencias.png",
+      "sha256": "43e1634b852b11b711b4f8c1b34b1e8f0085adae8ecad6298b2a5f8ca45a1d99",
+      "width": 1440,
+      "height": 3477
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-preparar-whatsapp.png",
+      "sha256": "e7f31e539e05d1b9e79f8db3d9082c1f93c16aa8c345780bae788a83eb641bbb",
+      "width": 1440,
+      "height": 2747
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-propietarios.png",
+      "sha256": "982e21576ae0985c23a1675de304b38e037ed8cbc447f03cbf9c163d398b6e59",
+      "width": 1440,
+      "height": 2234
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-resumen.png",
+      "sha256": "4c56409ea703171706251b70b779e096ef15e3b1162e214d15363c1e1da4b49a",
+      "width": 1440,
+      "height": 2212
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-servicios.png",
+      "sha256": "5cdbd33dcfd0b6e98fe0a14cae5eb7a4c86cfc78416fe12705f34f5be98ba7ee",
+      "width": 1440,
+      "height": 1879
+    },
+    {
+      "path": "docs/screenshots/phase-6/escritorio-vencimientos.png",
+      "sha256": "280a82150da5d21ebd9de3359d79db85fc9cb93361dd38061eb5f8c031005d0f",
+      "width": 1440,
+      "height": 2212
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-alquileres.png",
+      "sha256": "6126bd830c0c5dd81a7a6daba63056cf58f9fdd425ccbc59896b3dc46d6b9401",
+      "width": 390,
+      "height": 3273
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-anticreticos.png",
+      "sha256": "4602d6cd3d5b015b082dcb11e266d6c8de2778d31e56bf90f8ed18118723d925",
+      "width": 390,
+      "height": 4188
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-consentimientos.png",
+      "sha256": "84871b6b6380ece92cd536b3aa28db22c2a2af2a7d8c3e99b1d9b5459c22179c",
+      "width": 390,
+      "height": 4425
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-contratos.png",
+      "sha256": "62a0fa183bb978756fffdbbf08142d705f9f2978cbc281119acdf140aa94592e",
+      "width": 390,
+      "height": 3273
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-historial.png",
+      "sha256": "dfedec716bef0178e15488c5ddb5545bdd38dbb32808be1f4eef18ea286897e6",
+      "width": 390,
+      "height": 4016
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-pagos-reportados.png",
+      "sha256": "f7a6435a29de073be04bce668b6172834ba281ab90bf614a3c3d14983075e5e3",
+      "width": 390,
+      "height": 2983
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-preferencias.png",
+      "sha256": "5c059b016bd25b328b312fa9654bfa3a5e9641f78d25cbdf14dff5cc0c0eed09",
+      "width": 390,
+      "height": 6260
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-preparar-whatsapp.png",
+      "sha256": "737bd52dae38cd75356d518c698b29bfbe62f9abd01754275819621e18ca5579",
+      "width": 390,
+      "height": 4599
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-propietarios.png",
+      "sha256": "51c3f5cc79a8215a033ffd4587434202f8e5a1080db8aeb4e51919e809984aa9",
+      "width": 390,
+      "height": 3828
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-resumen.png",
+      "sha256": "7586a87dea4d84c91c0bda2ec6798aad4275af61ad855e9a06feeb6de595bed0",
+      "width": 390,
+      "height": 3674
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-servicios.png",
+      "sha256": "d7a09964165ac2026b946e9e1c66d7be5e7e46d3a01d04ba58fa545d39f2858d",
+      "width": 390,
+      "height": 3324
+    },
+    {
+      "path": "docs/screenshots/phase-6/movil-vencimientos.png",
+      "sha256": "344be4ee211ba8894390ca2662e63f545d079320332de36078f3526d81888815",
+      "width": 390,
+      "height": 3674
+    }
+  ],
+  "runtime": {
+    "python": "Python 3.12.14",
+    "node": "v24.22.1",
+    "mysql": "8.4.13",
+    "chromium": "Chromium 155.0.8059.79 built on Debian GNU/Linux 13 (trixie)"
+  },
+  "schema_check": {
+    "total_application_tables": 63,
+    "previous_tables": 49,
+    "added_tables": [
+      "communication_consent_heads",
+      "communication_consents",
+      "payment_report_decisions",
+      "reminder_attention_events",
+      "reminder_communication_events",
+      "reminder_communications",
+      "reminder_lead_days",
+      "reminder_notices",
+      "reminder_operations",
+      "reminder_preferences",
+      "reminder_recipients",
+      "reminder_templates",
+      "reminder_type_preferences",
+      "reported_payments"
+    ]
+  },
+  "git_source_trees": {
+    "backend/app": "c55f6e1e1dc4576f79542fa8ddd2544865434156",
+    "backend/tests": "c06b1276bfd06e6239b8672f01bd346f0c374ec6",
+    "backend/migrations": "5749748fbaf701aef837a575180dee4053e50e72",
+    "frontend/src": "f27079aaa86ab7bf1bf6e4b8c9b011888bf78e1f",
+    "frontend/tests": "546dfd6754778cfb773cdd1f37ea5378e6277cc1",
+    "frontend/e2e": "be8a9dd58dccb70d67e487f1f06d2a813f03b260",
+    ".github": "98ff1a277ffd70c6c1d2064a4171f73e92ef5bf4"
+  },
+  "verified_at_america_la_paz": "2026-11-08T12:00:41-04:00",
+  "backend": {
+    "invocations": 1,
+    "tests": 441,
+    "passed": 441,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 1734.384
+  },
+  "backend_by_file": {
+    "tests.test_anticreticos": 60,
+    "tests.test_finances": 52,
+    "tests.test_health": 5,
+    "tests.test_integration": 1,
+    "tests.test_migration_11": 8,
+    "tests.test_migration_2": 3,
+    "tests.test_migration_3": 3,
+    "tests.test_migration_4": 3,
+    "tests.test_migration_5": 3,
+    "tests.test_migration_6": 3,
+    "tests.test_phase1": 52,
+    "tests.test_reminders": 99,
+    "tests.test_tenancy": 72,
+    "tests.test_utilities": 77
+  },
+  "mysql_parameterized_cases": 205,
+  "migration_suites_tests": 23,
+  "phase6_concurrency_cases": [
+    "test_mysql_independent_reminder_actions_are_serialized[mysql-notice]",
+    "test_mysql_independent_reminder_actions_are_serialized[mysql-same_key]",
+    "test_mysql_independent_reminder_actions_are_serialized[mysql-prepare]",
+    "test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first[mysql-finances]",
+    "test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first[mysql-anticreticos]",
+    "test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first[mysql-reminders/preferences]",
+    "test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first[mysql-reminders/templates]",
+    "test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first[mysql-reminders/consents]",
+    "test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first[mysql-reminders/consent-history]"
+  ],
+  "phase6_migration_cases": [
+    "test_mysql_clean_0008_normalized_structure_and_no_automatic_records",
+    "test_mysql_populated_49_tables_preserved_byte_for_byte_including_credentials_and_sessions",
+    "test_mysql_0008_foreign_keys_unique_keys_checks_and_immutable_history"
+  ],
+  "react": {
+    "passed": 54
+  },
+  "playwright": {
+    "passed": 64,
+    "desktop": 32,
+    "mobile": 32
+  },
+  "typescript": "exit 0",
+  "production_build": "exit 0",
+  "alembic": "No new upgrade operations detected.",
+  "application_tables": {
+    "before": 49,
+    "added": 14,
+    "total": 63
+  },
+  "api_500_or_deadlock_errors": 0,
+  "source_or_tests_modified": false,
+  "notes": [
+    "Una única ejecución completa de pytest; sin sumar ejecuciones parciales.",
+    "Las 24 capturas versionadas se conservaron sin regenerarlas.",
+    "Los registros de texto solo normalizan secuencias ANSI, retornos de terminal y saltos de línea finales.",
+    "El XML JUnit se conserva íntegro."
+  ],
+  "records": {
+    "alembic.txt": "43d345b67ace77ab8c4cbf575a3baddf66e8623cf7d1e0b78e602b1d641ecf50",
+    "backend.txt": "79bf65a823b78643f77438db23c256297ac062354ae04d74aebcd049900e0065",
+    "backend.xml": "c705dac4be6bdfbc96387af21572423db8abd8f77af13298e91a1d0b102eaa76",
+    "build.txt": "ce19f020bad0e00435c0af2e7be915bca89ef6703a589f356bef15d25d2455bf",
+    "playwright.txt": "4f896fa7329a83d23b63ee40e03d2abc76ad4aae156406f9e170d2c858e21075",
+    "react.txt": "6ca410e6bff7eab0f9a501aab599c140354fd296460121c5d46909b74cea33eb",
+    "typescript.txt": "a6c092b06eae37313f97fbd3b04d5cc71d2d8273e745ca6f4969ddad69305f99"
+  }
+}

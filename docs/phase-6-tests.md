@@ -4,25 +4,29 @@ Entorno cloud, exclusivamente datos ficticios y bases MySQL 8.4 descartables. Ra
 
 ## Resultados definitivos
 
-Verificación final del código entregado, registrada en UTC. [Resumen reproducible y huella de archivos](phase-6-validation.txt).
+Verificación final ejecutada el 2026-11-08T12:00:41-04:00 (America/La_Paz) sobre el commit `685616ad087039800404d32b6c54df197a316ffa`. Código, migraciones y pruebas permanecieron sin modificaciones durante toda la ejecución. [Manifiesto y sumas SHA-256](phase-6-verification/manifest.json).
 
-| Comprobación | Resultado real |
+| Comprobación | Resultado definitivo |
 | --- | --- |
-| Backend, fases 0–6 | **441 casos distintos verificados**, 0 pendientes y 0 omitidos; detalle de ejecuciones debajo |
-| MySQL | 205 casos parametrizados explícitamente con MySQL, más las 23 pruebas de migración; bases descartables |
-| Migración 0008 | 3 pruebas aprobadas: limpia, 49 tablas pobladas up/down/up y restricciones SQL |
-| Concurrencia nueva | 3 carreras de acciones/preparación y 6 variantes de lectura, aprobadas en MySQL real |
-| React | **54 aprobadas**: 42 previas y 12 de fase 6 |
-| TypeScript y producción | `tsc --noEmit` y `vite build`, ambos aprobados |
-| Playwright completo | **64 aprobadas**: 48 previas y 16 nuevas; 32 en escritorio y 32 en móvil |
-| Alembic / código | Sin operaciones pendientes; 0001–0007 intactas; `git diff --check` limpio |
-| Evidencias visuales | 24 capturas reales, doce pantallas por dispositivo |
+| Backend completo, fases 0–6 | **441/441 aprobadas en una única ejecución completa**, 0 fallos, 0 errores, 0 omitidas; 1734.384 segundos |
+| Evidencia backend | [Registro íntegro](phase-6-verification/backend.txt) y [JUnit XML](phase-6-verification/backend.xml) |
+| MySQL real | 205 casos parametrizados con MySQL y 23 pruebas de migraciones sobre bases descartables |
+| Concurrencia de fase 6 | **9/9 aprobadas**: tres carreras de acciones/preparación y seis variantes de lectura simultánea |
+| Migración 0008 | **3/3 aprobadas**: base limpia, conservación de las 49 tablas pobladas up/down/up y restricciones SQL |
+| React | **54/54 aprobadas** ([registro](phase-6-verification/react.txt)) |
+| TypeScript | `tsc --noEmit`, código 0 ([registro](phase-6-verification/typescript.txt)) |
+| Compilación | `vite build`, código 0 ([registro](phase-6-verification/build.txt)) |
+| Playwright completo | **64/64 aprobadas**: 32 en escritorio y 32 en móvil ([registro](phase-6-verification/playwright.txt)) |
+| Alembic | Sin operaciones pendientes ([registro](phase-6-verification/alembic.txt)); 0001–0007 idénticas a main con fase 5 |
+| Capturas | **24 incluidas en Git**, doce por dispositivo; sumas verificadas y sin cambios |
 
-La pasada completa ejecutó los 441 casos: 438 aprobaron y tres fallaron por `BrokenBarrierError` en la barrera de prueba, que se aplicaba también a llamadas anidadas. Se corrigió para sincronizar solo el primer ingreso de cada solicitud. Después se repitió íntegramente el módulo y su migración: **102 aprobadas**, incluidos los tres casos afectados, sin fallos ni omisiones. Los resultados combinados cubren los mismos **441 casos distintos**; no se suman 438 + 102 como si fueran casos diferentes. Todos los casos de fases 0–5 aprobaron en la pasada completa.
+La ejecución completa confirma las fases anteriores y los casos de saldos reales, pagos parciales, ajustes, anulaciones, ausencia de dinero creado por avisos/reportes, consentimiento vigente y separación entre apertura y envío manual. El registro de la API durante Playwright no presentó errores 500, interbloqueos ni trazas. El dominio `wa.me` se intercepta en las pruebas; no se realizaron envíos externos.
 
-La regresión confirma funcionamiento de fases 0–5 y la integración de fase 6. El caso previo de fase 5 «fin de ocupación y restitución no cancelan deuda de servicios» aprobó en ambos tamaños. Los avisos de deprecación existentes se detallan al final; no hubo omisiones. No se realizaron envíos reales a WhatsApp.
+Los nuevos registros sustituyen el resultado combinado de la entrega anterior. **Los 441 casos aprobaron juntos; no se sumaron ejecuciones parciales ni se modificaron aserciones para aprobar.** Código y pruebas conservan la huella `cb88b2534ca2ca969794c7a065c65858a57a47249c4519cca587a8777dbc150c`.
 
-Una primera regresión integral aprobó 425 pruebas backend y `alembic check`. Se añadieron después comprobaciones del filtro API, campos de plantilla ausentes y capital pendiente con restitución futura tras finalizar ocupación; la ejecución definitiva indicada arriba incluye estas comprobaciones. No se suman ejecuciones repetidas para inflar el número de casos.
+### Historial de la entrega anterior
+
+El informe original de `685616a` combinaba 438 aprobaciones de una pasada general con una repetición de 102 casos del módulo. Tres casos habían fallado por `BrokenBarrierError` en la instrumentación y se corrigió entonces la barrera para llamadas anidadas. Esa historia se conserva aquí; la nueva verificación ejecuta **todo el conjunto de 441 casos sin fallos**, con la barrera que ya estaba incluida en el commit recibido. No fue necesario modificar código ni pruebas durante esta revisión.
 
 La suite backend repite casos en SQLite con FK activas y MySQL real. Las seis suites de migración se ejecutan secuencialmente en una base independiente. Se habilitaron `RUN_MYSQL_TESTS`, `PHASE1_TEST_DATABASE_URL` y todas las `PHASE*_MIGRATION_DATABASE_URL`, incluida `PHASE6_MIGRATION_DATABASE_URL`. No se presentan omisiones por falta de MySQL como aprobaciones.
 
@@ -124,7 +128,7 @@ Solo personas, números de ejemplo y registros ficticios del entorno descartable
 
 El navegador detectó MySQL 1213 al consultar a la vez finanzas, reportes y recordatorios. La lectura crítica `finances.state` bloqueaba cuentas/movimientos antes que la propiedad; las proyecciones de recordatorios comenzaban por la propiedad. Las lecturas de capital también podían comenzar por contratos. Ese orden invertido permitía un ciclo de espera.
 
-Se corrigió únicamente el protocolo de bloqueo: `finances.state` y las entradas de lectura `anticreticos.detail/summary/listing` bloquean primero la propiedad. No cambiaron cálculos, saldos ni reglas monetarias. La prueba nueva `test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first` ejecuta consultas por conexiones independientes, sincronizadas antes de su primera lectura bloqueante: **antes de la corrección fallaron ambos casos reproduciendo 1213; después aprobaron ambos**. Se amplió la comprobación a seis consultas (finanzas, capital, preferencias, plantillas, consentimientos e historial), todas con propiedad como primer bloqueo. La regresión completa se repite con esta corrección y las pruebas de navegador continúan sobre una base aislada.
+Se corrigió únicamente el protocolo de bloqueo: `finances.state` y las entradas de lectura `anticreticos.detail/summary/listing` bloquean primero la propiedad. No cambiaron cálculos, saldos ni reglas monetarias. La prueba nueva `test_mysql_parallel_finance_capital_and_reminder_reads_lock_property_first` ejecuta consultas por conexiones independientes, sincronizadas antes de su primera lectura bloqueante: **antes de la corrección fallaron ambos casos reproduciendo 1213; después aprobaron ambos**. Se amplió la comprobación a seis consultas (finanzas, capital, preferencias, plantillas, consentimientos e historial), todas con propiedad como primer bloqueo. La verificación final volvió a ejecutar estas seis variantes dentro de la misma pasada completa de 441 casos; también aprobaron los 64 recorridos de navegador sobre una base aislada.
 
 ## Incidencias de desarrollo y límites de la verificación
 
