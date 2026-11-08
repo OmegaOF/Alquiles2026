@@ -20,6 +20,8 @@ export const movementNames: Record<string, string> = {
   disbursed: "Pago realizado",
   provider_direct: "Pago del inquilino al proveedor",
   refund: "Devolución",
+  capital_received: "Entrega de capital anticrético",
+  capital_returned: "Restitución de capital anticrético",
 };
 export interface Catalog {
   id: number;
@@ -58,7 +60,7 @@ export interface Obligation {
 }
 export interface Movement {
   id: number;
-  person_id: number;
+  person_id: number | null;
   payer_id: number;
   beneficiary_person_id: number | null;
   beneficiary_label: string | null;
@@ -128,6 +130,11 @@ export interface RentPreview {
   currency: string;
 }
 export const summaryLabels: Record<string, string> = {
+  capital_agreed: "Capital anticrético acordado (no es dinero recibido)",
+  capital_received: "Capital anticrético recibido, separado de alquiler",
+  capital_returned: "Capital anticrético restituido, separado de gastos",
+  capital_adjustments: "Acuerdos de restitución sin movimiento de dinero",
+  capital_pending: "Capital anticrético pendiente de devolución",
   owner_services: "Parte económica de servicios del propietario",
   receivable: "Importes registrados por cobrar",
   pending: "Deuda pendiente",

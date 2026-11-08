@@ -11,6 +11,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import select
 from app.models import finances as m
+from app.models.anticreticos import AnticreticoMovement
 from app.models.entities import Unit
 from app.models.tenancy import Contract
 from app.models.utilities import (
@@ -176,6 +177,11 @@ def expense_values(db, obj):
 
 
 def movement_account(db, id):
+    capital = db.get(AnticreticoMovement, id)
+    if capital:
+        from app.services.anticreticos import finance_context
+
+        return finance_context(db, capital)
     incoming = db.get(m.FinanceIncoming, id)
     guarantee = db.get(m.FinanceGuarantee, id)
     if incoming or guarantee:
@@ -587,6 +593,11 @@ def refund(db, user, property_id, id, data):
 def void_movement(db, user, property_id, id, data):
     def run(op):
         obj = scoped(db, m.FinanceMovement, id, property_id)
+        require(
+            db.get(AnticreticoMovement, id) is None,
+            "Corrija los movimientos de capital desde Anticréticos para verificar sus saldos.",
+            409,
+        )
         require(not obj.void_operation_id, "El movimiento ya está anulado.", 409)
         returned = [
             u.fresh(db, m.FinanceMovement, r.movement_id)
@@ -1047,6 +1058,7 @@ def movement_dict(db, obj):
     guarantee = db.get(m.FinanceGuarantee, obj.id)
     disb = db.get(m.FinanceDisbursement, obj.id)
     refund_ = db.get(m.FinanceRefund, obj.id)
+    capital = db.get(AnticreticoMovement, obj.id)
     kind = (
         "advance"
         if incoming and incoming.category == "advance"
@@ -1064,6 +1076,8 @@ def movement_dict(db, obj):
             )
         )
     )
+    if capital:
+        kind = "capital_received" if capital.kind == "delivery" else "capital_returned"
     value = (
         available(db, obj)
         if incoming or guarantee or (disb and disb.is_direct)
@@ -1109,7 +1123,11 @@ def movement_dict(db, obj):
         "available": str(value),
         "refunded": str(returned),
         "applied": str(sum((p.amount for p in active_apps), ZERO)),
-        "contract_id": guarantee.contract_id if guarantee else None,
+        "contract_id": (
+            guarantee.contract_id
+            if guarantee
+            else getattr(a, "anticretico_contract_id", None)
+        ),
         "conditions": guarantee.conditions if guarantee else None,
         "expense_id": disb.expense_id if disb else None,
         "source_movement_id": refund_.source_movement_id if refund_ else None,
@@ -1211,8 +1229,11 @@ def state(db, user, property_id):
         True,
     )
     movements = [movement_dict(db, obj) for obj in movement_rows]
+    from app.services.anticreticos import summary as capital_summary
+
+    capital_groups = {g["currency"]: g for g in capital_summary(db, user, property_id)}
     summaries = []
-    for currency in sorted({a.currency for a in accounts}):
+    for currency in sorted({a.currency for a in accounts} | set(capital_groups)):
         obs = [o for o in obligations if o["currency"] == currency]
         exps = [e for e in expenses if e["currency"] == currency]
         moves = [
@@ -1272,6 +1293,15 @@ def state(db, user, property_id):
                 ),
             }
         )
+        capital = capital_groups.get(currency, {})
+        for key in [
+            "capital_agreed",
+            "capital_received",
+            "capital_returned",
+            "capital_adjustments",
+            "capital_pending",
+        ]:
+            summaries[-1][key] = capital.get(key, "0.00")
     return {
         "accounts": [u.scalar_dict(a) for a in accounts],
         "obligations": obligations,

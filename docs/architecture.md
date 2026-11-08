@@ -14,7 +14,7 @@ El arranque no depende de MySQL para atender `/health`; `/ready` consulta MySQL 
 
 ## Módulos y fases
 
-Propietarios/propiedades/unidades/usuarios/permisos implementados en fase 1 e identidad normalizada en 1.1. Contratos, reservas y ocupaciones implementados en fase 2. Servicios básicos, recibos y distribución implementados en fase 3. Obligaciones, pagos, garantías y gastos implementados en fase 4. Pendientes: capital y devoluciones de anticréticos (fase 5); recordatorios y adaptador WhatsApp (fase 6); reportes ECharts/PDF (fase 7). No se instalan anticipadamente dependencias de gráficos, PDF ni mensajería.
+Propietarios/propiedades/unidades/usuarios/permisos implementados en fase 1 e identidad normalizada en 1.1. Contratos, reservas y ocupaciones implementados en fase 2. Servicios básicos, recibos y distribución implementados en fase 3. Obligaciones, pagos, garantías y gastos implementados en fase 4. Capital, condiciones versionadas y restituciones de anticréticos implementados en fase 5. Pendientes: recordatorios y adaptador WhatsApp (fase 6); reportes ECharts/PDF (fase 7). No se instalan anticipadamente dependencias de gráficos, PDF ni mensajería.
 
 Cada fase deberá declarar dependencias y aceptación antes de implementarse. Se detendrá para revisión del usuario antes de iniciar la siguiente.
 
@@ -78,4 +78,14 @@ Los alquileres se generan con vista previa desde los periodos contractuales. Con
 
 Las operaciones económicas conservan clave idempotente, huella y resultado histórico; comparten bloqueo por propiedad con fases anteriores y utilizan lecturas actuales para saldos. Cantidades `DECIMAL(14,2)` y precisión de cálculo 48; dinero real, garantías y aplicaciones no se suman como nuevas entradas entre sí. Pagos directos de inquilinos al proveedor se distinguen de caja del propietario.
 
-`0006_finances` no modifica las migraciones 0001–0005. Datos, dependencias funcionales, restricciones, límites y recuperación: [phase-4.md](phase-4.md). HTTP: [phase-4-api.md](phase-4-api.md); evidencia real: [phase-4-tests.md](phase-4-tests.md). No existen procesos fiscales ni capital de anticrético en este módulo.
+`0006_finances` no modifica las migraciones 0001–0005. Datos, dependencias funcionales, restricciones, límites y recuperación: [phase-4.md](phase-4.md). HTTP: [phase-4-api.md](phase-4-api.md); evidencia real: [phase-4-tests.md](phase-4-tests.md). La entrega original de fase 4 excluyó el capital de anticrético; su complemento se incorpora en fase 5. No existen procesos fiscales.
+
+## Capital de anticréticos en fase 5
+
+Ocho tablas nuevas llevan el esquema a 49 tablas de aplicación. El complemento económico se identifica por `contract_id`, tiene revisiones inmutables y asignaciones explícitas de titulares/beneficiarios/responsables. El contrato sigue siendo la única fuente de espacio, moneda y ocupación. Registrar un acuerdo no significa recibir capital.
+
+Entregas y restituciones usan una fila `finance_movements` y un subtipo `anticretico_movements` con sus partes; nunca se convierten en ingresos ordinarios, garantías o gastos. Los acuerdos no monetarios tienen líneas firmadas, documento, fecha y autorización, sin inventar efectivo. Saldos por persona/pareja y resumen por moneda se calculan desde movimientos válidos y acuerdos, compartiendo criterios con Pagos y gastos.
+
+Todas las escrituras usan operación idempotente, bloqueo de propiedad, lecturas actuales, versiones de capital/contrato y auditoría. Las anulaciones comprueban toda la cronología antes de excluir un movimiento. Liquidación económica, salida efectiva y servicios permanecen independientes. No hay compensación cruzada ni mensajería.
+
+`0007_anticreticos` conserva las 41 tablas anteriores y las migraciones 0001–0006. Diagrama, DF/3FN, integridad, recuperación y límites: [phase-5.md](phase-5.md). API: [phase-5-api.md](phase-5-api.md); ejecución de pruebas y capturas: [phase-5-tests.md](phase-5-tests.md).

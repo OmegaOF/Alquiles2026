@@ -94,6 +94,18 @@ const fieldNames: Record<string, string> = {
   weekly_partial_rule: "regla pactada del periodo semanal incompleto",
   last_period_rule: "regla pactada del último periodo mensual",
   expected_distribution_id: "reparto confirmado del servicio",
+  expected_contract_version: "contrato actualizado; recargue los datos",
+  agreed_capital: "capital acordado",
+  restitution_on: "fecha pactada de restitución",
+  expected_delivery_on: "fecha prevista de entrega del capital",
+  holders: "titulares y sus importes acordados",
+  responsibles: "responsables de devolución y sus importes",
+  holder_id: "titular con derecho al capital",
+  responsible_id: "responsable de restitución",
+  assigned_amount: "importe expresamente asignado",
+  allocations: "partes del capital y sus responsables",
+  effective_on: "fecha efectiva del acuerdo",
+  delta: "cambio autorizado de la responsabilidad",
 };
 export async function api<T>(
   path: string,

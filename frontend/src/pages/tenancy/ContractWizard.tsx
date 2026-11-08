@@ -320,7 +320,7 @@ export function ContractWizard({
             {mode === "anticretico" && (
               <p className="permission-note">
                 Se registrarán inmueble, ocupantes, fechas y condiciones. El
-                capital y las devoluciones no están disponibles hasta la fase 5.
+                capital y las devoluciones se completan después en Anticréticos.
               </p>
             )}
             {mode === "mixed" && (

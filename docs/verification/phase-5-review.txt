@@ -1,0 +1,10 @@
+Revisión de entrega de fase 5, 2026-11-08 UTC.
+Rama local: phase-5-anticreticos-capital; base origin/main b4450db7293c482313833377a5fa19fbe4bdf45b.
+236 archivos versionables revisados, incluidos registros e imágenes.
+Sin .env privados, patrones de claves/tokens reconocidos ni credenciales temporales de prueba.
+Las URL de MySQL versionadas usan únicamente las claves públicas de ejemplo local/CI.
+6 migraciones anteriores idénticas byte a byte a la base.
+60 enlaces locales revisados, sin destinos ausentes.
+22 capturas nuevas con datos ficticios; revisión visual seleccionada documentada en phase-5-tests.md.
+No hay cambios de dependencias ni implementaciones fiscales, legales automáticas, WhatsApp o recordatorios.
+Esta revisión no constituye una certificación integral de seguridad o accesibilidad.

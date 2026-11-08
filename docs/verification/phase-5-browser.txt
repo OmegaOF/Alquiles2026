@@ -1,0 +1,67 @@
+Fase 5: API/MySQL descartables y Chromium, escritorio 1440x1000 y móvil 390x844.
+Credenciales temporales suministradas por entorno, sin valores versionados.
+
+
+> alquiles-frontend@0.1.0 test:e2e
+> playwright test --max-failures=1 --reporter=line
+
+
+Running 48 tests using 1 worker
+
+(node:98062) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/48] [escritorio] › e2e/anticreticos.spec.ts:189:1 › capital acordado, entregas y devoluciones parciales sin ingresos ordinarios
+[2/48] [escritorio] › e2e/anticreticos.spec.ts:251:1 › titulares y responsables expresos, sin deducir importes de copropiedad
+[3/48] [escritorio] › e2e/anticreticos.spec.ts:356:1 › correcciones, condiciones históricas, prórroga y liquidación independiente
+[4/48] [escritorio] › e2e/anticreticos.spec.ts:461:1 › fin de ocupación y restitución no cancelan deuda de servicios
+[5/48] [escritorio] › e2e/anticreticos.spec.ts:557:1 › propietario consulta y operador solo prepara entregas en sus casas
+[6/48] [escritorio] › e2e/connection.spec.ts:7:1 › inicio conecta React con FastAPI y MySQL sin desbordar la pantalla
+[7/48] [escritorio] › e2e/connection.spec.ts:27:1 › un error permite reintentar y recuperar la conexión
+[8/48] [escritorio] › e2e/finances.spec.ts:168:1 › alquiler, pago parcial, sobrante explícito y aplicación posterior de anticipo
+[9/48] [escritorio] › e2e/finances.spec.ts:233:1 › garantía separada, aplicación autorizada, devolución y gasto pagado parcialmente
+[10/48] [escritorio] › e2e/finances.spec.ts:411:1 › recibo externo 300, pago al proveedor y recuperación real de 70 más 150
+[11/48] [escritorio] › e2e/finances.spec.ts:476:1 › pago directo documentado del inquilino no inventa caja del propietario
+[12/48] [escritorio] › e2e/finances.spec.ts:516:1 › gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto al importar
+[13/48] [escritorio] › e2e/registry.spec.ts:4:1 › iniciar sesión, cerrar sesión y rechazar credenciales incorrectas
+[14/48] [escritorio] › e2e/registry.spec.ts:41:1 › registrar y editar persona, propiedad y cuartos desde React
+[15/48] [escritorio] › e2e/registry.spec.ts:117:1 › el propietario solo ve sus casas y no acciones de administración
+[16/48] [escritorio] › e2e/registry.spec.ts:172:1 › la sesión funciona también al entrar por localhost
+[17/48] [escritorio] › e2e/registry.spec.ts:192:1 › administrar una cuenta y asignar permisos desde React
+[18/48] [escritorio] › e2e/registry.spec.ts:261:1 › el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
+[19/48] [escritorio] › e2e/tenancy.spec.ts:88:1 › contrato diario guiado, modificación, prórroga y disponibilidad por cuarto
+[20/48] [escritorio] › e2e/tenancy.spec.ts:188:1 › reserva desde React, persona sin cuenta, confirmación y conversión en contrato
+[21/48] [escritorio] › e2e/tenancy.spec.ts:258:1 › finalización anticipada conserva personas e historial y actualiza la vista de la casa
+[22/48] [escritorio] › e2e/utilities.spec.ts:122:1 › servicio, recibo externo, ejemplo 14/15 días y corrección con historial
+[23/48] [escritorio] › e2e/utilities.spec.ts:267:1 › lecturas válidas e inválidas, reemplazo y consumo de dos medidores
+[24/48] [escritorio] › e2e/utilities.spec.ts:365:1 › contratos sucesivos exigen revisión manual antes de confirmar
+(node:100181) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[25/48] [movil] › e2e/anticreticos.spec.ts:189:1 › capital acordado, entregas y devoluciones parciales sin ingresos ordinarios
+[26/48] [movil] › e2e/anticreticos.spec.ts:251:1 › titulares y responsables expresos, sin deducir importes de copropiedad
+[27/48] [movil] › e2e/anticreticos.spec.ts:356:1 › correcciones, condiciones históricas, prórroga y liquidación independiente
+[28/48] [movil] › e2e/anticreticos.spec.ts:461:1 › fin de ocupación y restitución no cancelan deuda de servicios
+[29/48] [movil] › e2e/anticreticos.spec.ts:557:1 › propietario consulta y operador solo prepara entregas en sus casas
+[30/48] [movil] › e2e/connection.spec.ts:7:1 › inicio conecta React con FastAPI y MySQL sin desbordar la pantalla
+[31/48] [movil] › e2e/connection.spec.ts:27:1 › un error permite reintentar y recuperar la conexión
+[32/48] [movil] › e2e/finances.spec.ts:168:1 › alquiler, pago parcial, sobrante explícito y aplicación posterior de anticipo
+[33/48] [movil] › e2e/finances.spec.ts:233:1 › garantía separada, aplicación autorizada, devolución y gasto pagado parcialmente
+[34/48] [movil] › e2e/finances.spec.ts:411:1 › recibo externo 300, pago al proveedor y recuperación real de 70 más 150
+[35/48] [movil] › e2e/finances.spec.ts:476:1 › pago directo documentado del inquilino no inventa caja del propietario
+[36/48] [movil] › e2e/finances.spec.ts:516:1 › gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto al importar
+[37/48] [movil] › e2e/registry.spec.ts:4:1 › iniciar sesión, cerrar sesión y rechazar credenciales incorrectas
+[38/48] [movil] › e2e/registry.spec.ts:41:1 › registrar y editar persona, propiedad y cuartos desde React
+[39/48] [movil] › e2e/registry.spec.ts:117:1 › el propietario solo ve sus casas y no acciones de administración
+[40/48] [movil] › e2e/registry.spec.ts:172:1 › la sesión funciona también al entrar por localhost
+[41/48] [movil] › e2e/registry.spec.ts:192:1 › administrar una cuenta y asignar permisos desde React
+[42/48] [movil] › e2e/registry.spec.ts:261:1 › el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
+[43/48] [movil] › e2e/tenancy.spec.ts:88:1 › contrato diario guiado, modificación, prórroga y disponibilidad por cuarto
+[44/48] [movil] › e2e/tenancy.spec.ts:188:1 › reserva desde React, persona sin cuenta, confirmación y conversión en contrato
+[45/48] [movil] › e2e/tenancy.spec.ts:258:1 › finalización anticipada conserva personas e historial y actualiza la vista de la casa
+[46/48] [movil] › e2e/utilities.spec.ts:122:1 › servicio, recibo externo, ejemplo 14/15 días y corrección con historial
+[47/48] [movil] › e2e/utilities.spec.ts:267:1 › lecturas válidas e inválidas, reemplazo y consumo de dos medidores
+[48/48] [movil] › e2e/utilities.spec.ts:365:1 › contratos sucesivos exigen revisión manual antes de confirmar
+  48 passed (1.6m)
