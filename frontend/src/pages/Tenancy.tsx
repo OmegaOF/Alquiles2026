@@ -23,6 +23,7 @@ type Props = {
   properties: Property[];
   people: Person[];
   refreshPeople: () => Promise<void>;
+  onCapital?: (contract: Contract) => void;
 };
 export function Tenancy({
   view,
@@ -30,6 +31,7 @@ export function Tenancy({
   properties,
   people,
   refreshPeople,
+  onCapital,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>([]),
     [reservations, setReservations] = useState<Reservation[]>([]);
@@ -265,7 +267,7 @@ export function Tenancy({
           <p>
             {selected.price
               ? `${selected.price} ${selected.currency} · precio ${modeNames[selected.mode].toLowerCase()}`
-              : "Sin capital ni cálculos financieros en esta fase."}
+              : "La tarifa ordinaria no contiene el capital del anticrético."}
           </p>
           {selected.mode === "daily" && (
             <>
@@ -351,10 +353,18 @@ export function Tenancy({
             </>
           )}
           {selected.mode === "anticretico" && (
-            <p>
-              Contrato anticrético preparado. El capital y las devoluciones se
-              habilitarán en la fase 5.
-            </p>
+            <div>
+              <p>
+                El capital, sus titulares y devoluciones se administran por
+                separado en Anticréticos. La ocupación se conserva en este
+                contrato.
+              </p>
+              {onCapital && (
+                <button onClick={() => onCapital(selected)}>
+                  Ver capital del anticrético
+                </button>
+              )}
+            </div>
           )}
           {selected.mode === "mixed" && (
             <p>

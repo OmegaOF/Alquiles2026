@@ -631,7 +631,9 @@ export function FinanceForm(p: FormProps) {
                 : undefined
             }
             beneficiary={
-              action.kind === "refund" ? movement?.person_id : undefined
+              action.kind === "refund"
+                ? (movement?.person_id ?? undefined)
+                : undefined
             }
           />
         )}

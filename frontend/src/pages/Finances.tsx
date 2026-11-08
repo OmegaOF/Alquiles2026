@@ -40,12 +40,18 @@ export function Finances({
   user,
   properties,
   people,
+  initialPropertyId,
+  onCapital,
 }: {
   user: User;
   properties: Property[];
   people: Person[];
+  initialPropertyId?: number;
+  onCapital?: (propertyId: number) => void;
 }) {
-  const [propertyId, setPropertyId] = useState(properties[0]?.id || 0),
+  const [propertyId, setPropertyId] = useState(
+      initialPropertyId || properties[0]?.id || 0,
+    ),
     [tab, setTab] = useState("summary"),
     [data, setData] = useState<FinanceData>(empty),
     [catalogs, setCatalogs] = useState<FinanceCatalogs>({
@@ -256,8 +262,11 @@ export function Finances({
               m.kind,
             ) && (
               <p>
-                Aplicado: {money(m.applied, m.currency)} · {m.kind==='provider_direct'?'Pendiente de devolución externa':'Disponible'}:{" "}
-                <strong>{money(m.available, m.currency)}</strong>
+                Aplicado: {money(m.applied, m.currency)} ·{" "}
+                {m.kind === "provider_direct"
+                  ? "Pendiente de devolución externa"
+                  : "Disponible"}
+                : <strong>{money(m.available, m.currency)}</strong>
               </p>
             )}
             {m.conditions && <p>Condiciones: {m.conditions}</p>}
@@ -425,6 +434,14 @@ export function Finances({
           {tab === "summary" && (
             <>
               <h2>Resumen económico</h2>
+              {onCapital && (
+                <button
+                  className="secondary"
+                  onClick={() => onCapital(propertyId)}
+                >
+                  Ver anticréticos y capital de esta casa
+                </button>
+              )}
               <p>
                 Cada moneda se muestra por separado. Los importes por cobrar y
                 los gastos registrados no prueban que se haya recibido o pagado

@@ -468,6 +468,24 @@ def update_contract(db, user, id, patch):
         data = ContractInput.model_validate(merged)
     except ValidationError as error:
         raise HTTPException(422, validation_message(error)) from None
+    from app.models.anticreticos import AnticreticoTerms
+
+    capital_terms = db.scalar(
+        select(AnticreticoTerms)
+        .where(AnticreticoTerms.contract_id == id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if capital_terms and (data.mode, data.currency, data.property_id, data.unit_id) != (
+        obj.mode,
+        obj.currency,
+        obj.property_id,
+        obj.unit_id,
+    ):
+        raise HTTPException(
+            409,
+            "El anticrético tiene condiciones económicas históricas. Conserve su modalidad, moneda y espacio; registre otro contrato para cambiarlos.",
+        )
     if target_property(db, data.property_id, data.unit_id) != prop_id:
         raise HTTPException(
             422,

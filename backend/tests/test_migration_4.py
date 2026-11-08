@@ -58,7 +58,7 @@ def migration_db4():
         yield url, engine
     finally:
         reset(engine)
-        migrate(url)
+        migrate(url,target='head')
         engine.dispose()
 
 

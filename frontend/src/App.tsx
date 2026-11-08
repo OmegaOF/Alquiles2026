@@ -8,6 +8,8 @@ import { Users } from "./pages/Users";
 import { Tenancy } from "./pages/Tenancy";
 import { Utilities } from "./pages/Utilities";
 import { Finances } from "./pages/Finances";
+import { Anticreticos } from "./pages/Anticreticos";
+import type { CapitalTarget } from "./anticreticos";
 import { ErrorMessage, Field, errorText } from "./components/Form";
 export { PhaseZero } from "./PhaseZero";
 
@@ -171,7 +173,8 @@ type Page =
   | "availability"
   | "occupancy"
   | "utilities"
-  | "finances";
+  | "finances"
+  | "anticreticos";
 function Workspace({
   user,
   onLogout,
@@ -182,6 +185,10 @@ function Workspace({
   onUserChange: (user: User) => void;
 }) {
   const [page, setPage] = useState<Page>("properties");
+  const [capitalTarget, setCapitalTarget] = useState<CapitalTarget | null>(
+    null,
+  );
+  const [financeTarget, setFinanceTarget] = useState<number | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -246,6 +253,7 @@ function Workspace({
     ["occupancy", "Ocupantes e historial"],
     ["utilities", "Servicios básicos"],
     ["finances", "Pagos y gastos"],
+    ["anticreticos", "Anticréticos"],
   ];
   if (general) links.push(["users", "Usuarios y permisos"]);
   return (
@@ -264,7 +272,11 @@ function Workspace({
               key={id}
               className={`nav-button ${page === id ? "selected" : ""}`}
               aria-current={page === id ? "page" : undefined}
-              onClick={() => setPage(id)}
+              onClick={() => {
+                if (id === "anticreticos") setCapitalTarget(null);
+                if (id === "finances") setFinanceTarget(null);
+                setPage(id);
+              }}
             >
               {label}
             </button>
@@ -332,11 +344,39 @@ function Workspace({
               properties={properties}
               people={people}
               refreshPeople={refresh}
+              onCapital={(contract) => {
+                setCapitalTarget({
+                  propertyId: contract.resolved_property_id,
+                  contractId: contract.id,
+                });
+                setPage("anticreticos");
+              }}
             />
           ) : page === "utilities" ? (
             <Utilities user={user} properties={properties} people={people} />
           ) : page === "finances" ? (
-            <Finances user={user} properties={properties} people={people} />
+            <Finances
+              user={user}
+              properties={properties}
+              people={people}
+              initialPropertyId={financeTarget || undefined}
+              onCapital={(propertyId) => {
+                setCapitalTarget({ propertyId });
+                setPage("anticreticos");
+              }}
+            />
+          ) : page === "anticreticos" ? (
+            <Anticreticos
+              user={user}
+              properties={properties}
+              people={people}
+              initialTarget={capitalTarget}
+              onContracts={() => setPage("contracts")}
+              onFinances={(propertyId) => {
+                setFinanceTarget(propertyId);
+                setPage("finances");
+              }}
+            />
           ) : page === "users" && general ? (
             <Users
               users={users}
