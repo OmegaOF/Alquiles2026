@@ -126,6 +126,9 @@ export function SearchSelect({
     const newValue = next ? String(next.value) : "";
     if (value === undefined) setInternal(newValue);
     setLastSelected(next);
+    const form = input.current?.form;
+    if (form?.hasAttribute("data-guard-changes") && selectedValue !== newValue)
+      form.dataset.dirty = "true";
     onChange?.(newValue);
     setOpen(false);
     resetSearch("");

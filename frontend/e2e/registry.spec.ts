@@ -67,9 +67,9 @@ test("registrar y editar persona, propiedad y cuartos desde React", async ({
     .getByLabel("Dirección", { exact: true })
     .fill("Calle de pruebas 101");
   await page.getByLabel("Ciudad", { exact: true }).fill("La Paz");
-  await page
-    .getByRole("combobox", { name: "Propietario 1", exact: true })
-    .selectOption({ label: owner });
+  const ownerField = page.getByRole("combobox", { name: "Propietario 1", exact: true });
+  await ownerField.fill(owner);
+  await page.getByRole("option", { name: owner, exact: true }).click();
   await page
     .getByRole("button", { name: "Guardar cambios", exact: true })
     .click();
@@ -181,11 +181,11 @@ test("la sesión funciona también al entrar por localhost", async ({ page }) =>
     .getByRole("button", { name: "Ingresar al sistema", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Propiedades", exact: true }),
+    page.getByRole("heading", { name: "Inicio", exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Propiedades", exact: true }),
+    page.getByRole("heading", { name: "Inicio", exact: true }),
   ).toBeVisible();
 });
 

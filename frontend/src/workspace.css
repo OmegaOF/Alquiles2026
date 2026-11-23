@@ -231,3 +231,27 @@
   min-height: 44px;
   margin: 0;
 }
+
+.context-dialog {
+  max-width: min(800px, calc(100vw - 24px));
+  max-height: 90dvh;
+  width: 100%;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #84988d;
+  border-radius: 16px;
+  color: inherit;
+  background: white;
+}
+.context-dialog::backdrop {
+  background: rgb(14 43 35 / 65%);
+}
+.context-dialog .panel {
+  margin: 0;
+  border: 0;
+}
+
+.field:has(> :required) > span:first-child::after {
+  content: " *" / "";
+  color: #8a321b;
+}

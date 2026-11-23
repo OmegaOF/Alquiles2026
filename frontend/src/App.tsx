@@ -14,7 +14,7 @@ import type { CapitalTarget } from "./anticreticos";
 import { Reminders } from "./pages/Reminders";
 import type { ReminderTarget } from "./reminders";
 import { Reports } from "./pages/Reports";
-import { ErrorMessage, Field, errorText } from "./components/Form";
+import { ErrorMessage, Field, errorText, confirmFormDiscard } from "./components/Form";
 import { WorkspaceNavigation } from "./components/WorkspaceNavigation";
 import type { WorkspacePage } from "./components/WorkspaceNavigation";
 import { WorkspaceHome } from "./pages/WorkspaceHome";
@@ -183,7 +183,7 @@ function Workspace({
   const [page, setPage] = useState<WorkspacePage>("home");
   const main = useRef<HTMLElement>(null);
   function navigate(target: WorkspacePage) {
-    if (target === page) return;
+    if (target === page || !confirmFormDiscard(main.current?.querySelector("form[data-dirty]") ?? null)) return;
     setPage(target);
     requestAnimationFrame(() => main.current?.focus());
   }
@@ -238,8 +238,16 @@ function Workspace({
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    function beforeUnload(event: BeforeUnloadEvent) {
+      if (main.current?.querySelector("form[data-dirty]")) event.preventDefault();
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, []);
   async function logout() {
-    if (!window.confirm("¿Cerrar tu sesión en Mi Casa?")) return;
+    if (!confirmFormDiscard(main.current?.querySelector("form[data-dirty]") ?? null)
+      || !window.confirm("¿Cerrar tu sesión en Mi Casa?")) return;
     setLogoutBusy(true);
     try {
       await api("/auth/logout", "POST");

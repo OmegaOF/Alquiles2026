@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 export function Field({
   label,
@@ -24,6 +24,15 @@ export function ErrorMessage({ message }: { message: string }) {
     </p>
   ) : null;
 }
+export function markFormChanged(event: FormEvent<HTMLFormElement>) {
+  if ((event.target as HTMLElement).getAttribute("role") !== "combobox")
+    event.currentTarget.dataset.dirty = "true";
+}
+
+export function confirmFormDiscard(form: HTMLFormElement | null) {
+  return !form?.dataset.dirty || window.confirm("¿Salir y descartar los cambios sin guardar?");
+}
+
 export function FormActions({
   saving,
   onCancel,
@@ -39,7 +48,7 @@ export function FormActions({
       <button
         className="secondary"
         type="button"
-        onClick={onCancel}
+        onClick={(event) => { if (confirmFormDiscard(event.currentTarget.form)) onCancel(); }}
         disabled={saving}
       >
         Cancelar

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import type { Person } from "../types";
 import { api } from "../api";
+import { normalizeSearch, personOption } from "../components/SearchSelect";
 import {
   Field,
   ErrorMessage,
   FormActions,
   value,
   errorText,
+  markFormChanged,
 } from "../components/Form";
 
 export function People({
@@ -19,122 +21,18 @@ export function People({
   refresh: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Partial<Person> | null>(null);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!window.confirm("¿Guardar los datos de esta persona?")) return;
-    const data = new FormData(event.currentTarget);
-    setSaving(true);
-    setError("");
-    try {
-      await api(
-        `/persons${editing?.id ? `/${editing.id}` : ""}`,
-        editing?.id ? "PATCH" : "POST",
-        {
-          full_name: value(data, "full_name"),
-          document: value(data, "document") || null,
-          phone: value(data, "phone"),
-          whatsapp: value(data, "whatsapp"),
-          email: value(data, "email") || null,
-          address: value(data, "address"),
-          notes: value(data, "notes"),
-          is_owner: data.has("is_owner"),
-        },
-      );
+  const [query, setQuery] = useState("");
+  const matches = people.filter((person) => {
+    const option = personOption(person);
+    return normalizeSearch(`${option.label} ${option.search} ${option.value}`).includes(normalizeSearch(query));
+  });
+  if (editing)
+    return <PersonForm person={editing} onCancel={() => setEditing(null)} onSaved={async () => {
       await refresh();
       setEditing(null);
       setNotice("Los datos de la persona se guardaron correctamente.");
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-  if (editing)
-    return (
-      <section className="panel">
-        <h1>{editing.id ? "Editar persona" : "Registrar persona"}</h1>
-        <p>
-          Los datos de contacto son opcionales. Ser propietario no requiere una
-          cuenta de acceso.
-        </p>
-        <ErrorMessage message={error} />
-        <form onSubmit={save} key={editing.id || "new"}>
-          <div className="form-grid">
-            <Field label="Nombre completo">
-              <input
-                name="full_name"
-                defaultValue={editing.full_name}
-                maxLength={160}
-                required
-                autoComplete="name"
-              />
-            </Field>
-            <Field
-              label="Documento de identidad (opcional)"
-              hint="Usa el mismo documento para evitar registrar dos veces a una persona."
-            >
-              <input
-                name="document"
-                defaultValue={editing.document || ""}
-                maxLength={80}
-              />
-            </Field>
-            <Field label="Teléfono (opcional)">
-              <input
-                name="phone"
-                type="tel"
-                defaultValue={editing.phone || ""}
-                maxLength={40}
-                autoComplete="tel"
-              />
-            </Field>
-            <Field label="WhatsApp (opcional)">
-              <input
-                name="whatsapp"
-                type="tel"
-                defaultValue={editing.whatsapp || ""}
-                maxLength={40}
-              />
-            </Field>
-            <Field label="Correo electrónico (opcional)">
-              <input
-                name="email"
-                type="email"
-                defaultValue={editing.email || ""}
-                maxLength={254}
-                autoComplete="email"
-              />
-            </Field>
-            <Field label="Dirección (opcional)">
-              <input
-                name="address"
-                defaultValue={editing.address || ""}
-                maxLength={300}
-              />
-            </Field>
-            <label className="check">
-              <input
-                type="checkbox"
-                name="is_owner"
-                defaultChecked={editing.is_owner ?? true}
-              />
-              Es propietario o propietaria
-            </label>
-            <Field label="Observaciones (opcional)">
-              <textarea
-                name="notes"
-                defaultValue={editing.notes || ""}
-                maxLength={2000}
-              />
-            </Field>
-          </div>
-          <FormActions saving={saving} onCancel={() => setEditing(null)} />
-        </form>
-      </section>
-    );
+    }} />;
   return (
     <section>
       <div className="page-heading">
@@ -151,7 +49,6 @@ export function People({
           <button
             onClick={() => {
               setEditing({});
-              setError("");
               setNotice("");
             }}
           >
@@ -164,14 +61,20 @@ export function People({
           {notice}
         </p>
       )}
+      <Field label="Buscar personas">
+        <input type="search" value={query} placeholder="Nombre, documento o contacto"
+          onChange={(event) => setQuery(event.target.value)} />
+      </Field>
       {people.length === 0 ? (
         <div className="empty">
           Todavía no hay personas para mostrar.
           {canEdit && " Comienza registrando un propietario."}
         </div>
+      ) : matches.length === 0 ? (
+        <p role="status">No se encontraron personas.</p>
       ) : (
         <div className="record-list">
-          {people.map((person) => (
+          {matches.map((person) => (
             <article key={person.id}>
               <div className="record-main">
                 <h2>{person.full_name}</h2>
@@ -192,8 +95,7 @@ export function People({
                   className="secondary"
                   onClick={() => {
                     setEditing(person);
-                    setError("");
-                  }}
+                        }}
                 >
                   Editar <span className="sr-only">a {person.full_name}</span>
                 </button>
@@ -204,4 +106,125 @@ export function People({
       )}
     </section>
   );
+}
+
+export function PersonForm({
+  person,
+  asOwner = false,
+  onSaved,
+  onCancel,
+}: {
+  person: Partial<Person>;
+  asOwner?: boolean;
+  onSaved: (person: Person) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!window.confirm("¿Guardar los datos de esta persona?")) return;
+    const data = new FormData(event.currentTarget);
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await api<Person>(
+        `/persons${person.id ? `/${person.id}` : ""}`,
+        person.id ? "PATCH" : "POST",
+        {
+          full_name: value(data, "full_name"),
+          document: value(data, "document") || null,
+          phone: value(data, "phone"),
+          whatsapp: value(data, "whatsapp"),
+          email: value(data, "email") || null,
+          address: value(data, "address"),
+          notes: value(data, "notes"),
+          is_owner: asOwner || data.has("is_owner"),
+        },
+      );
+      await onSaved(saved);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+      <section className="panel">
+        <h1>{asOwner ? "Registrar propietario" : person.id ? "Editar persona" : "Registrar persona"}</h1>
+        <p>
+          Los datos de contacto son opcionales. Ser propietario no requiere una
+          cuenta de acceso.
+        </p>
+        <ErrorMessage message={error} />
+        <form onSubmit={save} data-guard-changes onChange={markFormChanged} key={person.id || "new"}>
+          <div className="form-grid">
+            <Field label="Nombre completo">
+              <input
+                name="full_name"
+                defaultValue={person.full_name}
+                maxLength={160}
+                required
+                autoComplete="name"
+              />
+            </Field>
+            <Field
+              label="Documento de identidad (opcional)"
+              hint="Usa el mismo documento para evitar registrar dos veces a una persona."
+            >
+              <input
+                name="document"
+                defaultValue={person.document || ""}
+                maxLength={80}
+              />
+            </Field>
+            <Field label="Teléfono (opcional)">
+              <input
+                name="phone"
+                type="tel"
+                defaultValue={person.phone || ""}
+                maxLength={40}
+                autoComplete="tel"
+              />
+            </Field>
+            <Field label="WhatsApp (opcional)">
+              <input
+                name="whatsapp"
+                type="tel"
+                defaultValue={person.whatsapp || ""}
+                maxLength={40}
+              />
+            </Field>
+            <Field label="Correo electrónico (opcional)">
+              <input
+                name="email"
+                type="email"
+                defaultValue={person.email || ""}
+                maxLength={254}
+                autoComplete="email"
+              />
+            </Field>
+            <Field label="Dirección (opcional)">
+              <input
+                name="address"
+                defaultValue={person.address || ""}
+                maxLength={300}
+              />
+            </Field>
+            {!asOwner && <label className="check">
+              <input type="checkbox" name="is_owner" defaultChecked={person.is_owner ?? true} />
+              Es propietario o propietaria
+            </label>}
+            <Field label="Observaciones (opcional)">
+              <textarea
+                name="notes"
+                defaultValue={person.notes || ""}
+                maxLength={2000}
+              />
+            </Field>
+          </div>
+          <FormActions saving={saving} onCancel={onCancel} />
+        </form>
+      </section>
+    );
 }
