@@ -16,6 +16,7 @@ from app.models.tenancy import (
 )
 from app.models import utilities as u, finances as f
 from app.services import tenancy
+from app.schemas.reports import ReportFilters
 from app.services.report_facts import Facts, scope_properties, locked_read_cache
 from app.services.report_projection import (
     Projection,
@@ -59,6 +60,7 @@ def options(db, user, filters):
         db.scalars(select(Unit).where(Unit.property_id.in_(ids)).order_by(Unit.id))
     )
     unit_map = {x.id: x for x in units}
+    property_map = {p.id: p for p in properties}
     contracts = list(
         db.scalars(
             select(Contract)
@@ -85,22 +87,28 @@ def options(db, user, filters):
             .order_by(Person.id)
         )
     )
+    person_names = {person.id: person.full_name for person in people}
+
+    def contract_choice(contract):
+        unit = unit_map.get(contract.unit_id)
+        property_id = contract.property_id or unit.property_id
+        space = f"{unit.code} · {unit.name}" if unit else "Casa completa"
+        return dict(
+            id=contract.id,
+            property_id=property_id,
+            unit_id=contract.unit_id,
+            mode=contract.mode,
+            name=f"{property_map[property_id].name} · {space} · {person_names[contract.responsible_person_id]}",
+            search=f"Contrato {contract.id} {contract.start_date} {contract.end_date}",
+        )
+
     return dict(
-        properties=[dict(id=p.id, name=p.name) for p in properties],
+        properties=[dict(id=p.id, name=p.name, search=" ".join(filter(None, (p.address, p.zone, p.city)))) for p in properties],
         units=[
             dict(id=x.id, name=f"{x.code} · {x.name}", property_id=x.property_id)
             for x in units
         ],
-        contracts=[
-            dict(
-                id=x.id,
-                property_id=x.property_id or unit_map[x.unit_id].property_id,
-                unit_id=x.unit_id,
-                mode=x.mode,
-                name=f"Contrato {x.id}",
-            )
-            for x in contracts
-        ],
+        contracts=[contract_choice(contract) for contract in contracts],
         owners=[dict(id=x.id, name=x.full_name) for x in people if x.id in owner_ids],
         people=[dict(id=x.id, name=x.full_name) for x in people],
         services=[
@@ -188,6 +196,21 @@ def counts(facts, cutoff, filters):
             else None
         ),
     )
+
+
+
+def overview(db, user):
+    """Resumen de solo lectura sin bloquear las propiedades ni calcular gráficas."""
+    filters = ReportFilters()
+    facts = Facts(db, user, filters, lock=False)
+    projection = Projection(facts, filters)
+    return plain(dict(
+        summary=[
+            {"currency": row["currency"], "pending": row["pending"]}
+            for row in projection.summaries()
+        ],
+        counts=counts(facts, projection.cut, filters),
+    ))
 
 
 def occupancy(facts, first, last, filters):

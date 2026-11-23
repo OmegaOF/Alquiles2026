@@ -1,3 +1,4 @@
+import { selectRecord } from "./selectRecord";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
@@ -64,7 +65,7 @@ test("crear cuenta de una persona existente no duplica su nombre y guarda alias 
   await userEvent.click(
     screen.getByRole("button", { name: "Registrar usuario" }),
   );
-  await userEvent.selectOptions(
+  await selectRecord(
     screen.getByLabelText(/^Persona vinculada/),
     String(person.id),
   );
@@ -94,10 +95,7 @@ test("registrar persona nueva junto con una cuenta envía un solo nombre persona
   await userEvent.click(
     screen.getByRole("button", { name: "Registrar usuario" }),
   );
-  await userEvent.selectOptions(
-    screen.getByLabelText(/^Persona vinculada/),
-    "new",
-  );
+  await selectRecord(screen.getByLabelText(/^Persona vinculada/), "new");
   await userEvent.type(
     screen.getByLabelText(/^Nombre completo de la persona/),
     "Juan Ramírez",
@@ -119,14 +117,8 @@ test("propietario debe vincularse a una persona propietaria existente", async ()
   await userEvent.click(
     screen.getByRole("button", { name: "Registrar usuario" }),
   );
-  await userEvent.selectOptions(
-    screen.getByLabelText(/^Persona vinculada/),
-    "new",
-  );
-  await userEvent.selectOptions(
-    screen.getByLabelText("Rol de acceso"),
-    "owner",
-  );
+  await selectRecord(screen.getByLabelText(/^Persona vinculada/), "new");
+  await selectRecord(screen.getByLabelText("Rol de acceso"), "owner");
   expect(screen.getByLabelText(/^Propietario vinculado/)).toHaveValue("");
   expect(
     screen.queryByRole("option", { name: "Registrar persona nueva" }),
@@ -134,6 +126,9 @@ test("propietario debe vincularse a una persona propietaria existente", async ()
   expect(
     screen.queryByLabelText(/^Nombre completo de la persona/),
   ).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("combobox", { name: "Propietario vinculado" }),
+  );
   expect(screen.getByRole("option", { name: person.full_name })).toBeVisible();
 });
 
@@ -199,9 +194,7 @@ test("editar nombre en Personas actualiza la cuenta y conserva su alias", async 
     screen.getByRole("button", { name: "Guardar cambios" }),
   );
   await screen.findByRole("status");
-  await userEvent.click(
-    screen.getByRole("button", { name: "Usuarios" }),
-  );
+  await userEvent.click(screen.getByRole("button", { name: "Usuarios" }));
   expect(
     await screen.findByRole("heading", { name: "Elena Vargas Corregida" }),
   ).toBeVisible();

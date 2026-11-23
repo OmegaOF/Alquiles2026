@@ -77,6 +77,7 @@ export type ReportData = {
 export type Choice = {
   id: number;
   name: string;
+  search?: string;
   property_id?: number;
   unit_id?: number | null;
 };

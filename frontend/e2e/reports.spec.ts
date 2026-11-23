@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { authenticate, apiBase, openSection } from "./helpers";
+import { dirname } from "node:path";
+import { authenticate, apiBase, openSection, selectRecord } from "./helpers";
 test.setTimeout(180000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
 const key = () => crypto.randomUUID().replaceAll("-", "");
@@ -304,9 +305,10 @@ async function enter(page: Page, f: Fixture, dashboard = false) {
   await expect(
     page.getByRole("combobox", { name: "Propiedad", exact: true }),
   ).toBeEnabled();
-  await page
-    .getByRole("combobox", { name: "Propiedad", exact: true })
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByRole("combobox", { name: "Propiedad", exact: true }),
+    String(f.house.id),
+  );
   await expect(
     page.getByRole("button", { name: "Ver resultados", exact: true }),
   ).toBeEnabled({ timeout: 60000 });
@@ -322,10 +324,22 @@ async function enter(page: Page, f: Fixture, dashboard = false) {
       .getByText(f.house.name, { exact: true }),
   ).toBeVisible();
 }
+function evidencePath(
+  info: TestInfo,
+  folder: "screenshots" | "pdf",
+  file: string,
+) {
+  const path =
+    process.env.CAPTURE_PHASE7_SCREENSHOTS === "1"
+      ? `../docs/${folder}/phase-7/${file}`
+      : info.outputPath(file);
+  mkdirSync(dirname(path), { recursive: true });
+  return path;
+}
+
 function screenshot(page: Page, info: TestInfo, name: string) {
-  mkdirSync("../docs/screenshots/phase-7", { recursive: true });
   return page.screenshot({
-    path: `../docs/screenshots/phase-7/${info.project.name}-${name}.png`,
+    path: evidencePath(info, "screenshots", `${info.project.name}-${name}.png`),
     fullPage: false,
   });
 }
@@ -362,18 +376,20 @@ test("dashboard, API y PDF concilian con monedas y capital separados", async ({
     .first()
     .scrollIntoViewIfNeeded();
   await screenshot(page, info, "resumen");
-  await page
-    .getByLabel("Moneda para las cifras y gráficos")
-    .selectOption("USD");
+  await selectRecord(
+    page.getByLabel("Moneda para las cifras y gráficos"),
+    "USD",
+  );
   await expect(
     page.getByRole("article", {
       name: "Total de entradas reales",
       exact: true,
     }),
   ).toContainText("30.00 USD");
-  await page
-    .getByLabel("Moneda para las cifras y gráficos")
-    .selectOption("BOB");
+  await selectRecord(
+    page.getByLabel("Moneda para las cifras y gráficos"),
+    "BOB",
+  );
   await expect(
     page.getByRole("img", { name: /Dinero recibido por periodo/ }),
   ).toBeVisible();
@@ -386,10 +402,11 @@ test("dashboard, API y PDF concilian con monedas y capital separados", async ({
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar PDF", exact: true }).click();
   const file = await download;
-  mkdirSync("../docs/pdf/phase-7", { recursive: true });
-  await file.saveAs(`../docs/pdf/phase-7/economico-${info.project.name}.pdf`);
+  await file.saveAs(
+    evidencePath(info, "pdf", `economico-${info.project.name}.pdf`),
+  );
   writeFileSync(
-    `../docs/pdf/phase-7/esperado-${info.project.name}.json`,
+    evidencePath(info, "pdf", `esperado-${info.project.name}.json`),
     JSON.stringify(
       {
         summary: api.summary,
@@ -419,7 +436,7 @@ test("diez reportes accesibles y capturas por tipo", async ({ page }, info) => {
     ["capital", "Capital de anticréticos"],
     ["comparison", "Comparar propiedades y periodos"],
   ]) {
-    await page.getByLabel("Tipo de reporte").selectOption(kind);
+    await selectRecord(page.getByLabel("Tipo de reporte"), kind);
     await page
       .getByRole("button", { name: "Ver resultados", exact: true })
       .click();
@@ -454,8 +471,7 @@ test("diez reportes accesibles y capturas por tipo", async ({ page }, info) => {
         .getByRole("button", { name: "Exportar PDF", exact: true })
         .click();
       const file = await pending;
-      mkdirSync("../docs/pdf/phase-7", { recursive: true });
-      await file.saveAs(`../docs/pdf/phase-7/${kind}-ejemplo.pdf`);
+      await file.saveAs(evidencePath(info, "pdf", `${kind}-ejemplo.pdf`));
     }
   }
 });
@@ -476,7 +492,10 @@ test("cambios consecutivos de filtros y gráficos no producen errores de ciclo d
       page.getByRole("region", { name: "Resultados del reporte" }),
     ).toBeVisible();
   }
-  await page.getByLabel("Medida para ver su evolución").selectOption("pending");
+  await selectRecord(
+    page.getByLabel("Medida para ver su evolución"),
+    "pending",
+  );
   await expect(
     page.getByRole("img", { name: /Evolución de la medida/ }),
   ).toBeVisible();
@@ -611,4 +630,42 @@ test("lectura concurrente con un pago mantiene una instantánea conciliada en My
     after.summary.find((x: { currency: string }) => x.currency === "BOB")
       .pending,
   ).toBe("200.00");
+});
+
+test("busca propiedad y contrato por sus nombres y envía los filtros autorizados", async ({
+  page,
+}) => {
+  const f = await setup(page);
+  const choices = await get(page, "/reports/options");
+  const contract = choices.contracts.find(
+    (item: { property_id: number; name: string }) =>
+      item.property_id === f.house.id && item.name.includes(f.tenant.full_name),
+  );
+  expect(contract).toBeDefined();
+
+  await page.goto("/");
+  await openSection(page, "Reportes", "Ingresos");
+  const house = page.getByRole("combobox", { name: "Propiedad", exact: true });
+  await selectRecord(house, { label: f.house.name });
+  await page.getByText("Más filtros y fecha de corte", { exact: true }).click();
+  const choice = page.getByRole("combobox", { name: "Contrato", exact: true });
+  await choice.fill(f.tenant.full_name);
+  const option = page
+    .getByRole("option")
+    .and(page.locator(`[data-value="${contract.id}"]`));
+  await expect(option).toContainText(f.house.name);
+  await option.click();
+  await expect(choice).toHaveValue(contract.name);
+  const response = page.waitForResponse((result) => {
+    const url = new URL(result.url());
+    return (
+      url.pathname.endsWith("/reports/economic") &&
+      url.searchParams.get("property_id") === String(f.house.id) &&
+      url.searchParams.get("contract_id") === String(contract.id)
+    );
+  });
+  await page
+    .getByRole("button", { name: "Ver resultados", exact: true })
+    .click();
+  expect((await response).ok()).toBe(true);
 });

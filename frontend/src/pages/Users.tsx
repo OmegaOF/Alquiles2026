@@ -3,11 +3,19 @@ import type { Person, Property, Role, User } from "../types";
 import { roleNames } from "../types";
 import { api } from "../api";
 import {
+  SearchSelect,
+  personOption,
+  normalizeSearch,
+  propertyOption,
+} from "../components/SearchSelect";
+import { useRegistrySearch } from "../components/registrySearch";
+import {
   Field,
   ErrorMessage,
   FormActions,
   value,
   errorText,
+  markFormChanged,
 } from "../components/Form";
 
 export function Users({
@@ -24,13 +32,23 @@ export function Users({
   refresh: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Partial<User> | null>(null);
+  const [accessQuery, setAccessQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [role, setRole] = useState<Role>("operator");
   const [assigned, setAssigned] = useState<number[]>([]);
   const [personChoice, setPersonChoice] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const candidates = people.filter(
+    (person) => role !== "owner" || person.is_owner,
+  );
+  const findPeople = useRegistrySearch(
+    role === "owner" ? "owners" : "people",
+    candidates.length,
+  );
   function edit(user: Partial<User>) {
+    setAccessQuery("");
     setEditing(user);
     setRole(user.role || "operator");
     setAssigned(user.property_ids || []);
@@ -99,37 +117,46 @@ export function Users({
           cuenta para cada propietario.
         </p>
         <ErrorMessage message={error} />
-        <form onSubmit={save} key={editing.id || "new"}>
+        <form
+          onSubmit={save}
+          data-guard-changes
+          onChange={markFormChanged}
+          key={editing.id || "new"}
+        >
           <div className="form-grid">
-            <Field
-              label={
-                role === "owner" ? "Propietario vinculado" : "Persona vinculada"
-              }
-              hint={
-                role === "owner"
-                  ? "Selecciona al propietario. Su nombre y sus propiedades determinan el acceso."
-                  : "Cada cuenta pertenece a una persona. Selecciona su registro para mantener un único nombre."
-              }
-            >
-              <select
-                name="person_id"
-                value={personChoice}
+            <div>
+              <SearchSelect
+                label={
+                  role === "owner"
+                    ? "Propietario vinculado"
+                    : "Persona vinculada"
+                }
+                options={[
+                  ...candidates.map(personOption),
+                  ...(!editing.id && role !== "owner"
+                    ? [{ value: "new", label: "Registrar persona nueva" }]
+                    : []),
+                ]}
                 required
-                onChange={(e) => setPersonChoice(e.target.value)}
-              >
-                <option value="">Seleccionar persona</option>
-                {people
-                  .filter((person) => role !== "owner" || person.is_owner)
-                  .map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.full_name}
-                    </option>
-                  ))}
-                {!editing.id && role !== "owner" && (
-                  <option value="new">Registrar persona nueva</option>
-                )}
-              </select>
-            </Field>
+                value={personChoice}
+                onChange={setPersonChoice}
+                load={findPeople}
+                placeholder="Buscar por nombre, documento o contacto"
+              />
+              {!editing.id && role !== "owner" && personChoice !== "new" && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    if (event.currentTarget.form)
+                      event.currentTarget.form.dataset.dirty = "true";
+                    setPersonChoice("new");
+                  }}
+                >
+                  + Registrar persona para esta cuenta
+                </button>
+              )}
+            </div>
             {personChoice === "new" && !editing.id && role !== "owner" ? (
               <Field
                 label="Nombre completo de la persona"
@@ -253,22 +280,36 @@ export function Users({
                   propiedades y asignarlas después.
                 </p>
               )}
-              {properties.map((p) => (
-                <label key={p.id} className="check">
-                  <input
-                    type="checkbox"
-                    checked={assigned.includes(p.id)}
-                    onChange={(e) =>
-                      setAssigned(
-                        e.target.checked
-                          ? [...assigned, p.id]
-                          : assigned.filter((id) => id !== p.id),
-                      )
-                    }
-                  />
-                  {p.name}
-                </label>
-              ))}
+              <Field label="Buscar casa para asignar acceso">
+                <input
+                  type="search"
+                  placeholder="Nombre o dirección"
+                  value={accessQuery}
+                  onChange={(event) => setAccessQuery(event.target.value)}
+                />
+              </Field>
+              {properties
+                .filter((house) =>
+                  normalizeSearch(propertyOption(house).label).includes(
+                    normalizeSearch(accessQuery),
+                  ),
+                )
+                .map((p) => (
+                  <label key={p.id} className="check">
+                    <input
+                      type="checkbox"
+                      checked={assigned.includes(p.id)}
+                      onChange={(e) =>
+                        setAssigned(
+                          e.target.checked
+                            ? [...assigned, p.id]
+                            : assigned.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                    {p.name}
+                  </label>
+                ))}
             </fieldset>
           )}
           {editing.id === currentUser.id && (
@@ -293,32 +334,47 @@ export function Users({
         </div>
         <button onClick={() => edit({})}>Registrar usuario</button>
       </div>
+      <Field label="Buscar cuentas">
+        <input
+          type="search"
+          value={query}
+          placeholder="Nombre, usuario o rol"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </Field>
       {notice && (
         <p role="status" className="success-message">
           {notice}
         </p>
       )}
       <div className="record-list">
-        {users.map((u) => (
-          <article key={u.id}>
-            <div className="record-main">
-              <h2>{u.full_name}</h2>
-              {u.display_name && <p>Alias de la cuenta: {u.display_name}</p>}
-              <p>
-                Usuario: {u.username} · {roleNames[u.role]}
-              </p>
-              <p>
-                {u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"}
-              </p>
-              {(u.role === "property_admin" || u.role === "operator") && (
-                <p>{u.property_ids.length} propiedades autorizadas</p>
-              )}
-            </div>
-            <button className="secondary" onClick={() => edit(u)}>
-              Editar permisos <span className="sr-only">de {u.full_name}</span>
-            </button>
-          </article>
-        ))}
+        {users
+          .filter((account) =>
+            normalizeSearch(
+              `${account.full_name} ${account.username} ${account.display_name ?? ""} ${roleNames[account.role]}`,
+            ).includes(normalizeSearch(query)),
+          )
+          .map((u) => (
+            <article key={u.id}>
+              <div className="record-main">
+                <h2>{u.full_name}</h2>
+                {u.display_name && <p>Alias de la cuenta: {u.display_name}</p>}
+                <p>
+                  Usuario: {u.username} · {roleNames[u.role]}
+                </p>
+                <p>
+                  {u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"}
+                </p>
+                {(u.role === "property_admin" || u.role === "operator") && (
+                  <p>{u.property_ids.length} propiedades autorizadas</p>
+                )}
+              </div>
+              <button className="secondary" onClick={() => edit(u)}>
+                Editar permisos{" "}
+                <span className="sr-only">de {u.full_name}</span>
+              </button>
+            </article>
+          ))}
       </div>
     </section>
   );

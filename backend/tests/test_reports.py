@@ -912,3 +912,32 @@ def test_63_table_inventory_candidates_constraints_models_and_migrations_intact(
                 == table["primary_key"]
             )
             assert len(real.get_foreign_keys(name)) == len(table["foreign_keys"])
+
+
+def test_home_overview_reuses_report_amounts_without_locks(admin, fin, clock, db):
+    rental(admin, fin)
+    expected = admin.get("/api/v1/dashboard").json()
+    statements = []
+
+    def collect(connection, cursor, statement, parameters, context, many):
+        statements.append(statement)
+
+    event.listen(db, "before_cursor_execute", collect)
+    try:
+        response = admin.get("/api/v1/dashboard/overview")
+    finally:
+        event.remove(db, "before_cursor_execute", collect)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["summary"] == [
+        {"currency": row["currency"], "pending": row["pending"]}
+        for row in expected["summary"]
+    ]
+    assert result["counts"]["contracts_active"] == expected["counts"]["contracts_active"]
+    assert not any("FOR UPDATE" in statement.upper() for statement in statements)
+
+    account = user(admin, "operator")
+    login_as(admin, account)
+    unauthorized = admin.get("/api/v1/dashboard/overview").json()
+    assert unauthorized["summary"] == []
+    assert unauthorized["counts"]["properties_registered"] == 0

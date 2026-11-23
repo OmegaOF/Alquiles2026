@@ -1,3 +1,4 @@
+import { selectRecord } from "./selectRecord";
 import {
   fireEvent,
   render,
@@ -143,10 +144,7 @@ test("dispone de los diez reportes y aplica filtros juntos desde backend", async
     screen.getByLabelText("Tipo de reporte"),
     "collections",
   );
-  await userEvent.selectOptions(
-    screen.getByLabelText("Propiedad", { exact: true }),
-    "1",
-  );
+  await selectRecord(screen.getByLabelText("Propiedad", { exact: true }), "1");
   await userEvent.click(screen.getByRole("button", { name: "Ver resultados" }));
   await waitFor(() =>
     expect(mocked).toHaveBeenCalledWith(
@@ -240,15 +238,13 @@ test("una respuesta antigua no reemplaza el último filtro", async () => {
 test("descarga usa filtros y huella del reporte, sin afirmar éxito tras error", async () => {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue({
-        ok: false,
-        status: 409,
-        json: async () => ({
-          detail: "Los datos cambiaron después de la consulta.",
-        }),
+    vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({
+        detail: "Los datos cambiaron después de la consulta.",
       }),
+    }),
   );
   render(<Reports view="reports" />);
   await screen.findByRole("heading", { name: "Reporte económico general" });

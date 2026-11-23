@@ -42,6 +42,11 @@ def options(
     return reports.options(db, user, filters)
 
 
+@router.get("/dashboard/overview")
+def overview(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    return reports.overview(db, user)
+
+
 @router.get("/dashboard", response_model=ReportResponse)
 def dashboard(
     filters: Filters, db: Session = Depends(get_db), user: User = Depends(current_user)

@@ -61,25 +61,21 @@ def scope_properties(db, user, filters):
 
 
 class Facts:
-    def __init__(self, db, user, filters):
+    def __init__(self, db, user, filters, *, lock=True):
         self.data = {}
         self.groups = {}
         self.properties, owners = scope_properties(db, user, filters)
         ids = {p.id for p in self.properties}
         # Mismo orden que finanzas/recordatorios, antes de bloquear las fuentes.
-        for prop in self.properties:
-            lock_property(db, user, prop.id)
+        if lock:
+            for prop in self.properties:
+                lock_property(db, user, prop.id)
 
         def load(model, condition):
-            values = list(
-                db.scalars(
-                    select(model)
-                    .where(condition)
-                    .order_by(*model.__table__.primary_key)
-                    .with_for_update()
-                    .execution_options(populate_existing=True)
-                )
-            )
+            query = select(model).where(condition).order_by(*model.__table__.primary_key)
+            if lock:
+                query = query.with_for_update().execution_options(populate_existing=True)
+            values = list(db.scalars(query))
             self.data[model] = values
             return values
 

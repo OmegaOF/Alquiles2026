@@ -67,7 +67,10 @@ test("registrar y editar persona, propiedad y cuartos desde React", async ({
     .getByLabel("Dirección", { exact: true })
     .fill("Calle de pruebas 101");
   await page.getByLabel("Ciudad", { exact: true }).fill("La Paz");
-  const ownerField = page.getByRole("combobox", { name: "Propietario 1", exact: true });
+  const ownerField = page.getByRole("combobox", {
+    name: "Propietario 1",
+    exact: true,
+  });
   await ownerField.fill(owner);
   await page.getByRole("option", { name: owner, exact: true }).click();
   await page
@@ -219,8 +222,11 @@ test("administrar una cuenta y asignar permisos desde React", async ({
     .getByRole("button", { name: "Registrar usuario", exact: true })
     .click();
   await page
-    .getByRole("combobox", { name: /^Persona vinculada/ })
-    .selectOption("new");
+    .getByRole("button", {
+      name: "+ Registrar persona para esta cuenta",
+      exact: true,
+    })
+    .click();
   await page
     .getByRole("textbox", { name: /Nombre completo de la persona/ })
     .fill("Operador de prueba " + tag);
@@ -297,11 +303,9 @@ test("el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
   await expect(
     page.getByRole("heading", { name: corrected, exact: true }),
   ).toHaveCount(2);
-  const accounts = page
-    .getByRole("article")
-    .filter({
-      has: page.getByRole("heading", { name: corrected, exact: true }),
-    });
+  const accounts = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: corrected, exact: true }),
+  });
   await expect(
     accounts.getByText("Alias de la cuenta: Alias a", { exact: true }),
   ).toBeVisible();

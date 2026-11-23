@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
+import { SearchSelect } from "../components/SearchSelect";
 import { ErrorMessage, Field, errorText } from "../components/Form";
 import {
   measureNames,
@@ -131,19 +132,17 @@ function ChoiceField({
   all?: string;
 }) {
   return (
-    <Field label={label}>
-      <select
-        value={draft[name] || ""}
-        onChange={(e) => set(name, e.target.value)}
-      >
-        <option value="">{all}</option>
-        {choices.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-    </Field>
+    <SearchSelect
+      label={label}
+      value={draft[name] || ""}
+      onChange={(id) => set(name, id)}
+      options={choices.map((choice) => ({
+        value: choice.id,
+        label: choice.name,
+        search: choice.search,
+      }))}
+      placeholder={all}
+    />
   );
 }
 
@@ -292,7 +291,14 @@ export function Reports({
   view: "dashboard" | "reports";
   section?: "occupancy" | "history" | "pdf";
 }) {
-  const sectionTitle = section === "occupancy" ? "Ocupación" : section === "history" ? "Historial" : section === "pdf" ? "PDF" : undefined;
+  const sectionTitle =
+    section === "occupancy"
+      ? "Ocupación"
+      : section === "history"
+        ? "Historial"
+        : section === "pdf"
+          ? "PDF"
+          : undefined;
   const initialKind = section === "history" ? "collections" : "economic";
   const [options, setOptions] = useState<ReportOptions | null>(null);
   const [draft, setDraft] = useState<Filters>({});
@@ -366,6 +372,7 @@ export function Reports({
         next.unit_id = "";
         next.contract_id = "";
       }
+      if (key === "unit_id") next.contract_id = "";
       if (["start_date", "end_date"].includes(key)) {
         next.month = "";
         next.year = "";
@@ -431,6 +438,20 @@ export function Reports({
     }
   }
   const selected = data?.summary.find((s) => s.currency === currency);
+  const occupancyChart = data && (
+    <ReportChart
+      title="Ocupación registrada"
+      description="Ocupación por fechas de los contratos vigentes y finalizados."
+      unit="% de días de cuartos"
+      months={data.occupancy.map((point) => point.month)}
+      series={[
+        {
+          name: "Ocupación",
+          values: data.occupancy.map((point) => point.occupancy_percent),
+        },
+      ]}
+    />
+  );
   const points = data?.series.filter((s) => s.currency === currency) || [];
   const chart = (
     title: string,
@@ -470,12 +491,23 @@ export function Reports({
   return (
     <section className="reports-page">
       <p className="eyebrow">INFORMACIÓN DE TUS PROPIEDADES</p>
-      <h1>{sectionTitle ?? (view === "dashboard" ? "Resumen general" : "Reportes")}</h1>
-      {section && data && (section !== "occupancy" || selected) && (
-        <p><a href={`#report-${section}`}>
-          {section === "pdf" ? "Ir a la descarga" : section === "history" ? "Ir a los registros" : "Ir al gráfico de ocupación"}
-        </a></p>
-      )}
+      <h1>
+        {sectionTitle ??
+          (view === "dashboard" ? "Resumen general" : "Reportes")}
+      </h1>
+      {section &&
+        data &&
+        (section !== "occupancy" || data.occupancy.length > 0) && (
+          <p>
+            <a href={`#report-${section}`}>
+              {section === "pdf"
+                ? "Ir a la descarga"
+                : section === "history"
+                  ? "Ir a los registros"
+                  : "Ir al gráfico de ocupación"}
+            </a>
+          </p>
+        )}
       <p className="intro">
         Consulta tus resultados, revisa los detalles y guarda un documento para
         leer con tranquilidad.
@@ -587,7 +619,10 @@ export function Reports({
             <ChoiceField
               label="Contrato"
               name="contract_id"
-              choices={scopeChoices(options?.contracts || [])}
+              choices={scopeChoices(options?.contracts || []).filter(
+                (contract) =>
+                  !draft.unit_id || String(contract.unit_id) === draft.unit_id,
+              )}
               draft={draft}
               set={set}
             />
@@ -829,6 +864,17 @@ export function Reports({
               <p key={note}>{note}</p>
             ))}
           </details>
+          {section === "occupancy" && (
+            <section
+              id="report-occupancy"
+              aria-labelledby="report-occupancy-title"
+            >
+              <h2 id="report-occupancy-title">Ocupación por mes</h2>
+              <Suspense fallback={<p role="status">Preparando gráfico…</p>}>
+                {occupancyChart}
+              </Suspense>
+            </section>
+          )}
           {selected && (
             <section aria-label="Gráficos del reporte">
               <h2>Cómo cambian tus resultados</h2>
@@ -868,18 +914,7 @@ export function Reports({
                     "Capital acumulado al cierre; independiente del alquiler",
                     ["capital_received", "capital_returned", "capital_pending"],
                   )}
-                  <div id="report-occupancy"><ReportChart
-                    title="Ocupación registrada"
-                    description="Fechas de contratos válidos en su versión actual; no reconstruye cambios históricos"
-                    unit="% de días de cuartos"
-                    months={data.occupancy.map((p) => p.month)}
-                    series={[
-                      {
-                        name: "Ocupación",
-                        values: data.occupancy.map((p) => p.occupancy_percent),
-                      },
-                    ]}
-                  /></div>
+                  {section !== "occupancy" && occupancyChart}
                 </div>
                 <Field label="Medida para ver su evolución">
                   <select
