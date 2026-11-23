@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { PropertySelect } from "../components/PropertySelect";
+import {
+  SearchSelect,
+  personOption,
+  unitOption,
+} from "../components/SearchSelect";
+import { confirmFormDiscard } from "../components/Form";
 import type { Person, Property, User } from "../types";
 import type { Contract } from "../tenancy";
 import type { Receipt } from "../utilities";
@@ -21,11 +28,11 @@ const tabs = [
   ["summary", "Resumen económico"],
   ["receivable", "Por cobrar"],
   ["receive", "Registrar pago"],
-  ["debts", "Deudas"],
+  ["debts", "Deudas pendientes"],
   ["history", "Historial de pagos"],
   ["advances", "Anticipos"],
   ["guarantees", "Garantías"],
-  ["expenses", "Gastos"],
+  ["expenses", "Gastos registrados"],
   ["disbursements", "Pagos realizados"],
   ["services", "Recuperación de servicios"],
 ] as const;
@@ -41,6 +48,8 @@ export function Finances({
   properties,
   people,
   initialPropertyId,
+  initialObligationId,
+  onPropertyChange,
   section,
   onCapital,
   onReminders,
@@ -49,10 +58,13 @@ export function Finances({
   properties: Property[];
   people: Person[];
   initialPropertyId?: number;
+  initialObligationId?: number;
+  onPropertyChange?: (id: number) => void;
   section?: "receivable" | "debts" | "expenses";
   onCapital?: (propertyId: number) => void;
   onReminders?: (propertyId: number) => void;
 }) {
+  const activeForm = useRef<HTMLDivElement>(null);
   const [propertyId, setPropertyId] = useState(
       initialPropertyId || properties[0]?.id || 0,
     ),
@@ -69,6 +81,9 @@ export function Finances({
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [personFilter, setPersonFilter] = useState(0),
+    [obligationFilter, setObligationFilter] = useState(
+      initialObligationId || 0,
+    ),
     [unitFilter, setUnitFilter] = useState(""),
     [contractFilter, setContractFilter] = useState(0),
     [conceptFilter, setConceptFilter] = useState(""),
@@ -146,6 +161,7 @@ export function Finances({
   }
   const obligations = data.obligations.filter(
     (o) =>
+      (!obligationFilter || obligationFilter === o.id) &&
       (!personFilter || o.person_id === personFilter) &&
       (!unitFilter ||
         (unitFilter === "whole"
@@ -210,10 +226,10 @@ export function Finances({
                 <button
                   onClick={() => {
                     setPersonFilter(o.person_id);
-                    open("receive");
+                    open("receive", o.id);
                   }}
                 >
-                  Registrar pago para esta persona
+                  Registrar cobro
                 </button>
               )}
               {admin && (
@@ -345,39 +361,53 @@ export function Finances({
         Consulta por separado lo que corresponde cobrar, el dinero recibido y
         los pagos realizados.
       </p>
-      <Field label="Casa de los pagos y gastos">
-        <select
-          value={propertyId || ""}
-          onChange={(e) => setPropertyId(Number(e.target.value))}
-        >
-          <option value="">Seleccionar casa</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySelect
+        label="Casa de los pagos y gastos"
+        properties={properties}
+        disabled={!!action}
+        value={propertyId || ""}
+        onChange={(id) => {
+          setPropertyId(Number(id));
+          setObligationFilter(0);
+          onPropertyChange?.(Number(id));
+        }}
+      />
       <nav
         className="utility-tabs finance-tabs"
         aria-label="Secciones económicas"
       >
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            className={tab === id ? "" : "secondary"}
-            aria-current={tab === id ? "page" : undefined}
-            onClick={() => {
-              setTab(id);
-              setAction(
-                id === "receive" && canWrite ? { kind: "receive" } : null,
-              );
-              setNotice("");
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        {tabs
+          .filter(
+            ([id]) =>
+              !section ||
+              (section === "debts"
+                ? ["debts", "history", "summary"].includes(id)
+                : section === "expenses"
+                  ? ["expenses", "disbursements", "summary"].includes(id)
+                  : !["debts", "expenses", "disbursements"].includes(id)),
+          )
+          .map(([id, label]) => (
+            <button
+              key={id}
+              className={tab === id ? "" : "secondary"}
+              aria-current={tab === id ? "page" : undefined}
+              onClick={() => {
+                if (
+                  !confirmFormDiscard(
+                    activeForm.current?.querySelector("form") ?? null,
+                  )
+                )
+                  return;
+                setTab(id);
+                setAction(
+                  id === "receive" && canWrite ? { kind: "receive" } : null,
+                );
+                setNotice("");
+              }}
+            >
+              {label}
+            </button>
+          ))}
       </nav>
       <ErrorMessage message={error || related.error} />
       {notice && (
@@ -396,21 +426,27 @@ export function Finances({
           onCancel={() => setAction(null)}
         />
       ) : action ? (
-        <FinanceForm
-          key={`${propertyId}-${action.kind}-${action.id || 0}`}
-          base={base}
-          action={action}
-          data={data}
-          catalogs={catalogs}
-          people={related.candidates}
-          units={related.units}
-          contracts={contracts}
-          receipts={receipts}
-          admin={admin}
-          initialPersonId={personFilter}
-          onSaved={saved}
-          onCancel={() => setAction(null)}
-        />
+        <div ref={activeForm}>
+          <FinanceForm
+            key={`${propertyId}-${action.kind}-${action.id || 0}`}
+            base={base}
+            action={action}
+            data={data}
+            catalogs={catalogs}
+            people={related.candidates}
+            units={related.units}
+            contracts={contracts.filter(
+              (contract) => contract.resolved_property_id === propertyId,
+            )}
+            receipts={receipts}
+            propertyId={propertyId}
+            onContactAdded={() => void related.reload()}
+            admin={admin}
+            initialPersonId={personFilter}
+            onSaved={saved}
+            onCancel={() => setAction(null)}
+          />
+        </div>
       ) : (
         <>
           {[
@@ -421,19 +457,12 @@ export function Finances({
             "guarantees",
             "disbursements",
           ].includes(tab) && (
-            <Field label="Filtrar por persona">
-              <select
-                value={personFilter}
-                onChange={(e) => setPersonFilter(Number(e.target.value))}
-              >
-                <option value={0}>Todas las personas de la casa</option>
-                {related.candidates.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <SearchSelect
+              label="Filtrar por persona"
+              value={personFilter || ""}
+              options={related.candidates.map(personOption)}
+              onChange={(id) => setPersonFilter(Number(id))}
+            />
           )}
           {tab === "summary" && (
             <>
@@ -517,40 +546,43 @@ export function Finances({
               <h2>
                 {tab === "debts" ? "Deudas pendientes" : "Importes por cobrar"}
               </h2>
+              <SearchSelect
+                label="Buscar importe por cobrar"
+                value={obligationFilter || ""}
+                options={data.obligations.map((obligation) => ({
+                  value: obligation.id,
+                  label: `${obligation.concept} · ${name(obligation.person_id)} · ${unit(obligation.unit_id)} · ${money(obligation.pending, obligation.currency)} · ${showDate(obligation.period_start)}`,
+                }))}
+                onChange={(id) => setObligationFilter(Number(id))}
+              />
               <details>
                 <summary>
                   Filtrar por cuarto, contrato, periodo, concepto y moneda
                 </summary>
                 <div className="form-grid">
-                  <Field label="Filtrar por cuarto">
-                    <select
-                      value={unitFilter}
-                      onChange={(e) => setUnitFilter(e.target.value)}
-                    >
-                      <option value="">Todos los espacios</option>
-                      <option value="whole">Casa completa</option>
-                      {related.units.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.code} · {u.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Filtrar por contrato">
-                    <select
-                      value={contractFilter}
-                      onChange={(e) =>
-                        setContractFilter(Number(e.target.value))
-                      }
-                    >
-                      <option value={0}>Todos los contratos</option>
-                      {contracts.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          Contrato {c.id} · {c.target_label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  <SearchSelect
+                    label="Filtrar por cuarto"
+                    value={unitFilter}
+                    onChange={setUnitFilter}
+                    options={[
+                      { value: "whole", label: "Casa completa" },
+                      ...related.units.map(unitOption),
+                    ]}
+                  />
+                  <SearchSelect
+                    label="Filtrar por contrato"
+                    value={contractFilter || ""}
+                    onChange={(id) => setContractFilter(Number(id))}
+                    options={contracts
+                      .filter(
+                        (contract) =>
+                          contract.resolved_property_id === propertyId,
+                      )
+                      .map((contract) => ({
+                        value: contract.id,
+                        label: `${contract.target_label} · ${name(contract.responsible_person_id)} · ${showDate(contract.start_date)}`,
+                      }))}
+                  />
                   <Field label="Filtrar por concepto">
                     <select
                       value={conceptFilter}

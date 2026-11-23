@@ -202,11 +202,15 @@ function Workspace({
     null,
   );
   const [financeTarget, setFinanceTarget] = useState<number | null>(null);
+  const [obligationTarget, setObligationTarget] = useState<
+    number | undefined
+  >();
   const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(
     null,
   );
   const [contractTarget, setContractTarget] = useState<number | null>(null);
   const [utilityTarget, setUtilityTarget] = useState<number | null>(null);
+  const [receiptTarget, setReceiptTarget] = useState<number | undefined>();
   const [tenancyProperty, setTenancyProperty] = useState<number | undefined>();
   const [properties, setProperties] = useState<Property[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -337,9 +341,13 @@ function Workspace({
             user={user}
             refresh={refresh}
             onHouseAction={(target, propertyId) => {
-              if (target === "utilities") setUtilityTarget(propertyId);
-              else if (target === "finances") setFinanceTarget(propertyId);
-              else {
+              if (target === "utilities") {
+                setUtilityTarget(propertyId);
+                setReceiptTarget(undefined);
+              } else if (target === "finances") {
+                setFinanceTarget(propertyId);
+                setObligationTarget(undefined);
+              } else {
                 setTenancyProperty(propertyId);
                 setContractTarget(null);
               }
@@ -387,6 +395,7 @@ function Workspace({
             properties={properties}
             people={people}
             initialPropertyId={utilityTarget || undefined}
+            initialReceiptId={receiptTarget}
           />
         ) : page === "finances" || page === "debts" || page === "expenses" ? (
           <Finances
@@ -402,6 +411,13 @@ function Workspace({
             properties={properties}
             people={people}
             initialPropertyId={financeTarget || undefined}
+            initialObligationId={
+              page === "debts" ? obligationTarget : undefined
+            }
+            onPropertyChange={(id) => {
+              setFinanceTarget(id);
+              setObligationTarget(undefined);
+            }}
             onReminders={(propertyId) => {
               setReminderTarget({ propertyId });
               setPage("reminders");
@@ -442,10 +458,18 @@ function Workspace({
                 setPage("contracts");
               } else if (origin.module === "utilities") {
                 setUtilityTarget(propertyId);
+                setReceiptTarget(origin.receipt_id);
                 setPage("utilities");
               } else {
                 setFinanceTarget(propertyId);
-                setPage("finances");
+                setObligationTarget(origin.obligation_id);
+                setPage(
+                  origin.obligation_id
+                    ? "debts"
+                    : origin.expense_id
+                      ? "expenses"
+                      : "finances",
+                );
               }
             }}
           />

@@ -1,9 +1,18 @@
 import { useRef, useState } from "react";
 import { api } from "../../api";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
+import { ContextDialog } from "../../components/ContextDialog";
+import { NewContact } from "../tenancy/Shared";
 import type { Person } from "../../types";
 import type { Contract } from "../../tenancy";
 import type { Receipt } from "../../utilities";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
 import { showDate } from "../../tenancy";
 import {
   money,
@@ -34,6 +43,8 @@ export type FormProps = {
   receipts: Receipt[];
   admin: boolean;
   initialPersonId?: number;
+  propertyId?: number;
+  onContactAdded?: () => void;
   onSaved: () => Promise<void>;
   onCancel: () => void;
 };
@@ -51,6 +62,8 @@ export function PersonChoice({
   value,
   onChange,
   optional = false,
+  disabled = false,
+  onCreate,
 }: {
   people: Person[];
   name: string;
@@ -58,28 +71,28 @@ export function PersonChoice({
   value?: number;
   onChange?: (id: number) => void;
   optional?: boolean;
+  disabled?: boolean;
+  onCreate?: () => void;
 }) {
   return (
-    <Field label={label}>
-      <select
+    <div>
+      <SearchSelect
+        label={label}
         name={name}
         required={!optional}
+        disabled={disabled}
+        options={people.map(personOption)}
         defaultValue={onChange ? undefined : value || ""}
         value={onChange ? value || "" : undefined}
-        onChange={
-          onChange ? (e) => onChange(Number(e.target.value)) : undefined
-        }
-      >
-        <option value="">
-          {optional ? "Sin indicar" : "Seleccionar persona"}
-        </option>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.full_name}
-          </option>
-        ))}
-      </select>
-    </Field>
+        onChange={onChange ? (id) => onChange(Number(id)) : undefined}
+        placeholder="Buscar por nombre, documento o teléfono"
+      />
+      {onCreate && !disabled && (
+        <button type="button" className="secondary" onClick={onCreate}>
+          + Registrar persona
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -89,12 +102,20 @@ function CashFields({
   currency,
   payer,
   beneficiary,
+  fixedCurrency,
+  onAmount,
+  created,
+  onCreate,
 }: {
   people: Person[];
   catalogs: FinanceCatalogs;
   currency: string;
   payer?: number;
   beneficiary?: number;
+  fixedCurrency?: boolean;
+  onAmount?: (amount: string) => void;
+  created: Record<string, number>;
+  onCreate?: (field: string) => void;
 }) {
   return (
     <>
@@ -102,13 +123,19 @@ function CashFields({
         <input
           name="currency"
           defaultValue={currency}
+          readOnly={fixedCurrency}
           pattern="[A-Z]{3}"
           maxLength={3}
           required
         />
       </Field>
       <Field label="Importe del dinero realmente entregado">
-        <input name="amount" {...amountInput} required />
+        <input
+          name="amount"
+          {...amountInput}
+          required
+          onChange={(event) => onAmount?.(event.target.value)}
+        />
       </Field>
       <Field label="Fecha del pago">
         <input
@@ -134,13 +161,19 @@ function CashFields({
         people={people}
         name="payer_id"
         label="Persona que entrega o paga el dinero"
-        value={payer}
+        key={created.payer_id || "payer"}
+        value={created.payer_id || payer}
+        onCreate={onCreate ? () => onCreate("payer_id") : undefined}
       />
       <PersonChoice
         people={people}
         name="beneficiary_person_id"
         label="Persona que recibe el dinero"
-        value={beneficiary}
+        key={created.beneficiary_person_id || "beneficiary"}
+        value={created.beneficiary_person_id || beneficiary}
+        onCreate={
+          onCreate ? () => onCreate("beneficiary_person_id") : undefined
+        }
         optional
       />
       <Field label="Empresa u otro destinatario (si corresponde)">
@@ -162,12 +195,15 @@ function CashFields({
 function AllocationFields({
   obligations,
   sourceAvailable,
+  defaults = {},
 }: {
   obligations: Obligation[];
   sourceAvailable?: string;
+  defaults?: Record<number, string>;
 }) {
   const [parts, setParts] = useState<Record<string, string>>({});
-  const sum = Object.values(parts).reduce((a, b) => a + exactCents(b), 0n);
+  const amounts: Record<string, string> = { ...defaults, ...parts };
+  const sum = Object.values(amounts).reduce((a, b) => a + exactCents(b), 0n);
   return (
     <fieldset>
       <legend>Elige cuánto aplicar a cada concepto</legend>
@@ -187,7 +223,7 @@ function AllocationFields({
               min="0"
               max={o.pending}
               name={`apply_${o.id}`}
-              value={parts[o.id] || ""}
+              value={amounts[o.id] || ""}
               onChange={(e) => setParts({ ...parts, [o.id]: e.target.value })}
             />
           </Field>
@@ -195,7 +231,7 @@ function AllocationFields({
             Quedaría pendiente:{" "}
             {money(
               exactAmount(
-                exactCents(o.pending) - exactCents(parts[o.id] || "0"),
+                exactCents(o.pending) - exactCents(amounts[o.id] || "0"),
               ),
               o.currency,
             )}
@@ -217,17 +253,43 @@ function AllocationFields({
 }
 
 export function FinanceForm(p: FormProps) {
-  const { action, data, catalogs, people, contracts, receipts, units } = p;
-  const movement = data.movements.find((x) => x.id === action.id);
-  const expense = data.expenses.find((x) => x.id === action.id);
+  const { action, data, catalogs, contracts, receipts, units } = p;
   const obligation = data.obligations.find((x) => x.id === action.id);
+  const linkedDebt = action.kind === "receive" ? obligation : undefined;
+  const movement = linkedDebt
+    ? undefined
+    : data.movements.find((x) => x.id === action.id);
+  const expense = linkedDebt
+    ? undefined
+    : data.expenses.find((x) => x.id === action.id);
+  const [amountReceived, setAmountReceived] = useState("");
+  const [addedPeople, setAddedPeople] = useState<Person[]>([]);
+  const [created, setCreated] = useState<Record<string, number>>({});
+  const [adding, setAdding] = useState<string>();
+  const people = [
+    ...p.people,
+    ...addedPeople.filter(
+      (person) => !p.people.some((item) => item.id === person.id),
+    ),
+  ];
+  const formRef = useRef<HTMLFormElement>(null);
+  const create = p.propertyId ? setAdding : undefined;
+  const amountToApply = linkedDebt
+    ? exactAmount(
+        exactCents(amountReceived) > exactCents(linkedDebt.pending)
+          ? exactCents(linkedDebt.pending)
+          : exactCents(amountReceived),
+      )
+    : "";
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [preview, setPreview] = useState<RentPreview | null>(null);
   const [personId, setPersonId] = useState(
-      movement?.person_id || p.initialPersonId || 0,
+      linkedDebt?.person_id || movement?.person_id || p.initialPersonId || 0,
     ),
-    [currency, setCurrency] = useState(movement?.currency || "BOB"),
+    [currency, setCurrency] = useState(
+      linkedDebt?.currency || movement?.currency || "BOB",
+    ),
     [contractId, setContractId] = useState(contracts[0]?.id || 0),
     [receiptId, setReceiptId] = useState(
       receipts.find((r) => r.current_distribution_id)?.id || 0,
@@ -313,6 +375,7 @@ export function FinanceForm(p: FormProps) {
   }
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
     const form = e.currentTarget;
     const v = formValues(form);
     let endpoint = "";
@@ -429,7 +492,9 @@ export function FinanceForm(p: FormProps) {
     }
     if (
       !window.confirm(
-        `¿Confirmar: ${titles[action.kind]}? Revisa el importe, la moneda, las personas y los conceptos antes de continuar.`,
+        linkedDebt
+          ? `¿Registrar ${money(v.cash.amount, v.cash.currency)} para ${people.find((person) => person.id === personId)?.full_name || "la persona titular"}? Se aplicará ${money(v.applications[0]?.amount || "0", v.cash.currency)} a ${linkedDebt.concept}.`
+          : `¿Confirmar: ${titles[action.kind]}? Revisa el importe, la moneda, las personas y los conceptos antes de continuar.`,
       )
     )
       return;
@@ -446,6 +511,7 @@ export function FinanceForm(p: FormProps) {
   }
   const compatible = data.obligations.filter(
     (o) =>
+      (!linkedDebt || linkedDebt.id === o.id) &&
       o.person_id ===
         (action.kind === "apply" ? movement?.person_id : personId) &&
       o.currency === (movement?.currency || currency) &&
@@ -456,38 +522,49 @@ export function FinanceForm(p: FormProps) {
     <section className="panel">
       <h2>{titles[action.kind]}</h2>
       <ErrorMessage message={error} />
-      <form onSubmit={submit}>
-        {["receive", "guarantee"].includes(action.kind) && (
+      <form
+        ref={formRef}
+        onSubmit={submit}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
+        {linkedDebt && (
+          <div className="review">
+            <strong>
+              {linkedDebt.concept} ·{" "}
+              {people.find((person) => person.id === personId)?.full_name}
+            </strong>
+            <p>
+              Saldo pendiente {money(linkedDebt.pending, linkedDebt.currency)} ·
+              vence el {showDate(linkedDebt.effective_due_on)}
+            </p>
+          </div>
+        )}
+        {["receive", "guarantee"].includes(action.kind) && !linkedDebt && (
           <PersonChoice
             people={people}
             name="person_id"
             label="Persona titular de la obligación o del saldo"
             value={personId}
             onChange={setPersonId}
+            onCreate={create ? () => create("titular") : undefined}
           />
         )}
         {["rent", "guarantee"].includes(action.kind) && (
-          <Field label="Contrato">
-            <select
-              name="contract_id"
-              value={contractId || ""}
-              required
-              onChange={(e) => {
-                setContractId(Number(e.target.value));
-                setPreview(null);
-              }}
-            >
-              <option value="">Seleccionar contrato</option>
-              {contracts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  Contrato {c.id} · {c.target_label} ·{" "}
-                  {people.find((p) => p.id === c.responsible_person_id)
-                    ?.full_name || "Persona registrada"}{" "}
-                  · {c.currency}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <SearchSelect
+            label="Contrato"
+            name="contract_id"
+            required
+            value={contractId || ""}
+            onChange={(value) => {
+              setContractId(Number(value));
+              setPreview(null);
+            }}
+            options={contracts.map((contract) => ({
+              value: contract.id,
+              label: `${contract.target_label} · ${people.find((person) => person.id === contract.responsible_person_id)?.full_name || "Persona registrada"} · ${showDate(contract.start_date)} · ${contract.currency}`,
+            }))}
+          />
         )}
         {action.kind === "rent" && (
           <>
@@ -586,36 +663,34 @@ export function FinanceForm(p: FormProps) {
                 No se crean deudas del inquilino en este paso.
               </p>
             )}
-            <Field
+            <SearchSelect
               label={
                 action.kind === "utility"
                   ? "Recibo de proveedor confirmado"
                   : "Recibo externo del proveedor"
               }
-            >
-              <select
-                value={receiptId || ""}
-                onChange={(e) => setReceiptId(Number(e.target.value))}
-                required
-              >
-                <option value="">Seleccionar recibo</option>
-                {receipts
-                  .filter(
-                    (r) =>
-                      action.kind === "provider" || r.current_distribution_id,
-                  )
-                  .map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.account_label} · {money(r.amount, r.currency)} ·{" "}
-                      {showDate(r.period_start)}
-                    </option>
-                  ))}
-              </select>
-            </Field>
+              required
+              value={receiptId || ""}
+              onChange={(id) => setReceiptId(Number(id))}
+              options={receipts
+                .filter(
+                  (receipt) =>
+                    action.kind === "provider" ||
+                    receipt.current_distribution_id,
+                )
+                .map((receipt) => ({
+                  value: receipt.id,
+                  label: `${receipt.account_label} · ${receipt.provider} · ${money(receipt.amount, receipt.currency)} · ${showDate(receipt.period_start)}`,
+                  search: receipt.external_reference || "",
+                }))}
+            />
             <PersonChoice
               people={people}
               name="owner_person_id"
               label="Responsable del registro del gasto del proveedor"
+              key={created.owner_person_id || "owner"}
+              value={created.owner_person_id}
+              onCreate={create ? () => create("owner_person_id") : undefined}
             />
           </>
         )}
@@ -624,6 +699,10 @@ export function FinanceForm(p: FormProps) {
             key={`${action.kind}-${action.id || 0}-${currency}-${personId}`}
             people={people}
             catalogs={catalogs}
+            fixedCurrency={!!linkedDebt}
+            onAmount={linkedDebt ? setAmountReceived : undefined}
+            created={created}
+            onCreate={create}
             currency={movement?.currency || expense?.currency || currency}
             payer={
               ["receive", "guarantee"].includes(action.kind)
@@ -639,25 +718,30 @@ export function FinanceForm(p: FormProps) {
         )}
         {action.kind === "receive" && (
           <>
-            <Field label="Moneda para seleccionar obligaciones">
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-              >
-                {Array.from(
-                  new Set([
-                    "BOB",
-                    "USD",
-                    ...data.obligations.map((o) => o.currency),
-                  ]),
-                ).map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-            </Field>
+            {!linkedDebt && (
+              <Field label="Moneda para seleccionar obligaciones">
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                >
+                  {Array.from(
+                    new Set([
+                      "BOB",
+                      "USD",
+                      ...data.obligations.map((o) => o.currency),
+                    ]),
+                  ).map((x) => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <AllocationFields
               key={`${personId}-${currency}`}
               obligations={compatible}
+              defaults={
+                linkedDebt ? { [linkedDebt.id]: amountToApply } : undefined
+              }
             />
             <Field label="Si queda dinero sin aplicar">
               <select name="surplus">
@@ -695,17 +779,19 @@ export function FinanceForm(p: FormProps) {
               people={people}
               name="person_id"
               label="Persona responsable del gasto"
+              key={created.person_id || "expense-person"}
+              value={created.person_id}
+              onCreate={create ? () => create("person_id") : undefined}
             />
-            <Field label="Cuarto (opcional)">
-              <select name="unit_id">
-                <option value="">Casa completa</option>
-                {units.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.code} · {x.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <SearchSelect
+              label="Cuarto (opcional)"
+              name="unit_id"
+              hint="Cuando queda vacío, el gasto corresponde a la casa completa."
+              options={units.map((unit) => ({
+                value: unit.id,
+                label: `${unit.code} · ${unit.name}`,
+              }))}
+            />
             <Field label="Categoría del gasto">
               <select name="category_id" required>
                 <option value="">Seleccionar categoría</option>
@@ -903,12 +989,34 @@ export function FinanceForm(p: FormProps) {
             type="button"
             className="secondary"
             disabled={busy}
-            onClick={p.onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) p.onCancel();
+            }}
           >
             Cancelar
           </button>
         </div>
       </form>
+      {p.propertyId && adding && (
+        <ContextDialog
+          label="Registrar persona para el movimiento"
+          onCancel={() => setAdding(undefined)}
+        >
+          <NewContact
+            propertyId={p.propertyId}
+            onCancel={() => setAdding(undefined)}
+            onAdded={async (person) => {
+              setAddedPeople((current) => [...current, person]);
+              if (adding === "titular") setPersonId(person.id);
+              else
+                setCreated((current) => ({ ...current, [adding]: person.id }));
+              if (formRef.current) formRef.current.dataset.dirty = "true";
+              setAdding(undefined);
+              p.onContactAdded?.();
+            }}
+          />
+        </ContextDialog>
+      )}
     </section>
   );
 }

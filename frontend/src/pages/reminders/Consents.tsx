@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
 import type { Person } from "../../types";
 import type { Consent } from "../../reminders";
@@ -153,20 +154,13 @@ export function Consents({
       {admin && (
         <form className="panel" onSubmit={(e) => void save(e)}>
           <h3>Registrar aceptación expresa</h3>
-          <Field label="Persona que autoriza WhatsApp">
-            <select
-              value={personId || ""}
-              onChange={(e) => setPersonId(Number(e.target.value))}
-              required
-            >
-              <option value="">Seleccionar persona</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <SearchSelect
+            label="Persona que autoriza WhatsApp"
+            value={personId || ""}
+            required
+            options={people.map(personOption)}
+            onChange={(value) => setPersonId(Number(value))}
+          />
           <Field label="Tipo de comunicación autorizado">
             <select
               value={purpose}

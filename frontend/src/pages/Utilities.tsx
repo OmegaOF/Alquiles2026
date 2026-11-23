@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { PropertySelect } from "../components/PropertySelect";
+import { SearchSelect } from "../components/SearchSelect";
 import type { Person, Property, User } from "../types";
 import type { Receipt, ServiceAccount, UtilityType } from "../utilities";
 import { distributionStates, money } from "../utilities";
-import { Field, ErrorMessage, errorText } from "../components/Form";
+import {
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+} from "../components/Form";
 import { usePropertyData } from "./tenancy/Shared";
 import { showDate } from "../tenancy";
 import { Services } from "./utilities/Services";
@@ -16,16 +22,20 @@ export function Utilities({
   properties,
   people,
   initialPropertyId,
+  initialReceiptId,
 }: {
   user: User;
   properties: Property[];
   people: Person[];
   initialPropertyId?: number;
+  initialReceiptId?: number;
 }) {
+  const content = useRef<HTMLElement>(null);
   const [propertyId, setPropertyId] = useState(
       initialPropertyId || properties[0]?.id || 0,
     ),
-    [tab, setTab] = useState("services"),
+    [tab, setTab] = useState(initialReceiptId ? "receipts" : "services"),
+    [receiptFilter, setReceiptFilter] = useState(""),
     [accounts, setAccounts] = useState<ServiceAccount[]>([]),
     [types, setTypes] = useState<UtilityType[]>([]),
     [receipts, setReceipts] = useState<Receipt[]>([]),
@@ -34,6 +44,7 @@ export function Utilities({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const seq = useRef(0);
+  const initialReceipt = useRef(initialReceiptId);
   const currentProperty = useRef(propertyId);
   currentProperty.current = propertyId;
   const property = properties.find((p) => p.id === propertyId),
@@ -53,6 +64,13 @@ export function Utilities({
         setAccounts(a);
         setTypes(t);
         setReceipts(r);
+        if (initialReceipt.current) {
+          const selected = r.find(
+            (receipt) => receipt.id === initialReceipt.current,
+          );
+          if (selected) setSelected(selected);
+          initialReceipt.current = undefined;
+        }
       }
     } catch (e) {
       if (request === seq.current) setError(errorText(e));
@@ -65,41 +83,37 @@ export function Utilities({
     setReceipts([]);
     setSelected(null);
     setCreating(false);
+    setReceiptFilter("");
     void load();
     return () => {
       seq.current++;
     };
   }, [propertyId]);
+  const canLeave = () =>
+    confirmFormDiscard(
+      content.current?.querySelector("form[data-dirty]") ?? null,
+    );
   const changeTab = (value: string) => {
+    if (value === tab || !canLeave()) return;
     setTab(value);
     setSelected(null);
     setCreating(false);
   };
   return (
-    <section>
+    <section ref={content}>
       <p className="eyebrow">RECIBOS EXISTENTES Y RESPONSABILIDADES</p>
       <h1>Servicios básicos</h1>
       <p>
         Registra los recibos de proveedores y revisa cómo se reparte cada gasto.
       </p>
-      <Field label="Casa de los servicios básicos">
-        <select
-          required
-          value={propertyId || ""}
-          onChange={(e) => {
-            setSelected(null);
-            setCreating(false);
-            setPropertyId(Number(e.target.value));
-          }}
-        >
-          <option value="">Seleccionar casa</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySelect
+        label="Casa de los servicios básicos"
+        properties={properties}
+        value={propertyId || ""}
+        onChange={(id) => {
+          if (canLeave()) setPropertyId(Number(id));
+        }}
+      />
       <nav className="utility-tabs" aria-label="Secciones de servicios básicos">
         {[
           ["services", "Servicios y suministros"],
@@ -144,6 +158,19 @@ export function Utilities({
           ) : creating ? (
             <ReceiptForm
               accounts={accounts}
+              createSupply={
+                user.role === "owner"
+                  ? undefined
+                  : {
+                      property,
+                      user,
+                      types,
+                      people: data.candidates,
+                      units: data.units,
+                      onAdded: (account) =>
+                        setAccounts((current) => [...current, account]),
+                    }
+              }
               onCancel={() => setCreating(false)}
               onSaved={async (r) => {
                 await load();
@@ -179,45 +206,58 @@ export function Utilities({
                   </p>
                 </div>
                 {user.role !== "owner" && tab !== "history" && (
-                  <button
-                    disabled={!accounts.some((a) => a.is_active)}
-                    onClick={() => setCreating(true)}
-                  >
+                  <button onClick={() => setCreating(true)}>
                     Registrar recibo
                   </button>
                 )}
               </div>
+              <SearchSelect
+                label="Buscar recibo"
+                value={receiptFilter}
+                onChange={setReceiptFilter}
+                options={receipts.map((receipt) => ({
+                  value: receipt.id,
+                  label: `${receipt.account_label} · ${receipt.provider} · ${showDate(receipt.issued_on)}`,
+                  search: receipt.external_reference || "",
+                }))}
+                placeholder="Buscar por referencia, suministro o proveedor"
+              />
               <div className="record-list">
-                {receipts.map((r) => (
-                  <article key={r.id}>
-                    <div className="record-main">
-                      <h3>
-                        {r.account_label}: {money(r.amount, r.currency)}
-                      </h3>
-                      <p>
-                        {r.provider} ·{" "}
-                        {r.external_reference || "Sin referencia externa"}
-                      </p>
-                      <p>
-                        Consumo: {showDate(r.period_start)} al{" "}
-                        {showDate(r.period_end)} · Límite de pago:{" "}
-                        {showDate(r.due_on)}
-                      </p>
-                      <p>
-                        <strong>
-                          {distributionStates[r.distribution_status]}
-                        </strong>{" "}
-                        · Sin pago registrado aquí
-                      </p>
-                    </div>
-                    <button
-                      className="secondary"
-                      onClick={() => setSelected(r)}
-                    >
-                      Ver recibo {r.id} y reparto
-                    </button>
-                  </article>
-                ))}
+                {receipts
+                  .filter(
+                    (receipt) =>
+                      !receiptFilter || String(receipt.id) === receiptFilter,
+                  )
+                  .map((r) => (
+                    <article key={r.id}>
+                      <div className="record-main">
+                        <h3>
+                          {r.account_label}: {money(r.amount, r.currency)}
+                        </h3>
+                        <p>
+                          {r.provider} ·{" "}
+                          {r.external_reference || "Sin referencia externa"}
+                        </p>
+                        <p>
+                          Consumo: {showDate(r.period_start)} al{" "}
+                          {showDate(r.period_end)} · Límite de pago:{" "}
+                          {showDate(r.due_on)}
+                        </p>
+                        <p>
+                          <strong>
+                            {distributionStates[r.distribution_status]}
+                          </strong>{" "}
+                          · Sin pago registrado aquí
+                        </p>
+                      </div>
+                      <button
+                        className="secondary"
+                        onClick={() => setSelected(r)}
+                      >
+                        Ver recibo {r.id} y reparto
+                      </button>
+                    </article>
+                  ))}
                 {!receipts.length && (
                   <p className="empty">
                     Todavía no hay recibos registrados para esta casa.

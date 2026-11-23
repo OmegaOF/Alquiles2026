@@ -1,6 +1,12 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase, credentials, openSection } from "./helpers";
+import {
+  authenticate,
+  apiBase,
+  credentials,
+  openSection,
+  selectRecord,
+} from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -132,9 +138,10 @@ async function pay(page: Page, f: Fixture, amount: string, oid = f.oid) {
 async function enter(page: Page, f: Fixture) {
   await page.goto("/");
   await openSection(page, "Inicio", "Avisos");
-  await page
-    .getByLabel("Casa de los recordatorios")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Casa de los recordatorios"),
+    String(f.house.id),
+  );
   await expect(
     page.getByRole("heading", { name: "Resumen de atención" }),
   ).toBeVisible();
@@ -202,7 +209,10 @@ test("saldo parcial, vencimientos y atención no crean otra deuda", async ({
   await capture(page, info, "resumen");
   await page.getByRole("button", { name: "Por vencer", exact: true }).click();
   await capture(page, info, "vencimientos");
-  await page.getByRole("button", { name: "Alquileres", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Consultas de recordatorios" })
+    .getByRole("button", { name: "Alquileres", exact: true })
+    .click();
   await capture(page, info, "alquileres");
   await detail(page, f);
   await page
@@ -214,7 +224,7 @@ test("saldo parcial, vencimientos y atención no crean otra deuda", async ({
   await expect(page.getByText("Alquiler ·", { exact: false })).toContainText(
     "Revisado",
   );
-  await page.getByLabel("Acción sobre este aviso").selectOption("snoozed");
+  await selectRecord(page.getByLabel("Acción sobre este aviso"), "snoozed");
   await page.getByLabel("Volver a atender el aviso el").fill(day(f.today, 1));
   await page
     .getByRole("button", { name: "Guardar mi revisión del aviso" })
@@ -226,9 +236,10 @@ test("saldo parcial, vencimientos y atención no crean otra deuda", async ({
   expect(finance.movements).toHaveLength(1);
   await page.reload();
   await openSection(page, "Inicio", "Avisos");
-  await page
-    .getByLabel("Casa de los recordatorios")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Casa de los recordatorios"),
+    String(f.house.id),
+  );
   expect(
     (await get(page, f.rem)).items.filter(
       (e: { key: string }) => e.key === `debt:${f.oid}`,
@@ -483,19 +494,22 @@ test("reportar un pago no mueve dinero; verificar vincula el ingreso existente",
     .getByRole("button", { name: "Pagos pendientes de verificar", exact: true })
     .click();
   await page.getByRole("button", { name: "Registrar pago reportado" }).click();
-  await page
-    .getByLabel("Obligación relacionada con el reporte")
-    .selectOption(String(f.oid));
-  await page
-    .getByLabel("Persona que informa haber pagado")
-    .selectOption(String(f.tenant.id));
+  await selectRecord(
+    page.getByLabel("Obligación relacionada con el reporte"),
+    String(f.oid),
+  );
+  await selectRecord(
+    page.getByLabel("Persona que informa haber pagado"),
+    String(f.tenant.id),
+  );
   await page
     .getByLabel("Concepto informado")
     .fill("Alquiler comunicado para revisión");
   await page.getByLabel("Importe reportado, todavía sin confirmar").fill("500");
-  await page
-    .getByLabel("Método de pago informado")
-    .selectOption(String(f.method.id));
+  await selectRecord(
+    page.getByLabel("Método de pago informado"),
+    String(f.method.id),
+  );
   await page
     .getByLabel("Referencia del comprobante reportado")
     .fill("Comprobante ficticio de pruebas");
@@ -514,9 +528,10 @@ test("reportar un pago no mueve dinero; verificar vincula el ingreso existente",
   await page
     .getByRole("button", { name: `Revisar reporte ${report.id}` })
     .click();
-  await page
-    .getByLabel("Ingreso real que corresponde al comprobante")
-    .selectOption(String(move.movement_id));
+  await selectRecord(
+    page.getByLabel("Ingreso real que corresponde al comprobante"),
+    String(move.movement_id),
+  );
   await page
     .getByLabel("Motivo de la decisión")
     .fill("Coincide con el comprobante y aplicación real");

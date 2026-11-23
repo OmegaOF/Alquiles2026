@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../../api";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
 import type { Person } from "../../types";
 import type { Distribution } from "../../utilities";
 import { money } from "../../utilities";
@@ -138,54 +139,42 @@ export function ResolutionForm({
                       </select>
                     </Field>
                     {r.kind === "occupant" && (
-                      <Field label={`Contrato de origen ${index + 1}`}>
-                        <select
-                          required
-                          value={r.contract_id || ""}
-                          onChange={(e) => {
-                            const c = sources.find(
-                              (s) => s.id === Number(e.target.value),
-                            );
-                            update(index, {
-                              contract_id: c?.id || null,
-                              person_id: c?.responsible_person_id || 0,
-                            });
-                          }}
-                        >
-                          <option value="">Seleccionar contrato</option>
-                          {sources.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              Contrato {c.id} · {showDate(c.start_date)} al{" "}
-                              {showDate(c.end_date)} · {c.occupied_days} días
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    )}
-                    <Field label={`Persona responsable ${index + 1}`}>
-                      <select
+                      <SearchSelect
+                        label={`Contrato de origen ${index + 1}`}
                         required
-                        value={r.person_id || ""}
-                        onChange={(e) =>
-                          update(index, { person_id: Number(e.target.value) })
-                        }
-                      >
-                        <option value="">Seleccionar persona</option>
-                        {people
-                          .filter(
-                            (p) =>
-                              r.kind === "owner" ||
-                              sources
-                                .find((c) => c.id === r.contract_id)
-                                ?.people.includes(p.id),
-                          )
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.full_name}
-                            </option>
-                          ))}
-                      </select>
-                    </Field>
+                        value={r.contract_id || ""}
+                        options={sources.map((contract) => ({
+                          value: contract.id,
+                          label: `${people.find((person) => person.id === contract.responsible_person_id)?.full_name || "Persona responsable"} · ${showDate(contract.start_date)} al ${showDate(contract.end_date)} · ${contract.occupied_days} días`,
+                        }))}
+                        onChange={(id) => {
+                          const contract = sources.find(
+                            (item) => item.id === Number(id),
+                          );
+                          update(index, {
+                            contract_id: contract?.id || null,
+                            person_id: contract?.responsible_person_id || 0,
+                          });
+                        }}
+                      />
+                    )}
+                    <SearchSelect
+                      label={`Persona responsable ${index + 1}`}
+                      required
+                      value={r.person_id || ""}
+                      onChange={(id) =>
+                        update(index, { person_id: Number(id) })
+                      }
+                      options={people
+                        .filter(
+                          (person) =>
+                            r.kind === "owner" ||
+                            sources
+                              .find((contract) => contract.id === r.contract_id)
+                              ?.people.includes(person.id),
+                        )
+                        .map(personOption)}
+                    />
                     <Field label={`Importe de responsabilidad ${index + 1}`}>
                       <input
                         type="number"

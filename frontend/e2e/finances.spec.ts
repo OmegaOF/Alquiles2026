@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase, openSection } from "./helpers";
+import { authenticate, apiBase, openSection, selectRecord } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -99,9 +99,10 @@ async function rent(
 async function enter(page: Page, f: Fixture, tab = "Resumen económico") {
   await page.goto("/");
   await openSection(page, "Cobros y gastos", "Cobros");
-  await page
-    .getByLabel("Casa de los pagos y gastos")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Casa de los pagos y gastos"),
+    String(f.house.id),
+  );
   await page.getByRole("button", { name: tab, exact: true }).click();
 }
 async function state(page: Page, f: Fixture) {
@@ -112,13 +113,15 @@ async function generateUI(
   contract: number,
   through = "2031-01-01",
 ) {
+  await openSection(page, "Cobros y gastos", "Cobros");
   await page.getByRole("button", { name: "Por cobrar", exact: true }).click();
   await page
     .getByRole("button", { name: "Generar alquileres", exact: true })
     .click();
-  await page
-    .getByRole("combobox", { name: "Contrato", exact: true })
-    .selectOption(String(contract));
+  await selectRecord(
+    page.getByRole("combobox", { name: "Contrato", exact: true }),
+    String(contract),
+  );
   await page.getByLabel("Generar periodos que comiencen hasta").fill(through);
   await page
     .getByRole("button", { name: "Revisar importes", exact: true })
@@ -136,15 +139,17 @@ async function generateUI(
 async function cashUI(page: Page, f: Fixture, amount: string, payer: number) {
   await page.getByLabel("Importe del dinero realmente entregado").fill(amount);
   await page.getByLabel("Fecha del pago", { exact: true }).fill("2031-02-01");
-  await page
-    .getByRole("combobox", { name: "Método de pago", exact: true })
-    .selectOption(String(f.method.id));
-  await page
-    .getByRole("combobox", {
+  await selectRecord(
+    page.getByRole("combobox", { name: "Método de pago", exact: true }),
+    String(f.method.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Persona que entrega o paga el dinero",
       exact: true,
-    })
-    .selectOption(String(payer));
+    }),
+    String(payer),
+  );
 }
 async function submit(page: Page) {
   await page
@@ -173,24 +178,25 @@ test("alquiler, pago parcial, sobrante explícito y aplicación posterior de ant
   let s = await state(page, f);
   const oid = s.obligations[0].id;
   await capture(page, info, "por-cobrar");
-  await page
-    .getByRole("button", { name: "Registrar pago para esta persona" })
-    .click();
+  await page.getByRole("button", { name: "Registrar cobro" }).click();
   await cashUI(page, f, "200", f.one.id);
-  await page.getByLabel(`Aplicar a Alquiler n.º ${oid}`).fill("200");
+  await expect(page.getByLabel(`Aplicar a Alquiler n.º ${oid}`)).toHaveValue(
+    "200.00",
+  );
   await capture(page, info, "registrar-pago");
   await submit(page);
-  await page.getByRole("button", { name: "Deudas", exact: true }).click();
+  await openSection(page, "Cobros y gastos", "Deudas");
   await expect(page.getByText(/Pagado parcialmente/)).toBeVisible();
   await capture(page, info, "deudas");
-  await page
-    .getByRole("button", { name: "Registrar pago para esta persona" })
-    .click();
+  await page.getByRole("button", { name: "Registrar cobro" }).click();
   await cashUI(page, f, "400", f.one.id);
-  await page.getByLabel(`Aplicar a Alquiler n.º ${oid}`).fill("300");
-  await page
-    .getByRole("combobox", { name: "Si queda dinero sin aplicar" })
-    .selectOption("credit");
+  await expect(page.getByLabel(`Aplicar a Alquiler n.º ${oid}`)).toHaveValue(
+    "300.00",
+  );
+  await selectRecord(
+    page.getByRole("combobox", { name: "Si queda dinero sin aplicar" }),
+    "credit",
+  );
   await submit(page);
   s = await state(page, f);
   expect(s.summary[0].received).toBe("600.00");
@@ -241,15 +247,17 @@ test("garantía separada, aplicación autorizada, devolución y gasto pagado par
   await page
     .getByRole("button", { name: "Registrar garantía", exact: true })
     .click();
-  await page
-    .getByRole("combobox", {
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Persona titular de la obligación o del saldo",
       exact: true,
-    })
-    .selectOption(String(f.one.id));
-  await page
-    .getByRole("combobox", { name: "Contrato", exact: true })
-    .selectOption(String(c.id));
+    }),
+    String(f.one.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", { name: "Contrato", exact: true }),
+    String(c.id),
+  );
   await cashUI(page, f, "500", f.one.id);
   await page
     .getByLabel("Condiciones pactadas de la garantía")
@@ -283,19 +291,21 @@ test("garantía separada, aplicación autorizada, devolución y gasto pagado par
   s = await state(page, f);
   expect(s.summary[0].guarantees_available).toBe("0.00");
   expect(s.summary[0].refunded).toBe("400.00");
-  await page.getByRole("button", { name: "Gastos", exact: true }).click();
+  await openSection(page, "Cobros y gastos", "Gastos");
   await page
     .getByRole("button", { name: "Registrar gasto", exact: true })
     .click();
-  await page
-    .getByRole("combobox", {
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Persona responsable del gasto",
       exact: true,
-    })
-    .selectOption(String(f.owner.id));
-  await page
-    .getByRole("combobox", { name: "Categoría del gasto", exact: true })
-    .selectOption(String(f.category.id));
+    }),
+    String(f.owner.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", { name: "Categoría del gasto", exact: true }),
+    String(f.category.id),
+  );
   await page
     .getByLabel("Descripción del gasto")
     .fill("Reparación de tubería del patio");
@@ -391,18 +401,20 @@ async function importUI(page: Page, f: Fixture, receipt: number) {
   await page
     .getByRole("button", { name: "Importar reparto confirmado", exact: true })
     .click();
-  await page
-    .getByRole("combobox", {
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Recibo de proveedor confirmado",
       exact: true,
-    })
-    .selectOption(String(receipt));
-  await page
-    .getByRole("combobox", {
+    }),
+    String(receipt),
+  );
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Responsable del registro del gasto del proveedor",
       exact: true,
-    })
-    .selectOption(String(f.owner.id));
+    }),
+    String(f.owner.id),
+  );
   await submit(page);
 }
 
@@ -441,19 +453,21 @@ test("recibo externo 300, pago al proveedor y recuperación real de 70 más 150"
     await page
       .getByRole("button", { name: "Registrar pago", exact: true })
       .click();
-    await page
-      .getByRole("combobox", {
+    await selectRecord(
+      page.getByRole("combobox", {
         name: "Persona titular de la obligación o del saldo",
         exact: true,
-      })
-      .selectOption(String(person.id));
+      }),
+      String(person.id),
+    );
     await cashUI(page, f, o.pending, person.id);
-    await page
-      .getByRole("combobox", {
+    await selectRecord(
+      page.getByRole("combobox", {
         name: "Persona que recibe el dinero",
         exact: true,
-      })
-      .selectOption(String(f.owner.id));
+      }),
+      String(f.owner.id),
+    );
     await page
       .getByLabel(`Aplicar a Electricidad gastos ${f.house.id} n.º ${o.id}`)
       .fill(o.pending);
@@ -523,18 +537,20 @@ test("gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto a
       exact: true,
     })
     .click();
-  await page
-    .getByRole("combobox", {
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Recibo externo del proveedor",
       exact: true,
-    })
-    .selectOption(String(r.id));
-  await page
-    .getByRole("combobox", {
+    }),
+    String(r.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Responsable del registro del gasto del proveedor",
       exact: true,
-    })
-    .selectOption(String(f.owner.id));
+    }),
+    String(f.owner.id),
+  );
   await submit(page);
   let s = await state(page, f);
   expect(s.obligations).toHaveLength(0);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
 import type { Person } from "../../types";
 import type { FinanceData, FinanceCatalogs } from "../../finances";
@@ -132,16 +133,12 @@ export function PaymentReports({
   }
   function personSelect(label: string, name: string) {
     return (
-      <Field label={label}>
-        <select name={name} required>
-          <option value="">Seleccionar persona</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <SearchSelect
+        label={label}
+        name={name}
+        required
+        options={people.map(personOption)}
+      />
     );
   }
   const candidates = selected
@@ -189,22 +186,18 @@ export function PaymentReports({
       {creating && (
         <form className="panel" onSubmit={(e) => void save(e)}>
           <h3>Registrar información de pago</h3>
-          <Field label="Obligación relacionada con el reporte">
-            <select
-              value={obligationId || ""}
-              onChange={(e) => setObligationId(Number(e.target.value))}
-            >
-              <option value="">Otro concepto: indicar persona y moneda</option>
-              {(finance?.obligations || [])
-                .filter((o) => exactCents(o.pending) > 0n)
-                .map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.concept} · {personName(o.person_id)} ·{" "}
-                    {money(o.pending, o.currency)} · n.º {o.id}
-                  </option>
-                ))}
-            </select>
-          </Field>
+          <SearchSelect
+            label="Obligación relacionada con el reporte"
+            value={obligationId || ""}
+            hint="Si queda vacía, indica la persona y la moneda del concepto."
+            onChange={(id) => setObligationId(Number(id))}
+            options={(finance?.obligations || [])
+              .filter((obligation) => exactCents(obligation.pending) > 0n)
+              .map((obligation) => ({
+                value: obligation.id,
+                label: `${obligation.concept} · ${personName(obligation.person_id)} · ${money(obligation.pending, obligation.currency)}`,
+              }))}
+          />
           {!obligationId && (
             <>
               {personSelect("Persona responsable del concepto", "person_id")}
@@ -346,18 +339,15 @@ export function PaymentReports({
                 </Field>
                 {decision === "verified" && (
                   <>
-                    <Field label="Ingreso real que corresponde al comprobante">
-                      <select name="movement_id" required>
-                        <option value="">Seleccionar movimiento real</option>
-                        {candidates.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            Movimiento {m.id} · {money(m.amount, m.currency)} ·{" "}
-                            {showDate(m.occurred_on)} ·{" "}
-                            {m.reference || "Sin referencia externa"}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
+                    <SearchSelect
+                      label="Ingreso real que corresponde al comprobante"
+                      name="movement_id"
+                      required
+                      options={candidates.map((movement) => ({
+                        value: movement.id,
+                        label: `${money(movement.amount, movement.currency)} · ${showDate(movement.occurred_on)} · ${movement.reference || "Sin referencia externa"}`,
+                      }))}
+                    />
                     <p>
                       Se muestran ingresos vigentes del mismo titular, importe,
                       método y moneda. Si el reporte corresponde a una

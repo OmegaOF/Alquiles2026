@@ -1,7 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../../api";
+import { SearchSelect } from "../../components/SearchSelect";
+import { ContextDialog } from "../../components/ContextDialog";
+import { ServiceForm } from "./Services";
+import { supplyOption } from "../../utilities";
 import type { Receipt, ServiceAccount } from "../../utilities";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
 import { addDays, localToday } from "../../tenancy";
 
 export function ReceiptForm({
@@ -9,21 +19,34 @@ export function ReceiptForm({
   initial,
   onCancel,
   onSaved,
+  createSupply,
 }: {
   accounts: ServiceAccount[];
   initial?: Receipt;
+  createSupply?: Omit<
+    Parameters<typeof ServiceForm>[0],
+    "initial" | "onCancel" | "onSaved"
+  > & { onAdded: (account: ServiceAccount) => void };
   onCancel: () => void;
   onSaved: (receipt: Receipt) => Promise<void>;
 }) {
+  const [adding, setAdding] = useState(false);
+  const [newSupply, setNewSupply] = useState<ServiceAccount>();
+  const supplies =
+    newSupply && !accounts.some((account) => account.id === newSupply.id)
+      ? [...accounts, newSupply]
+      : accounts;
+  const form = useRef<HTMLFormElement>(null);
   const [accountId, setAccountId] = useState(
       initial?.account_id || accounts.find((a) => a.is_active)?.id || 0,
     ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const current = accounts.find((a) => a.id === accountId),
+  const current = supplies.find((a) => a.id === accountId),
     today = localToday();
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
     if (
       !window.confirm(
         "¿Guardar los datos del recibo existente del proveedor? Esto no registra un pago ni emite un documento de cobro.",
@@ -81,25 +104,36 @@ export function ReceiptForm({
         emite ningún documento ni se registra dinero pagado.
       </p>
       <ErrorMessage message={error} />
-      <form onSubmit={save}>
+      <form
+        ref={form}
+        onSubmit={save}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
         <div className="form-grid">
-          <Field label="Servicio del recibo">
-            <select
+          <div>
+            <SearchSelect
+              label="Servicio del recibo"
               required
-              value={accountId || ""}
               disabled={!!initial}
-              onChange={(e) => setAccountId(Number(e.target.value))}
-            >
-              <option value="">Seleccionar suministro</option>
-              {accounts
-                .filter((a) => a.is_active || a.id === initial?.account_id)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label} · {a.provider}
-                  </option>
-                ))}
-            </select>
-          </Field>
+              options={supplies.map((account) => ({
+                ...supplyOption(account),
+                disabled: !account.is_active,
+              }))}
+              value={accountId || ""}
+              onChange={(id) => setAccountId(Number(id))}
+              placeholder="Buscar por suministro, proveedor o número de cuenta"
+            />
+            {!initial && createSupply && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAdding(true)}
+              >
+                + Registrar suministro
+              </button>
+            )}
+          </div>
           <Field label="Referencia externa del recibo (opcional)">
             <input
               name="reference"
@@ -215,12 +249,33 @@ export function ReceiptForm({
             type="button"
             className="secondary"
             disabled={busy}
-            onClick={onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
           >
             Cancelar registro
           </button>
         </div>
       </form>
+      {adding && createSupply && (
+        <ContextDialog
+          label="Registrar suministro para el recibo"
+          onCancel={() => setAdding(false)}
+        >
+          <ServiceForm
+            {...createSupply}
+            initial={{}}
+            onCancel={() => setAdding(false)}
+            onSaved={async (account) => {
+              setNewSupply(account);
+              setAccountId(account.id);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(false);
+              createSupply.onAdded(account);
+            }}
+          />
+        </ContextDialog>
+      )}
     </section>
   );
 }

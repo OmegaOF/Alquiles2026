@@ -1,3 +1,4 @@
+import { selectRecord } from "./selectRecord";
 import {
   fireEvent,
   render,
@@ -289,7 +290,7 @@ test("la aceptación no se preselecciona ni se deduce de un teléfono extranjero
   expect(
     screen.getByRole("checkbox", { name: /agregar 591/ }),
   ).not.toBeChecked();
-  await userEvent.selectOptions(
+  await selectRecord(
     screen.getByLabelText("Persona que autoriza WhatsApp"),
     "1",
   );

@@ -1,3 +1,4 @@
+import { selectRecord } from "./selectRecord";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
@@ -109,13 +110,11 @@ test("centavos exactos no convierten dinero a punto flotante", () => {
 });
 
 test("pago guiado conserva pagador distinto y aplicaciones explícitas sin reparto automático", async () => {
-  const fetch = vi
-    .spyOn(globalThis, "fetch")
-    .mockResolvedValue(
-      new Response(JSON.stringify({ operation_id: 1, movement_id: 40 }), {
-        status: 201,
-      }),
-    );
+  const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ operation_id: 1, movement_id: 40 }), {
+      status: 201,
+    }),
+  );
   vi.spyOn(window, "confirm").mockReturnValue(true);
   render(
     <FinanceForm {...props} action={{ kind: "receive" }} initialPersonId={2} />,
@@ -126,18 +125,18 @@ test("pago guiado conserva pagador distinto y aplicaciones explícitas sin repar
     screen.getByLabelText("Importe del dinero realmente entregado"),
     "600",
   );
-  await u.selectOptions(
+  await selectRecord(
     screen.getByRole("combobox", { name: "Método de pago" }),
     "1",
   );
-  await u.selectOptions(
+  await selectRecord(
     screen.getByRole("combobox", {
       name: "Persona que entrega o paga el dinero",
     }),
     "1",
   );
   await u.type(screen.getByLabelText("Aplicar a Alquiler n.º 20"), "500");
-  await u.selectOptions(
+  await selectRecord(
     screen.getByRole("combobox", { name: "Si queda dinero sin aplicar" }),
     "credit",
   );
@@ -155,14 +154,12 @@ test("pago guiado conserva pagador distinto y aplicaciones explícitas sin repar
 });
 
 test("un reintento de formulario conserva el identificador de la operación", async () => {
-  const fetch = vi
-    .spyOn(globalThis, "fetch")
-    .mockImplementation(
-      async () =>
-        new Response(JSON.stringify({ detail: "Error temporal" }), {
-          status: 409,
-        }),
-    );
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ detail: "Error temporal" }), {
+        status: 409,
+      }),
+  );
   vi.spyOn(window, "confirm").mockReturnValue(true);
   render(
     <FinanceForm {...props} action={{ kind: "receive" }} initialPersonId={2} />,
@@ -172,11 +169,11 @@ test("un reintento de formulario conserva el identificador de la operación", as
     screen.getByLabelText("Importe del dinero realmente entregado"),
     "50",
   );
-  await u.selectOptions(
+  await selectRecord(
     screen.getByRole("combobox", { name: "Método de pago" }),
     "1",
   );
-  await u.selectOptions(
+  await selectRecord(
     screen.getByRole("combobox", { name: "Si queda dinero sin aplicar" }),
     "advance",
   );

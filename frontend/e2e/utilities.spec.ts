@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase, openSection } from "./helpers";
+import { authenticate, apiBase, openSection, selectRecord } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -68,9 +68,10 @@ async function setup(page: Page, createService = true, method = "equal") {
 async function enter(page: Page, house: number) {
   await page.goto("/");
   await openSection(page, "Cobros y gastos", "Servicios");
-  await page
-    .getByLabel("Casa de los servicios básicos")
-    .selectOption(String(house));
+  await selectRecord(
+    page.getByLabel("Casa de los servicios básicos"),
+    String(house),
+  );
 }
 async function rent(
   page: Page,
@@ -129,9 +130,10 @@ test("servicio, recibo externo, ejemplo 14/15 días y corrección con historial"
   await page
     .getByRole("button", { name: "Registrar servicio", exact: true })
     .click();
-  await page
-    .getByRole("combobox", { name: "Tipo de servicio", exact: true })
-    .selectOption({ label: "Electricidad" });
+  await selectRecord(
+    page.getByRole("combobox", { name: "Tipo de servicio", exact: true }),
+    { label: "Electricidad" },
+  );
   const label = `Electricidad de casa ${f.house.id}`;
   await page.getByLabel("Nombre para reconocer el suministro").fill(label);
   await page
@@ -158,15 +160,18 @@ test("servicio, recibo externo, ejemplo 14/15 días y corrección con historial"
     })
     .getByLabel("B · Cuarto con ventana", { exact: true })
     .check();
-  await page
-    .getByLabel("Persona que asume la parte del propietario")
-    .selectOption(String(f.owner.id));
-  await page
-    .getByLabel("Persona prevista para pagar al proveedor (opcional)")
-    .selectOption(String(f.owner.id));
-  await page
-    .getByLabel("Persona prevista para recibir reintegros (opcional)")
-    .selectOption(String(f.owner.id));
+  await selectRecord(
+    page.getByLabel("Persona que asume la parte del propietario"),
+    String(f.owner.id),
+  );
+  await selectRecord(
+    page.getByLabel("Persona prevista para pagar al proveedor (opcional)"),
+    String(f.owner.id),
+  );
+  await selectRecord(
+    page.getByLabel("Persona prevista para recibir reintegros (opcional)"),
+    String(f.owner.id),
+  );
   await page
     .getByRole("button", { name: "Guardar servicio", exact: true })
     .click();
@@ -199,24 +204,20 @@ test("servicio, recibo externo, ejemplo 14/15 días y corrección con historial"
   await expect(
     page.getByRole("heading", { name: /Resumen del reparto/ }),
   ).toBeVisible();
-  const first = page
-    .locator(".utility-space")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "A · Cuarto con patio: Bs 150,00",
-        exact: true,
-      }),
-    });
+  const first = page.locator(".utility-space").filter({
+    has: page.getByRole("heading", {
+      name: "A · Cuarto con patio: Bs 150,00",
+      exact: true,
+    }),
+  });
   await expect(first).toContainText("Bs 70,00");
   await expect(first).toContainText("Bs 80,00");
-  const second = page
-    .locator(".utility-space")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "B · Cuarto con ventana: Bs 150,00",
-        exact: true,
-      }),
-    });
+  const second = page.locator(".utility-space").filter({
+    has: page.getByRole("heading", {
+      name: "B · Cuarto con ventana: Bs 150,00",
+      exact: true,
+    }),
+  });
   await expect(second).toContainText(f.two.full_name);
   await capture(page, info, "reparto");
   await page
@@ -288,7 +289,7 @@ test("lecturas válidas e inválidas, reemplazo y consumo de dos medidores", asy
   await page
     .getByLabel("Identificación del medidor nuevo")
     .fill(`A-${f.house.id}`);
-  await page.getByLabel("Espacio medido").selectOption(String(f.a.id));
+  await selectRecord(page.getByLabel("Espacio medido"), String(f.a.id));
   await page.getByLabel("Fecha de instalación").fill("2031-01-01");
   await page.getByLabel("Lectura inicial (opcional)").fill("100");
   await page
@@ -340,9 +341,10 @@ test("lecturas válidas e inválidas, reemplazo y consumo de dos medidores", asy
   // Se vuelve a cargar el módulo para consultar el recibo externo recién registrado.
   await page.reload();
   await openSection(page, "Cobros y gastos", "Servicios");
-  await page
-    .getByLabel("Casa de los servicios básicos")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Casa de los servicios básicos"),
+    String(f.house.id),
+  );
   await page
     .getByRole("button", { name: "Recibos y distribución", exact: true })
     .click();
@@ -419,4 +421,78 @@ test("contratos sucesivos exigen revisión manual antes de confirmar", async ({
     "Distribución confirmada",
   );
   await capture(page, info, "confirmacion");
+});
+
+test("registra un suministro nuevo desde el recibo y conserva los datos del proveedor", async ({
+  page,
+}) => {
+  await authenticate(page);
+  page.on("dialog", (dialog) => dialog.accept());
+  const f = await setup(page, false);
+  await enter(page, f.house.id);
+  await page
+    .getByRole("button", { name: "Recibos y distribución", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Registrar recibo", exact: true })
+    .click();
+  const amount = page.getByLabel("Importe total del recibo");
+  await amount.fill("75.25");
+  await page
+    .getByLabel("Referencia externa del recibo (opcional)")
+    .fill("UX-75");
+  await page
+    .getByRole("button", { name: "+ Registrar suministro", exact: true })
+    .click();
+  const modal = page.getByRole("dialog", {
+    name: "Registrar suministro para el recibo",
+  });
+  await selectRecord(
+    modal.getByRole("combobox", { name: "Tipo de servicio" }),
+    { label: "Electricidad" },
+  );
+  await modal
+    .getByLabel("Nombre para reconocer el suministro")
+    .fill("Suministro nuevo UX");
+  await modal
+    .getByLabel("Empresa proveedora", { exact: true })
+    .fill("Proveedor UX");
+  await modal.getByLabel("Fecha de inicio del servicio").fill("2020-01-01");
+  await selectRecord(
+    modal.getByLabel("Persona que asume la parte del propietario"),
+    String(f.owner.id),
+  );
+  await modal
+    .getByRole("button", { name: "Guardar servicio", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Servicio del recibo" }),
+  ).toHaveValue(/Suministro nuevo UX/);
+  await expect(amount).toHaveValue("75.25");
+  await expect(
+    page.getByLabel("Referencia externa del recibo (opcional)"),
+  ).toHaveValue("UX-75");
+  await page.getByLabel("Inicio del periodo de consumo").fill("2031-01-01");
+  await page.getByLabel("Fin del periodo de consumo").fill("2031-01-31");
+  await page
+    .getByLabel("Fecha de emisión del recibo externo")
+    .fill("2031-02-01");
+  await page.getByLabel("Fecha límite de pago al proveedor").fill("2031-02-05");
+  await page
+    .getByRole("button", { name: "Guardar recibo", exact: true })
+    .click();
+  await expect(page.getByText("UX-75", { exact: false }).first()).toBeVisible();
+  const response = await page.request.get(
+    `${apiBase}/api/v1/utility-receipts?property_id=${f.house.id}`,
+  );
+  expect(response.ok()).toBe(true);
+  expect(await response.json()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        external_reference: "UX-75",
+        amount: "75.25",
+        account_label: "Suministro nuevo UX",
+      }),
+    ]),
+  );
 });

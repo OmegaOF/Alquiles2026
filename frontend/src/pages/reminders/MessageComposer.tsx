@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
+import { SearchSelect } from "../../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
 import {
   money,
@@ -245,23 +246,19 @@ export function MessageComposer({
           {notice}
         </p>
       )}
-      <Field label="Destinatario del aviso">
-        <select
-          value={recipient || ""}
-          onChange={(e) => {
-            setRecipient(Number(e.target.value));
-            setNotice("");
-          }}
-          disabled={busy || !!communication}
-        >
-          <option value="">Seleccionar persona relacionada</option>
-          {event.recipients.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <SearchSelect
+        label="Destinatario del aviso"
+        value={recipient || ""}
+        disabled={busy || !!communication}
+        options={event.recipients.map((person) => ({
+          value: person.id,
+          label: person.full_name,
+        }))}
+        onChange={(value) => {
+          setRecipient(Number(value));
+          setNotice("");
+        }}
+      />
       {recipient > 0 && !draft && !busy && (
         <button
           className="secondary"

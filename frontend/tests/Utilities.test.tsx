@@ -267,12 +267,12 @@ test("porcentajes y responsabilidades muestran controles separados y no infieren
     screen.getByLabelText(
       "Persona prevista para pagar al proveedor (opcional)",
     ),
-  ).toHaveValue("1");
+  ).toHaveValue("Ana Propietaria");
   expect(
     screen.getByLabelText(
       "Persona prevista para recibir reintegros (opcional)",
     ),
-  ).toHaveValue("1");
+  ).toHaveValue("Ana Propietaria");
 });
 
 test("propietario consulta servicios sin acciones para registrarlos o cambiarlos", () => {

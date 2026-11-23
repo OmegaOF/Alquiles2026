@@ -8,7 +8,13 @@ import type {
 } from "../../utilities";
 import { configFields, methods } from "../../utilities";
 import { ConfigurationFields } from "./ConfigurationFields";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
 import { localToday, showDate } from "../../tenancy";
 
 type Props = {
@@ -182,7 +188,7 @@ export function Services(props: Props) {
   );
 }
 
-function ServiceForm({
+export function ServiceForm({
   property,
   user,
   types,
@@ -191,10 +197,10 @@ function ServiceForm({
   initial,
   onCancel,
   onSaved,
-}: Props & {
+}: Pick<Props, "property" | "user" | "types" | "people" | "units"> & {
   initial: Partial<ServiceAccount>;
   onCancel: () => void;
-  onSaved: () => Promise<void>;
+  onSaved: (account: ServiceAccount) => Promise<void>;
 }) {
   const [config, setConfig] = useState<ConfigFields>({
     ...configFields(),
@@ -225,7 +231,7 @@ function ServiceForm({
       is_active: data.has("is_active"),
     };
     try {
-      await api(
+      const account = await api<ServiceAccount>(
         initial.id
           ? `/service-accounts/${initial.id}`
           : `/properties/${property.id}/service-accounts`,
@@ -239,7 +245,7 @@ function ServiceForm({
               configuration: config,
             },
       );
-      await onSaved();
+      await onSaved(account);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -251,7 +257,7 @@ function ServiceForm({
       <h2>{initial.id ? "Editar servicio" : "Registrar servicio"}</h2>
       <p>Casa: {property.name}</p>
       <ErrorMessage message={error} />
-      <form onSubmit={save}>
+      <form onSubmit={save} data-guard-changes onChange={markFormChanged}>
         <div className="form-grid">
           <Field label="Tipo de servicio">
             <select
@@ -357,7 +363,9 @@ function ServiceForm({
             type="button"
             className="secondary"
             disabled={busy}
-            onClick={onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
           >
             Cancelar registro
           </button>
@@ -419,7 +427,9 @@ function ConfigForm({
           type="button"
           className="secondary"
           disabled={busy}
-          onClick={onCancel}
+          onClick={(event) => {
+            if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+          }}
         >
           Volver a servicios
         </button>

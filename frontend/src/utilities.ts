@@ -18,6 +18,19 @@ export interface UtilityType {
   name: string;
   is_active: boolean;
 }
+export function supplyOption(account: ServiceAccount) {
+  return {
+    value: account.id,
+    label: [
+      account.label,
+      account.provider,
+      account.is_active ? "" : "Inactivo",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    search: account.account_number ?? "",
+  };
+}
 export interface Configuration {
   id: number;
   account_id: number;

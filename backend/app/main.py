@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.registry import router as registry_router
@@ -42,6 +42,16 @@ async def validation_error(request: Request, exc: RequestValidationError):
 async def integrity_error(request: Request, exc: IntegrityError):
     # El contexto de Session hace rollback al cerrarse si falla un flush previo al commit.
     return JSONResponse(status_code=409, content={"detail": "Ya existe un registro con esa identificación, usuario o número de cuarto; revise los datos."})
+
+@app.exception_handler(OperationalError)
+async def concurrent_database_update(request: Request, exc: OperationalError):
+    if (getattr(exc.orig, "args", ()) or (None,))[0] not in {1205, 1213}:
+        raise exc
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Otra operación estaba actualizando los datos. Revisa el formulario y vuelve a intentarlo."},
+    )
+
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")

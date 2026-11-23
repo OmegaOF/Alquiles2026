@@ -1,4 +1,5 @@
 import type { Person } from "../../types";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
 import { Field } from "../../components/Form";
 import { methods } from "../../utilities";
 import type { ConfigFields, UtilityMethod } from "../../utilities";
@@ -150,7 +151,7 @@ export function ConfigurationFields({
             "reimbursement_person_id",
           ] as const
         ).map((key, i) => (
-          <Field
+          <SearchSelect
             key={key}
             label={
               [
@@ -159,21 +160,10 @@ export function ConfigurationFields({
                 "Persona prevista para recibir reintegros (opcional)",
               ][i]
             }
-          >
-            <select
-              value={value[key] || ""}
-              onChange={(e) =>
-                update({ [key]: Number(e.target.value) || null })
-              }
-            >
-              <option value="">Seleccionar persona</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          </Field>
+            value={value[key] || ""}
+            options={people.map(personOption)}
+            onChange={(id) => update({ [key]: Number(id) || null })}
+          />
         ))}
       </div>
       <p>

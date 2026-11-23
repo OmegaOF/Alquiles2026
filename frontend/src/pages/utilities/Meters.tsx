@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
+import { SearchSelect } from "../../components/SearchSelect";
+import { supplyOption } from "../../utilities";
 import type { User, Unit } from "../../types";
 import type { ServiceAccount, Meter, Reading } from "../../utilities";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
@@ -171,23 +173,15 @@ export function Meters({
   return (
     <section>
       <h2>Medidores y lecturas</h2>
-      <Field label="Servicio para consultar medidores">
-        <select
-          value={accountId || ""}
-          onChange={(e) => {
-            setAccountId(Number(e.target.value));
-            setNotice("");
-          }}
-        >
-          <option value="">Seleccionar servicio</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.label}
-              {!a.is_active ? " · Inactivo" : ""}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <SearchSelect
+        label="Servicio para consultar medidores"
+        value={accountId || ""}
+        options={accounts.map(supplyOption)}
+        onChange={(id) => {
+          setAccountId(Number(id));
+          setNotice("");
+        }}
+      />
       <ErrorMessage message={error} />
       {notice && (
         <p className="success-message" role="status">
@@ -476,22 +470,23 @@ function MeterForm({
           <Field label="Identificación del medidor nuevo">
             <input name="serial" required maxLength={100} />
           </Field>
-          <Field label="Espacio medido">
-            <select
-              name="unit"
-              defaultValue={replacement?.unit_id || ""}
-              disabled={!!replacement}
-            >
-              <option value="">Medidor principal de la casa</option>
-              {units
-                .filter((u) => account.configuration.unit_ids.includes(u.id))
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.code} · {u.name}
-                  </option>
-                ))}
-            </select>
-          </Field>
+          <SearchSelect
+            label="Espacio medido"
+            name="unit"
+            defaultValue={replacement?.unit_id || ""}
+            disabled={!!replacement}
+            options={units
+              .filter(
+                (unit) =>
+                  account.configuration.unit_ids.includes(unit.id) ||
+                  unit.id === replacement?.unit_id,
+              )
+              .map((unit) => ({
+                value: unit.id,
+                label: `${unit.code} · ${unit.name}`,
+              }))}
+            hint="Si queda vacío, es el medidor principal de la casa."
+          />
           <Field
             label={replacement ? "Fecha del reemplazo" : "Fecha de instalación"}
           >

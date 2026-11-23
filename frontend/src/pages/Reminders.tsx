@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { PropertySelect } from "../components/PropertySelect";
+import { SearchSelect, personOption } from "../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../components/Form";
 import type { Person, Property, User } from "../types";
 import type {
@@ -42,7 +44,7 @@ export function Reminders({
     ),
     [data, setData] = useState<ReminderData | null>(null),
     [people, setPeople] = useState<Person[]>([]),
-    [view, setView] = useState(pending ? "reports" : "all"),
+    [view, setView] = useState("all"),
     [selectedKey, setSelectedKey] = useState<string | null>(
       initialTarget?.noticeKey || null,
     ),
@@ -217,6 +219,7 @@ export function Reminders({
       (view === "snoozed" && e.attention_state === "snoozed");
     return (
       tab &&
+      (!pending || view !== "all" || e.requires_attention) &&
       (!filterType || e.kind === filterType) &&
       (!filterPriority || e.priority === filterPriority) &&
       (!filterPerson || e.person_id === filterPerson) &&
@@ -244,19 +247,12 @@ export function Reminders({
         Revisa qué requiere atención, quién es responsable y qué comunicación
         registraste. Los avisos no crean pagos ni deudas.
       </p>
-      <Field label="Casa de los recordatorios">
-        <select
-          value={propertyId || ""}
-          onChange={(e) => setPropertyId(Number(e.target.value))}
-        >
-          <option value="">Seleccionar casa</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySelect
+        label="Casa de los recordatorios"
+        properties={properties}
+        value={propertyId || ""}
+        onChange={(id) => setPropertyId(Number(id))}
+      />
       <div className="form-actions">
         <button
           className="secondary"
@@ -292,7 +288,7 @@ export function Reminders({
             aria-label="Consultas de recordatorios"
           >
             {[
-              ["all", "Todos"],
+              ["all", pending ? "Requieren atención" : "Todos"],
               ["upcoming", "Por vencer"],
               ["overdue", "Vencidos"],
               ["rent", "Alquileres"],
@@ -622,33 +618,21 @@ export function Reminders({
                       ))}
                     </select>
                   </Field>
-                  <Field label="Responsable del asunto">
-                    <select
-                      value={filterPerson || ""}
-                      onChange={(e) => setFilterPerson(Number(e.target.value))}
-                    >
-                      <option value="">Todas las personas</option>
-                      {people.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Casa completa o cuarto">
-                    <select
-                      value={filterUnit}
-                      onChange={(e) => setFilterUnit(e.target.value)}
-                    >
-                      <option value="">Todos los espacios</option>
-                      <option value="whole">Casa completa</option>
-                      {units.map(([id, name]) => (
-                        <option key={id} value={id}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  <SearchSelect
+                    label="Responsable del asunto"
+                    value={filterPerson || ""}
+                    options={people.map(personOption)}
+                    onChange={(id) => setFilterPerson(Number(id))}
+                  />
+                  <SearchSelect
+                    label="Casa completa o cuarto"
+                    value={filterUnit}
+                    onChange={setFilterUnit}
+                    options={[
+                      { value: "whole", label: "Casa completa" },
+                      ...units.map(([id, label]) => ({ value: id, label })),
+                    ]}
+                  />
                   <Field label="Estado de mi atención">
                     <select
                       value={filterState}
