@@ -1,3 +1,4 @@
+import { selectRecord } from "./selectRecord";
 import {
   fireEvent,
   render,
@@ -199,7 +200,7 @@ test("capital acordado guarda solo condiciones y asignaciones expresas, con amba
   expect(body).not.toHaveProperty("amount");
 });
 
-function fillCash() {
+async function fillCash() {
   fireEvent.change(
     screen.getByLabelText("Importe de capital que se devuelve"),
     { target: { value: "10000.01" } },
@@ -207,13 +208,13 @@ function fillCash() {
   fireEvent.change(screen.getByLabelText("Método de entrega o devolución"), {
     target: { value: "1" },
   });
-  fireEvent.change(
+  await selectRecord(
     screen.getByLabelText("Persona que efectivamente entrega o paga"),
-    { target: { value: "3" } },
+    "3",
   );
-  fireEvent.change(
+  await selectRecord(
     screen.getByLabelText("Persona que efectivamente recibe el dinero"),
-    { target: { value: "2" } },
+    "2",
   );
   fireEvent.change(screen.getByLabelText("Importe de la parte 1"), {
     target: { value: "10000.01" },
@@ -226,7 +227,7 @@ test("devolución muestra antes y después exactos, titular, pagador y beneficia
     .mockResolvedValue(new Response("{}", { status: 201 }));
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   render(<CapitalForm {...cashProps} kind="return" />);
-  fillCash();
+  await fillCash();
   const review = screen.getByRole("region", { name: "Revisión del capital" });
   expect(within(review).getByText(/39.999,99/)).toBeInTheDocument();
   expect(
@@ -250,7 +251,7 @@ test("cancelar la confirmación no registra una devolución", async () => {
   const fetcher = vi.spyOn(globalThis, "fetch");
   vi.spyOn(window, "confirm").mockReturnValue(false);
   render(<CapitalForm {...cashProps} kind="return" />);
-  fillCash();
+  await fillCash();
   await userEvent.click(
     screen.getByRole("button", { name: "Confirmar movimiento real" }),
   );
@@ -269,7 +270,7 @@ test("el reintento tras conflicto conserva la misma clave y muestra el mensaje d
     );
   vi.spyOn(window, "confirm").mockReturnValue(true);
   render(<CapitalForm {...cashProps} kind="return" />);
-  fillCash();
+  await fillCash();
   await userEvent.click(
     screen.getByRole("button", { name: "Confirmar movimiento real" }),
   );

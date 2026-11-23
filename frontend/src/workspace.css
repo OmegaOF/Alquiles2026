@@ -251,7 +251,8 @@
   border: 0;
 }
 
-.field:has(> :required) > span:first-child::after {
+.field:has(> :required) > span:first-child::after,
+.search-select:has(> [aria-required="true"]) > label::after {
   content: " *" / "";
   color: #8a321b;
 }

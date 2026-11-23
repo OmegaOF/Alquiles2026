@@ -14,7 +14,12 @@ import type { CapitalTarget } from "./anticreticos";
 import { Reminders } from "./pages/Reminders";
 import type { ReminderTarget } from "./reminders";
 import { Reports } from "./pages/Reports";
-import { ErrorMessage, Field, errorText, confirmFormDiscard } from "./components/Form";
+import {
+  ErrorMessage,
+  Field,
+  errorText,
+  confirmFormDiscard,
+} from "./components/Form";
 import { WorkspaceNavigation } from "./components/WorkspaceNavigation";
 import type { WorkspacePage } from "./components/WorkspaceNavigation";
 import { WorkspaceHome } from "./pages/WorkspaceHome";
@@ -183,7 +188,13 @@ function Workspace({
   const [page, setPage] = useState<WorkspacePage>("home");
   const main = useRef<HTMLElement>(null);
   function navigate(target: WorkspacePage) {
-    if (target === page || !confirmFormDiscard(main.current?.querySelector("form[data-dirty]") ?? null)) return;
+    if (
+      target === page ||
+      !confirmFormDiscard(
+        main.current?.querySelector("form[data-dirty]") ?? null,
+      )
+    )
+      return;
     setPage(target);
     requestAnimationFrame(() => main.current?.focus());
   }
@@ -196,6 +207,7 @@ function Workspace({
   );
   const [contractTarget, setContractTarget] = useState<number | null>(null);
   const [utilityTarget, setUtilityTarget] = useState<number | null>(null);
+  const [tenancyProperty, setTenancyProperty] = useState<number | undefined>();
   const [properties, setProperties] = useState<Property[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -240,14 +252,20 @@ function Workspace({
   }, []);
   useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
-      if (main.current?.querySelector("form[data-dirty]")) event.preventDefault();
+      if (main.current?.querySelector("form[data-dirty]"))
+        event.preventDefault();
     }
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, []);
   async function logout() {
-    if (!confirmFormDiscard(main.current?.querySelector("form[data-dirty]") ?? null)
-      || !window.confirm("¿Cerrar tu sesión en Mi Casa?")) return;
+    if (
+      !confirmFormDiscard(
+        main.current?.querySelector("form[data-dirty]") ?? null,
+      ) ||
+      !window.confirm("¿Cerrar tu sesión en Mi Casa?")
+    )
+      return;
     setLogoutBusy(true);
     try {
       await api("/auth/logout", "POST");
@@ -260,152 +278,195 @@ function Workspace({
   }
   return (
     <div className="app-shell">
-      <a href="#contenido" className="skip">Ir al contenido</a>
+      <a href="#contenido" className="skip">
+        Ir al contenido
+      </a>
       <header className="app-header">
-        <div className="app-brand"><span aria-hidden="true">⌂</span> Mi Casa</div>
-          <div className="app-account">
-            <strong>{user.full_name}</strong>
-            {user.display_name && (
-              <span className="role-label">
-                Alias de la cuenta: {user.display_name}
-              </span>
-            )}
-            <span className="role-label">{roleNames[user.role]}</span>
-          </div>
-          <button
-            className="secondary logout"
-            onClick={() => void logout()}
-            disabled={logoutBusy}
-          >
-            {logoutBusy ? "Cerrando…" : "Cerrar sesión"}
+        <div className="app-brand">
+          <span aria-hidden="true">⌂</span> Mi Casa
+        </div>
+        <div className="app-account">
+          <strong>{user.full_name}</strong>
+          {user.display_name && (
+            <span className="role-label">
+              Alias de la cuenta: {user.display_name}
+            </span>
+          )}
+          <span className="role-label">{roleNames[user.role]}</span>
+        </div>
+        <button
+          className="secondary logout"
+          onClick={() => void logout()}
+          disabled={logoutBusy}
+        >
+          {logoutBusy ? "Cerrando…" : "Cerrar sesión"}
+        </button>
+      </header>
+      <WorkspaceNavigation page={page} general={general} navigate={navigate} />
+      <main ref={main} id="contenido" className="app-content" tabIndex={-1}>
+        <ErrorMessage message={error} />
+        {loading ? (
+          <p role="status">Cargando tu información…</p>
+        ) : error ? (
+          <button className="secondary" onClick={() => void load()}>
+            Volver a cargar
           </button>
-        </header>
-        <WorkspaceNavigation page={page} general={general} navigate={navigate} />
-        <main ref={main} id="contenido" className="app-content" tabIndex={-1}>
-          <ErrorMessage message={error} />
-          {loading ? (
-            <p role="status">Cargando tu información…</p>
-          ) : error ? (
-            <button className="secondary" onClick={() => void load()}>
-              Volver a cargar
-            </button>
-          ) : page === "dashboard" || page === "reports" || page.startsWith("report-") ? (
-            <Reports key={page} view={page === "dashboard" ? "dashboard" : "reports"}
-              section={page === "report-occupancy" ? "occupancy" : page === "report-history" ? "history" : page === "report-pdf" ? "pdf" : undefined} />
-          ) : page === "properties" || page === "rooms" ? (
-            <Properties
-              key={page}
-              rooms={page === "rooms"}
-              properties={properties}
-              people={people}
-              users={users}
-              user={user}
-              refresh={refresh}
-            />
-          ) : page === "tenants" ? (
-            <OccupancyScreen heading="Inquilinos" properties={properties} people={people} />
-          ) : page === "persons" ? (
-            <People people={people} canEdit={general} refresh={refresh} />
-          ) : [
-              "contracts",
-              "reservations",
-              "availability",
-              "occupancy",
-            ].includes(page) ? (
-            <Tenancy
-              key={page}
-              view={
-                page as
-                  | "contracts"
-                  | "reservations"
-                  | "availability"
-                  | "occupancy"
+        ) : page === "dashboard" ||
+          page === "reports" ||
+          page.startsWith("report-") ? (
+          <Reports
+            key={page}
+            view={page === "dashboard" ? "dashboard" : "reports"}
+            section={
+              page === "report-occupancy"
+                ? "occupancy"
+                : page === "report-history"
+                  ? "history"
+                  : page === "report-pdf"
+                    ? "pdf"
+                    : undefined
+            }
+          />
+        ) : page === "properties" || page === "rooms" ? (
+          <Properties
+            key={page}
+            rooms={page === "rooms"}
+            properties={properties}
+            people={people}
+            users={users}
+            user={user}
+            refresh={refresh}
+            onHouseAction={(target, propertyId) => {
+              if (target === "utilities") setUtilityTarget(propertyId);
+              else if (target === "finances") setFinanceTarget(propertyId);
+              else {
+                setTenancyProperty(propertyId);
+                setContractTarget(null);
               }
-              user={user}
-              properties={properties}
-              people={people}
-              refreshPeople={refresh}
-              initialContractId={contractTarget || undefined}
-              onCapital={(contract) => {
+              navigate(target);
+            }}
+          />
+        ) : page === "tenants" ? (
+          <OccupancyScreen
+            heading="Inquilinos"
+            properties={properties}
+            people={people}
+          />
+        ) : page === "persons" ? (
+          <People people={people} canEdit={general} refresh={refresh} />
+        ) : ["contracts", "reservations", "availability", "occupancy"].includes(
+            page,
+          ) ? (
+          <Tenancy
+            key={page}
+            view={
+              page as
+                | "contracts"
+                | "reservations"
+                | "availability"
+                | "occupancy"
+            }
+            user={user}
+            properties={properties}
+            people={people}
+            refreshPeople={refresh}
+            users={users}
+            initialPropertyId={tenancyProperty}
+            initialContractId={contractTarget || undefined}
+            onCapital={(contract) => {
+              setCapitalTarget({
+                propertyId: contract.resolved_property_id,
+                contractId: contract.id,
+              });
+              setPage("anticreticos");
+            }}
+          />
+        ) : page === "utilities" ? (
+          <Utilities
+            user={user}
+            properties={properties}
+            people={people}
+            initialPropertyId={utilityTarget || undefined}
+          />
+        ) : page === "finances" || page === "debts" || page === "expenses" ? (
+          <Finances
+            key={page}
+            section={
+              page === "debts"
+                ? "debts"
+                : page === "expenses"
+                  ? "expenses"
+                  : "receivable"
+            }
+            user={user}
+            properties={properties}
+            people={people}
+            initialPropertyId={financeTarget || undefined}
+            onReminders={(propertyId) => {
+              setReminderTarget({ propertyId });
+              setPage("reminders");
+            }}
+            onCapital={(propertyId) => {
+              setCapitalTarget({ propertyId });
+              setPage("anticreticos");
+            }}
+          />
+        ) : page === "anticreticos" ? (
+          <Anticreticos
+            user={user}
+            properties={properties}
+            people={people}
+            initialTarget={capitalTarget}
+            onContracts={() => setPage("contracts")}
+            onFinances={(propertyId) => {
+              setFinanceTarget(propertyId);
+              setPage("finances");
+            }}
+          />
+        ) : page === "reminders" || page === "pending" ? (
+          <Reminders
+            key={page}
+            pending={page === "pending"}
+            user={user}
+            properties={properties}
+            initialTarget={reminderTarget}
+            onOrigin={(propertyId, origin) => {
+              if (origin.module === "anticreticos") {
                 setCapitalTarget({
-                  propertyId: contract.resolved_property_id,
-                  contractId: contract.id,
+                  propertyId,
+                  contractId: origin.contract_id,
                 });
                 setPage("anticreticos");
-              }}
-            />
-          ) : page === "utilities" ? (
-            <Utilities
-              user={user}
-              properties={properties}
-              people={people}
-              initialPropertyId={utilityTarget || undefined}
-            />
-          ) : page === "finances" || page === "debts" || page === "expenses" ? (
-            <Finances key={page} section={page === "debts" ? "debts" : page === "expenses" ? "expenses" : "receivable"}
-              user={user}
-              properties={properties}
-              people={people}
-              initialPropertyId={financeTarget || undefined}
-              onReminders={(propertyId) => {
-                setReminderTarget({ propertyId });
-                setPage("reminders");
-              }}
-              onCapital={(propertyId) => {
-                setCapitalTarget({ propertyId });
-                setPage("anticreticos");
-              }}
-            />
-          ) : page === "anticreticos" ? (
-            <Anticreticos
-              user={user}
-              properties={properties}
-              people={people}
-              initialTarget={capitalTarget}
-              onContracts={() => setPage("contracts")}
-              onFinances={(propertyId) => {
+              } else if (origin.module === "contracts") {
+                setContractTarget(origin.contract_id || null);
+                setPage("contracts");
+              } else if (origin.module === "utilities") {
+                setUtilityTarget(propertyId);
+                setPage("utilities");
+              } else {
                 setFinanceTarget(propertyId);
                 setPage("finances");
-              }}
-            />
-          ) : page === "reminders" || page === "pending" ? (
-            <Reminders key={page} pending={page === "pending"}
-              user={user}
-              properties={properties}
-              initialTarget={reminderTarget}
-              onOrigin={(propertyId, origin) => {
-                if (origin.module === "anticreticos") {
-                  setCapitalTarget({
-                    propertyId,
-                    contractId: origin.contract_id,
-                  });
-                  setPage("anticreticos");
-                } else if (origin.module === "contracts") {
-                  setContractTarget(origin.contract_id || null);
-                  setPage("contracts");
-                } else if (origin.module === "utilities") {
-                  setUtilityTarget(propertyId);
-                  setPage("utilities");
-                } else {
-                  setFinanceTarget(propertyId);
-                  setPage("finances");
-                }
-              }}
-            />
-          ) : page === "users" && general ? (
-            <Users
-              users={users}
-              people={people}
-              properties={properties}
-              currentUser={user}
-              refresh={refresh}
-            />
-          ) : page === "security" ? (
-            <Security user={user} />
-          ) : (
-            <WorkspaceHome user={user} properties={properties} navigate={navigate} />
-          )}
-        </main>
+              }
+            }}
+          />
+        ) : page === "users" && general ? (
+          <Users
+            users={users}
+            people={people}
+            properties={properties}
+            currentUser={user}
+            refresh={refresh}
+          />
+        ) : page === "security" ? (
+          <Security user={user} />
+        ) : (
+          <WorkspaceHome
+            user={user}
+            properties={properties}
+            navigate={navigate}
+          />
+        )}
+      </main>
     </div>
   );
 }
@@ -428,8 +489,13 @@ function Security({ user }: { user: User }) {
       <h1>Seguridad</h1>
       <div className="panel">
         <h2>Tu cuenta</h2>
-        <p>{user.username} · {roleNames[user.role]}</p>
-        <p>Si necesitas recuperar tu contraseña o cambiar tu acceso, comunícate con el administrador general.</p>
+        <p>
+          {user.username} · {roleNames[user.role]}
+        </p>
+        <p>
+          Si necesitas recuperar tu contraseña o cambiar tu acceso, comunícate
+          con el administrador general.
+        </p>
       </div>
       <section className="connection" aria-labelledby="connection-title">
         <div>

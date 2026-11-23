@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import { api } from "../../api";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
 import type { Person } from "../../types";
 import type { Catalog } from "../../finances";
 import type { CapitalBook } from "../../anticreticos";
@@ -184,27 +191,20 @@ export function CapitalForm({
   }
   function personSelect(label: string, id: number, set: (id: number) => void) {
     return (
-      <Field label={label}>
-        <select
-          value={id || ""}
-          onChange={(e) => set(Number(e.target.value))}
-          required
-        >
-          <option value="">Seleccionar persona</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <SearchSelect
+        label={label}
+        value={id || ""}
+        options={people.map(personOption)}
+        required
+        onChange={(value) => set(Number(value))}
+      />
     );
   }
   return (
     <section className="panel">
       <h2>{titles[kind]}</h2>
       <ErrorMessage message={error} />
-      <form onSubmit={submit}>
+      <form onSubmit={submit} data-guard-changes onChange={markFormChanged}>
         {cash && (
           <>
             <p>
@@ -320,38 +320,26 @@ export function CapitalForm({
             </p>
             {parts.map((p, index) => (
               <article className="utility-space" key={index}>
-                <Field label={`Titular de la parte ${index + 1}`}>
-                  <select
-                    value={p.holder_id}
-                    onChange={(e) =>
-                      update(index, { holder_id: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="">Seleccionar titular</option>
-                    {book.holders.map((h) => (
-                      <option key={h.person_id} value={h.person_id}>
-                        {name(h.person_id)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={`Responsable de la parte ${index + 1}`}>
-                  <select
-                    value={p.responsible_id}
-                    onChange={(e) =>
-                      update(index, { responsible_id: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="">Seleccionar responsable</option>
-                    {book.responsibles.map((r) => (
-                      <option key={r.person_id} value={r.person_id}>
-                        {name(r.person_id)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                <SearchSelect
+                  label={`Titular de la parte ${index + 1}`}
+                  required
+                  value={p.holder_id}
+                  onChange={(id) => update(index, { holder_id: id })}
+                  options={book.holders.map((holder) => ({
+                    value: holder.person_id,
+                    label: name(holder.person_id),
+                  }))}
+                />
+                <SearchSelect
+                  label={`Responsable de la parte ${index + 1}`}
+                  required
+                  value={p.responsible_id}
+                  onChange={(id) => update(index, { responsible_id: id })}
+                  options={book.responsibles.map((responsible) => ({
+                    value: responsible.person_id,
+                    label: name(responsible.person_id),
+                  }))}
+                />
                 {kind === "adjustment" && adjustKind === "reassignment" && (
                   <Field label={`Cambio de la parte ${index + 1}`}>
                     <select
@@ -487,7 +475,9 @@ export function CapitalForm({
           <button
             type="button"
             className="secondary"
-            onClick={onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
             disabled={busy}
           >
             Cancelar

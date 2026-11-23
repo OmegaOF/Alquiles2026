@@ -1,3 +1,4 @@
+import { selectRecord } from "./selectRecord";
 import {
   act,
   fireEvent,
@@ -145,19 +146,23 @@ async function reachConditions(mode = "daily") {
       name: "Registrar contrato",
     }),
   );
-  expect(screen.getByText("PASO 1 DE 8")).toBeVisible();
-  await next();
-  await userEvent.selectOptions(
+  expect(screen.getByText("PASO 1 DE 4")).toBeVisible();
+  await selectRecord(
     await screen.findByLabelText("Espacio a alquilar"),
     String(unit.id),
   );
-  await next();
   await userEvent.selectOptions(
     screen.getByLabelText("Modalidad de alquiler"),
     mode,
   );
+  fireEvent.change(screen.getByLabelText("Fecha de entrada"), {
+    target: { value: "2031-01-01" },
+  });
+  fireEvent.change(screen.getByLabelText("Fecha de salida"), {
+    target: { value: "2031-01-03" },
+  });
   await next();
-  await userEvent.selectOptions(
+  await selectRecord(
     screen.getByLabelText("Persona responsable del contrato"),
     "2",
   );
@@ -167,20 +172,12 @@ async function reachConditions(mode = "daily") {
     ).getByLabelText("Elena Ocupante"),
   );
   await next();
-  fireEvent.change(screen.getByLabelText("Fecha de entrada"), {
-    target: { value: "2031-01-01" },
-  });
-  fireEvent.change(screen.getByLabelText("Fecha de salida"), {
-    target: { value: "2031-01-03" },
-  });
-  await next();
 }
 async function confirmWizard() {
   await next();
   expect(
     screen.getByRole("heading", { name: "Revisar el resumen" }),
   ).toBeVisible();
-  await next();
   await userEvent.click(
     screen.getByLabelText("He revisado los datos y confirmo el contrato"),
   );
@@ -223,10 +220,7 @@ test("historial descarta una respuesta tardía de la casa consultada anteriormen
       people={people}
     />,
   );
-  await userEvent.selectOptions(
-    screen.getByLabelText("Propiedad del historial"),
-    "2",
-  );
+  await selectRecord(screen.getByLabelText("Propiedad del historial"), "2");
   await screen.findByRole("heading", { name: "Contrato 2 · Finalizado" });
   await act(async () => {
     resolveFirst([row(1)]);
@@ -240,7 +234,7 @@ test("historial descarta una respuesta tardía de la casa consultada anteriormen
   ).not.toBeInTheDocument();
 });
 
-test("registro diario recorre ocho pasos y conserva servicios, personas y moneda sin generar pagos", async () => {
+test("registro diario recorre cuatro pasos y conserva servicios, personas y moneda sin generar pagos", async () => {
   const fetcher = setup();
   await reachConditions();
   const services = screen.getByLabelText("Servicios básicos incluidos");

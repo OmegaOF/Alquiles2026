@@ -1,7 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import type { Person, Property, User } from "../../types";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
 import {
   addDays,
   daysBetween,
@@ -12,10 +18,21 @@ import {
 } from "../../tenancy";
 import type { Availability, Contract, Mode, Reservation } from "../../tenancy";
 import { usePropertyData, NewContact } from "./Shared";
+import {
+  SearchSelect,
+  personOption,
+  unitOption,
+} from "../../components/SearchSelect";
+import { PropertySelect } from "../../components/PropertySelect";
+import { useRegistrySearch } from "../../components/registrySearch";
+import { ContextDialog } from "../../components/ContextDialog";
+import { PropertyForm, RoomForm } from "../Properties";
 
 export function ContractWizard({
   user,
-  properties,
+  properties: registeredProperties,
+  users = [],
+  initialPropertyId,
   people,
   initial,
   reservation,
@@ -25,6 +42,8 @@ export function ContractWizard({
 }: {
   user: User;
   properties: Property[];
+  users?: User[];
+  initialPropertyId?: number;
   people: Person[];
   initial?: Contract;
   reservation?: Reservation;
@@ -34,10 +53,19 @@ export function ContractWizard({
 }) {
   const canActivate =
     user.role === "general_admin" || user.role === "property_admin";
+  const [newHouse, setNewHouse] = useState<Property>();
+  const properties =
+    newHouse &&
+    !registeredProperties.some((property) => property.id === newHouse.id)
+      ? [...registeredProperties, newHouse]
+      : registeredProperties;
+  const form = useRef<HTMLFormElement>(null);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState(1),
     [propertyId, setPropertyId] = useState(
       initial?.resolved_property_id ||
         reservation?.resolved_property_id ||
+        initialPropertyId ||
         properties[0]?.id ||
         0,
     ),
@@ -82,15 +110,40 @@ export function ContractWizard({
     [notes, setNotes] = useState(initial?.notes || "");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [adding, setAdding] = useState(false),
+    [adding, setAdding] = useState<"person" | "property" | "unit" | null>(null),
+    [newPerson, setNewPerson] = useState<Person>(),
     [available, setAvailable] = useState<Availability | null>(null);
   const data = usePropertyData(
     propertyId,
     people,
     user.role === "general_admin",
   );
+  const candidates =
+    newPerson && !data.candidates.some((person) => person.id === newPerson.id)
+      ? [...data.candidates, newPerson]
+      : data.candidates;
+  const findPeople = useRegistrySearch(
+    user.role === "general_admin" ? "people" : "contacts",
+    candidates.length,
+    propertyId,
+  );
   const name = (id: number) =>
-    data.candidates.find((p) => p.id === id)?.full_name || `Persona ${id}`;
+    candidates.find((p) => p.id === id)?.full_name || "Persona registrada";
+  function chooseProperty(id: number, owners: Property["owners"] = []) {
+    setPropertyId(id);
+    setUnitId(0);
+    setResponsible(0);
+    setNewPerson(undefined);
+    setOccupants([]);
+    setOwnerParties(owners);
+  }
+  function goTo(step: number) {
+    setStep(step);
+    requestAnimationFrame(() => stepHeading.current?.focus());
+  }
+  useEffect(() => {
+    setAvailable(null);
+  }, [propertyId, start, end]);
   useEffect(() => {
     if (mode === "mixed") setStatus("draft");
   }, [mode]);
@@ -113,32 +166,20 @@ export function ContractWizard({
   const target = unitId
     ? available?.units.find((u) => u.unit_id === unitId)
     : available?.whole;
-  if (adding)
-    return (
-      <NewContact
-        propertyId={propertyId}
-        onCancel={() => setAdding(false)}
-        onAdded={async (person) => {
-          await data.reload();
-          await refreshPeople();
-          setResponsible(person.id);
-          setAdding(false);
-        }}
-      />
-    );
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (step < 8) {
-      if (step === 4 && !ownerParties.length) {
+    if (busy) return;
+    if (step < 4) {
+      if (step === 2 && !ownerParties.length) {
         setError("Selecciona al menos un propietario firmante del contrato.");
         return;
       }
-      if (step === 5 && end < start) {
+      if (step === 1 && end < start) {
         setError("La salida no puede ser anterior a la entrada.");
         return;
       }
-      setStep(step + 1);
+      goTo(step + 1);
       return;
     }
     if (
@@ -194,18 +235,14 @@ export function ContractWizard({
     }
   }
   const titles = [
-    "Seleccionar casa",
-    "Elegir casa completa o cuarto",
-    "Modalidad de alquiler",
-    "Responsable y ocupantes",
-    "Fechas de entrada y salida",
-    "Condiciones y precio",
+    "Casa, espacio y fechas",
+    "Inquilino y firmantes",
+    "Precio y condiciones",
     "Revisar el resumen",
-    "Confirmar el contrato",
   ];
   return (
     <section className="panel wizard">
-      <p className="eyebrow">PASO {step} DE 8</p>
+      <p className="eyebrow">PASO {step} DE 4</p>
       <h1>
         {reservation
           ? "Convertir reserva en contrato"
@@ -213,70 +250,77 @@ export function ContractWizard({
             ? "Modificar contrato"
             : "Registrar contrato"}
       </h1>
-      <h2>{titles[step - 1]}</h2>
-      <progress aria-label="Avance del registro" max={8} value={step} />
+      <h2 tabIndex={-1} ref={stepHeading}>
+        {titles[step - 1]}
+      </h2>
+      <progress aria-label="Avance del registro" max={4} value={step} />
       <ErrorMessage message={error || data.error} />
-      <form onSubmit={submit}>
+      <form
+        ref={form}
+        onSubmit={submit}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
         {step === 1 && (
           <>
-            <Field label="Casa del contrato">
-              <select
-                value={propertyId || ""}
-                required
-                disabled={!!initial || !!reservation}
-                onChange={(e) => {
-                  setPropertyId(Number(e.target.value));
-                  setUnitId(0);
-                  setResponsible(0);
-                  setOccupants([]);
-                  setOwnerParties(
-                    properties.find((p) => p.id === Number(e.target.value))
-                      ?.owners || [],
-                  );
-                }}
+            <PropertySelect
+              label="Casa del contrato"
+              properties={properties}
+              value={propertyId || ""}
+              required
+              activeOnly={!initial && !reservation}
+              disabled={!!initial || !!reservation}
+              onChange={(value) => {
+                const id = Number(value);
+                chooseProperty(
+                  id,
+                  properties.find((property) => property.id === id)?.owners,
+                );
+              }}
+            />
+            {!initial && !reservation && user.role === "general_admin" && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAdding("property")}
               >
-                <option value="">Seleccionar casa</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {!p.is_active ? " · Deshabilitada" : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                + Registrar casa
+              </button>
+            )}
             {!properties.length && (
               <p>
                 No hay propiedades autorizadas. Registra una propiedad o
                 solicita acceso al administrador.
               </p>
             )}
-          </>
-        )}
-        {step === 2 && (
-          <>
-            <Field label="Espacio a alquilar">
-              <select
-                value={unitId}
-                disabled={
-                  !!reservation ||
-                  (initial?.status === "active" &&
-                    initial.start_date <= localToday())
-                }
-                onChange={(e) => setUnitId(Number(e.target.value))}
+            <SearchSelect
+              label="Espacio a alquilar"
+              value={unitId}
+              disabled={
+                !propertyId ||
+                !!reservation ||
+                (initial?.status === "active" &&
+                  initial.start_date <= localToday())
+              }
+              options={[
+                { value: 0, label: "Casa completa" },
+                ...data.units.map((unit) => ({
+                  ...unitOption(unit),
+                  disabled: !unit.is_enabled || unit.maintenance,
+                })),
+              ]}
+              onChange={(value) => setUnitId(Number(value))}
+              placeholder="Buscar cuarto por nombre o código"
+            />
+            {!initial && !reservation && !!propertyId && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAdding("unit")}
               >
-                <option value={0}>Casa completa</option>
-                {data.units.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.code} · {unit.name}
-                    {!unit.is_enabled
-                      ? " · Deshabilitado"
-                      : unit.maintenance
-                        ? " · En mantenimiento"
-                        : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                + Registrar cuarto
+              </button>
+            )}
             {initial?.status === "active" &&
               initial.start_date <= localToday() && (
                 <p>
@@ -287,17 +331,13 @@ export function ContractWizard({
               )}
             <p className="permission-note">
               Alquilar la casa completa bloquea todos sus cuartos en las mismas
-              fechas. Las fechas se eligen en el paso 5.
+              fechas.
             </p>
             {target && (
               <p>
                 <strong>{stateNames[target.state]}</strong>: {target.reason}
               </p>
             )}
-          </>
-        )}
-        {step === 3 && (
-          <>
             <Field label="Modalidad de alquiler">
               <select
                 value={mode}
@@ -329,97 +369,6 @@ export function ContractWizard({
                 se activan combinaciones ni cálculos ambiguos.
               </p>
             )}
-          </>
-        )}
-        {step === 4 && (
-          <>
-            <Field label="Persona responsable del contrato">
-              <select
-                required
-                value={responsible || ""}
-                disabled={!!reservation}
-                onChange={(e) => {
-                  setResponsible(Number(e.target.value));
-                  setOccupants(
-                    occupants.filter((id) => id !== Number(e.target.value)),
-                  );
-                }}
-              >
-                <option value="">Seleccionar persona</option>
-                {data.candidates.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <p>
-              La persona responsable y los ocupantes no necesitan cuentas de
-              usuario.
-            </p>
-            {!reservation && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setAdding(true)}
-              >
-                Registrar nueva persona
-              </button>
-            )}
-            <fieldset>
-              <legend>Ocupantes adicionales (opcional)</legend>
-              {data.candidates
-                .filter((p) => p.id !== responsible)
-                .map((p) => (
-                  <label className="check" key={p.id}>
-                    <input
-                      type="checkbox"
-                      checked={occupants.includes(p.id)}
-                      onChange={(e) =>
-                        setOccupants(
-                          e.target.checked
-                            ? [...occupants, p.id]
-                            : occupants.filter((id) => id !== p.id),
-                        )
-                      }
-                    />
-                    {p.full_name}
-                  </label>
-                ))}
-            </fieldset>
-            <fieldset>
-              <legend>Propietarios firmantes del contrato</legend>
-              <p>
-                Revisa las personas que firman, especialmente si registras una
-                estancia pasada. Se conservarán aunque cambie el dueño actual.
-              </p>
-              {data.candidates
-                .filter((p) => p.is_owner)
-                .map((p) => (
-                  <label className="check" key={p.id}>
-                    <input
-                      type="checkbox"
-                      disabled={initial?.status === "active"}
-                      checked={ownerParties.some((o) => o.person_id === p.id)}
-                      onChange={(e) =>
-                        setOwnerParties(
-                          e.target.checked
-                            ? [
-                                ...ownerParties,
-                                { person_id: p.id, share: null },
-                              ]
-                            : ownerParties.filter((o) => o.person_id !== p.id),
-                        )
-                      }
-                    />
-                    {p.full_name}
-                  </label>
-                ))}
-            </fieldset>
-          </>
-        )}
-        {step === 5 && (
-          <>
             <div className="form-grid">
               <Field label="Fecha de entrada">
                 <input
@@ -473,7 +422,88 @@ export function ContractWizard({
             )}
           </>
         )}
-        {step === 6 && (
+        {step === 2 && (
+          <>
+            <SearchSelect
+              label="Persona responsable del contrato"
+              required
+              disabled={!!reservation}
+              value={responsible || ""}
+              options={candidates.map(personOption)}
+              load={findPeople}
+              placeholder="Buscar inquilino por nombre, documento o teléfono"
+              onChange={(value) => {
+                const id = Number(value);
+                setResponsible(id);
+                setOccupants(occupants.filter((personId) => personId !== id));
+              }}
+            />
+            <p>
+              La persona responsable y los ocupantes no necesitan cuentas de
+              usuario.
+            </p>
+            {!reservation && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAdding("person")}
+              >
+                + Registrar inquilino
+              </button>
+            )}
+            <fieldset>
+              <legend>Ocupantes adicionales (opcional)</legend>
+              {candidates
+                .filter((p) => p.id !== responsible)
+                .map((p) => (
+                  <label className="check" key={p.id}>
+                    <input
+                      type="checkbox"
+                      checked={occupants.includes(p.id)}
+                      onChange={(e) =>
+                        setOccupants(
+                          e.target.checked
+                            ? [...occupants, p.id]
+                            : occupants.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                    {p.full_name}
+                  </label>
+                ))}
+            </fieldset>
+            <fieldset>
+              <legend>Propietarios firmantes del contrato</legend>
+              <p>
+                Revisa las personas que firman, especialmente si registras una
+                estancia pasada. Se conservarán aunque cambie el dueño actual.
+              </p>
+              {candidates
+                .filter((p) => p.is_owner)
+                .map((p) => (
+                  <label className="check" key={p.id}>
+                    <input
+                      type="checkbox"
+                      disabled={initial?.status === "active"}
+                      checked={ownerParties.some((o) => o.person_id === p.id)}
+                      onChange={(e) =>
+                        setOwnerParties(
+                          e.target.checked
+                            ? [
+                                ...ownerParties,
+                                { person_id: p.id, share: null },
+                              ]
+                            : ownerParties.filter((o) => o.person_id !== p.id),
+                        )
+                      }
+                    />
+                    {p.full_name}
+                  </label>
+                ))}
+            </fieldset>
+          </>
+        )}
+        {step === 3 && (
           <>
             <div className="form-grid">
               {["daily", "weekly", "monthly"].includes(mode) && (
@@ -636,54 +666,52 @@ export function ContractWizard({
             </p>
           </>
         )}
-        {step === 7 && (
-          <div className="review">
-            <h3>
-              {properties.find((p) => p.id === propertyId)?.name} ·{" "}
-              {unitId
-                ? data.units.find((u) => u.id === unitId)?.name
-                : "Casa completa"}
-            </h3>
-            <p>
-              {modeNames[mode]} · {stateNames[status]}
-            </p>
-            <p>Responsable: {name(responsible)}</p>
-            <p>
-              Ocupantes: {occupants.map(name).join(", ") || "Sin adicionales"}
-            </p>
-            <p>
-              Propietarios firmantes:{" "}
-              {ownerParties.map((o) => name(o.person_id)).join(", ") ||
-                "Seleccione al menos uno antes de confirmar."}
-            </p>
-            <p>
-              {showDate(start)} al {showDate(end)} · {daysBetween(start, end)}{" "}
-              días de ocupación inclusiva
-            </p>
-            {mode === "daily" && (
-              <p>
-                {count === "nights"
-                  ? daysBetween(start, end) - 1
-                  : daysBetween(start, end)}{" "}
-                {count === "nights" ? "noches" : "días cobrables"} · Todos los
-                servicios básicos incluidos.
-              </p>
-            )}
-            <p>
-              {["daily", "weekly", "monthly"].includes(mode)
-                ? `${price} ${currency} · precio ${modeNames[mode].toLowerCase()}`
-                : "Sin capital ni cálculos financieros."}
-            </p>
-            {target && (
-              <p>
-                <strong>{stateNames[target.state]}</strong>: {target.reason}
-              </p>
-            )}
-            <p>No se crean deudas ni pagos al guardar.</p>
-          </div>
-        )}
-        {step === 8 && (
+        {step === 4 && (
           <>
+            <div className="review">
+              <h3>
+                {properties.find((p) => p.id === propertyId)?.name} ·{" "}
+                {unitId
+                  ? data.units.find((u) => u.id === unitId)?.name
+                  : "Casa completa"}
+              </h3>
+              <p>
+                {modeNames[mode]} · {stateNames[status]}
+              </p>
+              <p>Responsable: {name(responsible)}</p>
+              <p>
+                Ocupantes: {occupants.map(name).join(", ") || "Sin adicionales"}
+              </p>
+              <p>
+                Propietarios firmantes:{" "}
+                {ownerParties.map((o) => name(o.person_id)).join(", ") ||
+                  "Seleccione al menos uno antes de confirmar."}
+              </p>
+              <p>
+                {showDate(start)} al {showDate(end)} · {daysBetween(start, end)}{" "}
+                días de ocupación inclusiva
+              </p>
+              {mode === "daily" && (
+                <p>
+                  {count === "nights"
+                    ? daysBetween(start, end) - 1
+                    : daysBetween(start, end)}{" "}
+                  {count === "nights" ? "noches" : "días cobrables"} · Todos los
+                  servicios básicos incluidos.
+                </p>
+              )}
+              <p>
+                {["daily", "weekly", "monthly"].includes(mode)
+                  ? `${price} ${currency} · precio ${modeNames[mode].toLowerCase()}`
+                  : "Sin capital ni cálculos financieros."}
+              </p>
+              {target && (
+                <p>
+                  <strong>{stateNames[target.state]}</strong>: {target.reason}
+                </p>
+              )}
+              <p>No se crean deudas ni pagos al guardar.</p>
+            </div>
             <p>
               Revisa que el inmueble, las personas, las fechas y las condiciones
               sean correctos. Los cambios quedarán en el historial.
@@ -703,7 +731,7 @@ export function ContractWizard({
               className="secondary"
               type="button"
               disabled={busy}
-              onClick={() => setStep(step - 1)}
+              onClick={() => goTo(step - 1)}
             >
               Anterior
             </button>
@@ -711,7 +739,7 @@ export function ContractWizard({
           <button disabled={busy || !propertyId}>
             {busy
               ? "Guardando…"
-              : step < 8
+              : step < 4
                 ? "Siguiente"
                 : reservation
                   ? "Crear contrato desde la reserva"
@@ -721,12 +749,71 @@ export function ContractWizard({
             type="button"
             className="secondary"
             disabled={busy}
-            onClick={onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
           >
             Cancelar registro
           </button>
         </div>
       </form>
+      {adding === "person" && (
+        <ContextDialog
+          label="Registrar inquilino"
+          onCancel={() => setAdding(null)}
+        >
+          <NewContact
+            propertyId={propertyId}
+            onCancel={() => setAdding(null)}
+            onAdded={async (person) => {
+              setNewPerson(person);
+              setResponsible(person.id);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(null);
+              void data.reload();
+              void refreshPeople().catch(() => {});
+            }}
+          />
+        </ContextDialog>
+      )}
+      {adding === "property" && (
+        <ContextDialog label="Registrar casa" onCancel={() => setAdding(null)}>
+          <PropertyForm
+            property={{}}
+            people={people}
+            users={users}
+            general
+            onCancel={() => setAdding(null)}
+            onSaved={async (house) => {
+              setNewHouse(house);
+              chooseProperty(house.id, house.owners);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(null);
+              void refreshPeople().catch(() => {});
+            }}
+          />
+        </ContextDialog>
+      )}
+      {adding === "unit" && (
+        <ContextDialog
+          label="Registrar cuarto"
+          onCancel={() => setAdding(null)}
+        >
+          <RoomForm
+            house={properties.find((house) => house.id === propertyId)}
+            fixedHouse
+            properties={properties}
+            initial={{}}
+            onCancel={() => setAdding(null)}
+            onSaved={(_houseId, room) => {
+              setUnitId(room.id);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(null);
+              void data.reload();
+            }}
+          />
+        </ContextDialog>
+      )}
     </section>
   );
 }

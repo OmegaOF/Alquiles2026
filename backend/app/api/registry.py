@@ -87,6 +87,9 @@ def lookup(
             matches.append(model.id == int(token))
         query = query.where(or_(*matches))
     size = 12
+    exact = q.strip()
+    if exact.isascii() and exact.isdecimal() and len(exact) <= 10:
+        query = query.order_by(model.id != int(exact))
     rows = list(db.scalars(query.order_by(order, model.id).offset((page - 1) * size).limit(size + 1)))
     options = []
     for row in rows[:size]:

@@ -1,6 +1,15 @@
 import { useRef, useState } from "react";
 import { api } from "../../api";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
+import { SearchSelect, personOption } from "../../components/SearchSelect";
+import { ContextDialog } from "../../components/ContextDialog";
+import { NewContact } from "../tenancy/Shared";
 import type { Person } from "../../types";
 import type { CapitalBook } from "../../anticreticos";
 import {
@@ -24,16 +33,31 @@ const blank = (): Row => ({
 export function ConditionsForm({
   book,
   people,
+  propertyId = book.contract.resolved_property_id,
+  onAdded,
   base,
   onSaved,
   onCancel,
 }: {
   book: CapitalBook;
   people: Person[];
+  propertyId?: number;
+  onAdded?: () => void;
   base: string;
   onSaved: () => Promise<void>;
   onCancel: () => void;
 }) {
+  const [adding, setAdding] = useState<{
+    index: number;
+    kind: "holders" | "responsibles";
+    field: "person_id" | "beneficiary_person_id";
+  }>();
+  const [added, setAdded] = useState<Person[]>([]);
+  const options = [
+    ...people,
+    ...added.filter((person) => !people.some((item) => item.id === person.id)),
+  ].map(personOption);
+  const form = useRef<HTMLFormElement>(null);
   const prior = book.conditions;
   const [agreed, setAgreed] = useState(prior?.agreed_capital || ""),
     [holders, setHolders] = useState<Row[]>(
@@ -75,52 +99,52 @@ export function ConditionsForm({
         </p>
         {items.map((r, index) => (
           <div className="utility-space" key={index}>
-            <Field
+            <SearchSelect
               label={`${kind === "holders" ? "Titular" : "Responsable"} ${index + 1}`}
+              options={options}
+              required
+              value={r.person_id}
+              onChange={(id) =>
+                set(
+                  items.map((item, i) =>
+                    i === index ? { ...item, person_id: id } : item,
+                  ),
+                )
+              }
+            />
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setAdding({ kind, index, field: "person_id" })}
             >
-              <select
-                value={r.person_id}
-                required
-                onChange={(e) =>
-                  set(
-                    items.map((v, i) =>
-                      i === index ? { ...v, person_id: e.target.value } : v,
-                    ),
-                  )
-                }
-              >
-                <option value="">Seleccionar persona</option>
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+              + Registrar {kind === "holders" ? "titular" : "responsable"}
+            </button>
             {kind === "holders" && (
-              <Field
-                label={`Persona autorizada a recibir por titular ${index + 1}`}
-              >
-                <select
+              <>
+                <SearchSelect
+                  label={`Persona autorizada a recibir por titular ${index + 1}`}
+                  options={options}
                   value={r.beneficiary_person_id}
-                  onChange={(e) =>
+                  onChange={(id) =>
                     set(
-                      items.map((v, i) =>
+                      items.map((item, i) =>
                         i === index
-                          ? { ...v, beneficiary_person_id: e.target.value }
-                          : v,
+                          ? { ...item, beneficiary_person_id: id }
+                          : item,
                       ),
                     )
                   }
+                />
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() =>
+                    setAdding({ kind, index, field: "beneficiary_person_id" })
+                  }
                 >
-                  <option value="">Pendiente de documentar</option>
-                  {people.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  + Registrar persona autorizada
+                </button>
+              </>
             )}
             <Field
               label={`Importe acordado de ${kind === "holders" ? "titular" : "responsable"} ${index + 1}`}
@@ -233,7 +257,12 @@ export function ConditionsForm({
         versiones anteriores y no trasladan responsabilidades automáticamente.
       </p>
       <ErrorMessage message={error} />
-      <form onSubmit={submit}>
+      <form
+        ref={form}
+        onSubmit={submit}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
         <fieldset>
           <legend>1. Capital y fechas pactadas</legend>
           <Field label="Capital total acordado">
@@ -324,13 +353,41 @@ export function ConditionsForm({
           <button
             type="button"
             className="secondary"
-            onClick={onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
             disabled={busy}
           >
             Cancelar
           </button>
         </div>
       </form>
+      {adding && (
+        <ContextDialog
+          label="Registrar persona para el anticrético"
+          onCancel={() => setAdding(undefined)}
+        >
+          <NewContact
+            propertyId={propertyId}
+            onCancel={() => setAdding(undefined)}
+            onAdded={async (person) => {
+              setAdded((current) => [...current, person]);
+              const update =
+                adding.kind === "holders" ? setHolders : setResponsibles;
+              update((current) =>
+                current.map((row, index) =>
+                  index === adding.index
+                    ? { ...row, [adding.field]: String(person.id) }
+                    : row,
+                ),
+              );
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(undefined);
+              onAdded?.();
+            }}
+          />
+        </ContextDialog>
+      )}
     </section>
   );
 }

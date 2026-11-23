@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
+import { PropertySelect } from "../../components/PropertySelect";
 import type { Person, Property } from "../../types";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
 import { localToday, showDate, stateNames } from "../../tenancy";
 import type { Availability, Occupancy } from "../../tenancy";
 import { History } from "./Shared";
 
-export function AvailabilityScreen({ properties }: { properties: Property[] }) {
+export function AvailabilityScreen({
+  properties,
+  initialPropertyId,
+}: {
+  properties: Property[];
+  initialPropertyId?: number;
+}) {
   const requestId = useRef(0);
-  const [propertyId, setPropertyId] = useState(properties[0]?.id || 0),
+  const [propertyId, setPropertyId] = useState(
+      initialPropertyId || properties[0]?.id || 0,
+    ),
     [start, setStart] = useState(localToday()),
     [end, setEnd] = useState(localToday()),
     [data, setData] = useState<Availability | null>(null),
@@ -53,20 +62,12 @@ export function AvailabilityScreen({ properties }: { properties: Property[] }) {
         }}
       >
         <div className="form-grid">
-          <Field label="Propiedad a consultar">
-            <select
-              required
-              value={propertyId || ""}
-              onChange={(e) => setPropertyId(Number(e.target.value))}
-            >
-              <option value="">Seleccionar propiedad</option>
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <PropertySelect
+            label="Propiedad a consultar"
+            properties={properties}
+            value={propertyId || ""}
+            onChange={(id) => setPropertyId(Number(id))}
+          />
           <Field label="Consultar desde">
             <input
               type="date"
@@ -172,19 +173,12 @@ export function OccupancyScreen({
         Los contratos finalizados conservan sus personas y sus cambios
         anteriores.
       </p>
-      <Field label="Propiedad del historial">
-        <select
-          value={propertyId || ""}
-          onChange={(e) => setPropertyId(Number(e.target.value))}
-        >
-          <option value="">Seleccionar propiedad</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySelect
+        label="Propiedad del historial"
+        properties={properties}
+        value={propertyId || ""}
+        onChange={(id) => setPropertyId(Number(id))}
+      />
       <label className="check">
         <input
           type="checkbox"

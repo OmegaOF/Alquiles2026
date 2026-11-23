@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Person, Property, Unit, User } from "../types";
 import { api } from "../api";
-import { SearchSelect, normalizeSearch, personOption, propertyOption } from "../components/SearchSelect";
+import {
+  SearchSelect,
+  normalizeSearch,
+  personOption,
+  propertyOption,
+} from "../components/SearchSelect";
 import { ContextDialog } from "../components/ContextDialog";
 import { PersonForm } from "./People";
 import { useRegistrySearch } from "../components/registrySearch";
@@ -23,6 +28,10 @@ type Props = {
   users: User[];
   user: User;
   refresh: () => Promise<void>;
+  onHouseAction?: (
+    section: "contracts" | "availability" | "utilities" | "finances",
+    propertyId: number,
+  ) => void;
 };
 export function Properties({
   rooms = false,
@@ -31,6 +40,7 @@ export function Properties({
   users,
   user,
   refresh,
+  onHouseAction,
 }: Props) {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [newHouses, setNewHouses] = useState<Property[]>([]);
@@ -41,11 +51,18 @@ export function Properties({
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
   const general = user.role === "general_admin";
   const canEdit = general || user.role === "property_admin";
-  const houses = [...properties, ...newHouses.filter((house) => !properties.some((item) => item.id === house.id))];
+  const houses = [
+    ...properties,
+    ...newHouses.filter(
+      (house) => !properties.some((item) => item.id === house.id),
+    ),
+  ];
   const findProperties = useRegistrySearch("properties", houses.length);
   const property = houses.find((p) => p.id === selected);
   const matchingHouses = properties.filter((house) =>
-    normalizeSearch(`${propertyOption(house).label} ${house.id}`).includes(normalizeSearch(query)),
+    normalizeSearch(`${propertyOption(house).label} ${house.id}`).includes(
+      normalizeSearch(query),
+    ),
   );
   if (editing)
     return (
@@ -69,26 +86,49 @@ export function Properties({
         <div className="page-heading">
           <h1>Cuartos</h1>
           {!creatingRoom && (canEdit || user.role === "operator") && (
-            <button onClick={() => { setCreatingRoom(true); setNotice(""); }}>Registrar cuarto</button>
+            <button
+              onClick={() => {
+                setCreatingRoom(true);
+                setNotice("");
+              }}
+            >
+              Registrar cuarto
+            </button>
           )}
         </div>
-        {notice && <p role="status" className="success-message">{notice}</p>}
+        {notice && (
+          <p role="status" className="success-message">
+            {notice}
+          </p>
+        )}
         {creatingRoom ? (
-          <RoomForm initial={{}} properties={houses} house={property}
+          <RoomForm
+            initial={{}}
+            properties={houses}
+            house={property}
             onCancel={() => setCreatingRoom(false)}
             onSaved={(houseId) => {
               setSelected(houseId);
               setCreatingRoom(false);
               setNotice("El cuarto o unidad se guardó correctamente.");
             }}
-            createHouse={general ? { people, users, onCreated: (house) => {
-              setNewHouses((current) => [...current, house]);
-              void refresh().catch(() => {});
-            } } : undefined}
+            createHouse={
+              general
+                ? {
+                    people,
+                    users,
+                    onCreated: (house) => {
+                      setNewHouses((current) => [...current, house]);
+                      void refresh().catch(() => {});
+                    },
+                  }
+                : undefined
+            }
           />
         ) : (
           <>
-            <SearchSelect label="Casa de los cuartos"
+            <SearchSelect
+              label="Casa de los cuartos"
               placeholder="Buscar por nombre, dirección o ID"
               options={houses.map(propertyOption)}
               load={findProperties}
@@ -96,9 +136,16 @@ export function Properties({
               onChange={(id) => setSelected(Number(id) || null)}
             />
             {property ? (
-              <Units key={property.id} property={property} onChanged={() => {}}
-                canEdit={canEdit || user.role === "operator"} canCreate={false} />
-            ) : <p>Selecciona una casa para consultar sus cuartos.</p>}
+              <Units
+                key={property.id}
+                property={property}
+                onChanged={() => {}}
+                canEdit={canEdit || user.role === "operator"}
+                canCreate={false}
+              />
+            ) : (
+              <p>Selecciona una casa para consultar sus cuartos.</p>
+            )}
           </>
         )}
       </section>
@@ -169,6 +216,34 @@ export function Properties({
             </>
           )}
         </div>
+        {onHouseAction && (
+          <div className="actions">
+            <button
+              className="secondary"
+              onClick={() => onHouseAction("availability", property.id)}
+            >
+              Consultar disponibilidad
+            </button>
+            <button
+              className="secondary"
+              onClick={() => onHouseAction("contracts", property.id)}
+            >
+              Ver contratos de la casa
+            </button>
+            <button
+              className="secondary"
+              onClick={() => onHouseAction("utilities", property.id)}
+            >
+              Ver servicios de la casa
+            </button>
+            <button
+              className="secondary"
+              onClick={() => onHouseAction("finances", property.id)}
+            >
+              Ver cobros de la casa
+            </button>
+          </div>
+        )}
         <PropertyAvailability
           propertyId={property.id}
           version={availabilityVersion}
@@ -211,8 +286,12 @@ export function Properties({
         </p>
       )}
       <Field label="Buscar casas">
-        <input type="search" value={query} placeholder="Nombre, dirección o zona"
-          onChange={(event) => setQuery(event.target.value)} />
+        <input
+          type="search"
+          value={query}
+          placeholder="Nombre, dirección o zona"
+          onChange={(event) => setQuery(event.target.value)}
+        />
       </Field>
       {!properties.length ? (
         <div className="empty">
@@ -319,7 +398,7 @@ function PropertyAvailability({
   );
 }
 
-function PropertyForm({
+export function PropertyForm({
   property,
   people,
   users,
@@ -336,7 +415,12 @@ function PropertyForm({
 }) {
   const [addingOwner, setAddingOwner] = useState<number | null>(null);
   const [newOwners, setNewOwners] = useState<Person[]>([]);
-  const availableOwners = [...people, ...newOwners.filter((person) => !people.some((item) => item.id === person.id))].filter((person) => person.is_owner);
+  const availableOwners = [
+    ...people,
+    ...newOwners.filter(
+      (person) => !people.some((item) => item.id === person.id),
+    ),
+  ].filter((person) => person.is_owner);
   const findOwners = useRegistrySearch("owners", availableOwners.length);
   const form = useRef<HTMLFormElement>(null);
   const [owners, setOwners] = useState(
@@ -399,7 +483,12 @@ function PropertyForm({
         pueden dejarse vacíos.
       </p>
       <ErrorMessage message={error} />
-      <form ref={form} onSubmit={save} data-guard-changes onChange={markFormChanged}>
+      <form
+        ref={form}
+        onSubmit={save}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
         <div className="form-grid">
           <Field label="Nombre de la propiedad">
             <input
@@ -475,11 +564,21 @@ function PropertyForm({
                       load={findOwners}
                       required
                       value={owner.person_id || ""}
-                      onChange={(id) => setOwners(owners.map((item, i) => (
-                        index === i ? { ...item, person_id: Number(id) } : item
-                      )))}
+                      onChange={(id) =>
+                        setOwners(
+                          owners.map((item, i) =>
+                            index === i
+                              ? { ...item, person_id: Number(id) }
+                              : item,
+                          ),
+                        )
+                      }
                     />
-                    <button type="button" className="secondary" onClick={() => setAddingOwner(index)}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setAddingOwner(index)}
+                    >
                       + Registrar propietario
                     </button>
                   </div>
@@ -578,14 +677,24 @@ function PropertyForm({
         <FormActions saving={saving} onCancel={onCancel} />
       </form>
       {addingOwner !== null && (
-        <ContextDialog label="Registrar propietario" onCancel={() => setAddingOwner(null)}>
-          <PersonForm person={{}} asOwner onCancel={() => setAddingOwner(null)}
+        <ContextDialog
+          label="Registrar propietario"
+          onCancel={() => setAddingOwner(null)}
+        >
+          <PersonForm
+            person={{}}
+            asOwner
+            onCancel={() => setAddingOwner(null)}
             onSaved={async (person) => {
               if (form.current) form.current.dataset.dirty = "true";
               setNewOwners((current) => [...current, person]);
-              setOwners((current) => current.map((owner, index) => (
-                index === addingOwner ? { ...owner, person_id: person.id } : owner
-              )));
+              setOwners((current) =>
+                current.map((owner, index) =>
+                  index === addingOwner
+                    ? { ...owner, person_id: person.id }
+                    : owner,
+                ),
+              );
               setAddingOwner(null);
             }}
           />
@@ -626,15 +735,24 @@ function Units({
     void load();
   }, [property.id]);
   if (editing)
-    return <RoomForm initial={editing} house={property} fixedHouse properties={[property]}
-      onCancel={() => { setEditing(null); setError(""); }}
-      onSaved={() => {
-        setEditing(null);
-        setNotice("El cuarto o unidad se guardó correctamente.");
-        void load();
-        onChanged();
-      }}
-    />;
+    return (
+      <RoomForm
+        initial={editing}
+        house={property}
+        fixedHouse
+        properties={[property]}
+        onCancel={() => {
+          setEditing(null);
+          setError("");
+        }}
+        onSaved={() => {
+          setEditing(null);
+          setNotice("El cuarto o unidad se guardó correctamente.");
+          void load();
+          onChanged();
+        }}
+      />
+    );
   return (
     <section className="units-section">
       <div className="page-heading">
@@ -710,7 +828,7 @@ function Units({
   );
 }
 
-function RoomForm({
+export function RoomForm({
   house,
   fixedHouse = false,
   properties,
@@ -723,9 +841,13 @@ function RoomForm({
   fixedHouse?: boolean;
   properties: Property[];
   initial: Partial<Unit>;
-  onSaved: (houseId: number) => void;
+  onSaved: (houseId: number, unit: Unit) => void;
   onCancel: () => void;
-  createHouse?: { people: Person[]; users: User[]; onCreated: (property: Property) => void };
+  createHouse?: {
+    people: Person[];
+    users: User[];
+    onCreated: (property: Property) => void;
+  };
 }) {
   const fixed = fixedHouse ? house : undefined;
   const [propertyId, setPropertyId] = useState(house?.id ?? 0);
@@ -748,7 +870,7 @@ function RoomForm({
     setSaving(true);
     setError("");
     try {
-      await api(
+      const room = await api<Unit>(
         `/properties/${property.id}/units${initial.id ? `/${initial.id}` : ""}`,
         initial.id ? "PATCH" : "POST",
         {
@@ -761,7 +883,7 @@ function RoomForm({
           notes: value(data, "notes"),
         },
       );
-      onSaved(property.id);
+      onSaved(property.id, room);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -769,104 +891,129 @@ function RoomForm({
     }
   }
   return (
-      <section className="panel">
-        <h2>
-          {initial.id ? "Editar cuarto o unidad" : "Registrar cuarto o unidad"}
-        </h2>
-        {fixed && <p><strong>Casa</strong> · {fixed.name}</p>}
-        <ErrorMessage message={error} />
-        <form ref={form} onSubmit={save} data-guard-changes onChange={markFormChanged}>
-          {!fixed && <>
-            <SearchSelect label="¿A qué casa pertenece?" required
-              options={properties.map(propertyOption)} load={findProperties}
-              value={propertyId || ""} onChange={(id) => setPropertyId(Number(id))}
+    <section className="panel">
+      <h2>
+        {initial.id ? "Editar cuarto o unidad" : "Registrar cuarto o unidad"}
+      </h2>
+      {fixed && (
+        <p>
+          <strong>Casa</strong> · {fixed.name}
+        </p>
+      )}
+      <ErrorMessage message={error} />
+      <form
+        ref={form}
+        onSubmit={save}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
+        {!fixed && (
+          <>
+            <SearchSelect
+              label="¿A qué casa pertenece?"
+              required
+              options={properties.map(propertyOption)}
+              load={findProperties}
+              value={propertyId || ""}
+              onChange={(id) => setPropertyId(Number(id))}
               placeholder="Buscar por nombre, dirección o ID"
             />
             {createHouse && (
-              <button type="button" className="secondary" onClick={() => setAddingHouse(true)}>+ Registrar casa</button>
-            )}
-          </>}
-          <div className="form-grid">
-            <Field label="Número o identificador">
-              <input
-                name="code"
-                defaultValue={initial.code}
-                maxLength={50}
-                required
-              />
-            </Field>
-            <Field label="Nombre del cuarto o unidad">
-              <input
-                name="name"
-                defaultValue={initial.name}
-                maxLength={160}
-                required
-              />
-            </Field>
-            <Field label="Tipo de unidad">
-              <select
-                name="unit_type"
-                defaultValue={initial.unit_type || "cuarto"}
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAddingHouse(true)}
               >
-                <option value="cuarto">Cuarto</option>
-                <option value="departamento">Departamento</option>
-                <option value="local">Local</option>
-                <option value="otro">Otro</option>
-              </select>
-            </Field>
-            <Field label="Descripción (opcional)">
-              <textarea
-                name="description"
-                defaultValue={initial.description || ""}
-                maxLength={2000}
-              />
-            </Field>
-            <label className="check">
-              <input
-                name="is_enabled"
-                type="checkbox"
-                defaultChecked={initial.is_enabled ?? true}
-              />
-              Unidad habilitada
-            </label>
-            <label className="check">
-              <input
-                name="maintenance"
-                type="checkbox"
-                defaultChecked={initial.maintenance ?? false}
-              />
-              En mantenimiento
-            </label>
-            <Field label="Observaciones (opcional)">
-              <textarea
-                name="notes"
-                defaultValue={initial.notes || ""}
-                maxLength={2000}
-              />
-            </Field>
-          </div>
-          <p className="muted">
-            Usa un número o código visible único en la casa. La disponibilidad combina estos estados con los contratos y las
-            reservas.
-          </p>
-          <FormActions
-            saving={saving}
-            onCancel={onCancel}
-          />
-        </form>
-        {addingHouse && createHouse && (
-          <ContextDialog label="Registrar casa" onCancel={() => setAddingHouse(false)}>
-            <PropertyForm property={{}} people={createHouse.people} users={createHouse.users} general
-              onCancel={() => setAddingHouse(false)}
-              onSaved={async (house) => {
-                if (form.current) form.current.dataset.dirty = "true";
-                createHouse.onCreated(house);
-                setPropertyId(house.id);
-                setAddingHouse(false);
-              }}
-            />
-          </ContextDialog>
+                + Registrar casa
+              </button>
+            )}
+          </>
         )}
-      </section>
-    );
+        <div className="form-grid">
+          <Field label="Número o identificador">
+            <input
+              name="code"
+              defaultValue={initial.code}
+              maxLength={50}
+              required
+            />
+          </Field>
+          <Field label="Nombre del cuarto o unidad">
+            <input
+              name="name"
+              defaultValue={initial.name}
+              maxLength={160}
+              required
+            />
+          </Field>
+          <Field label="Tipo de unidad">
+            <select
+              name="unit_type"
+              defaultValue={initial.unit_type || "cuarto"}
+            >
+              <option value="cuarto">Cuarto</option>
+              <option value="departamento">Departamento</option>
+              <option value="local">Local</option>
+              <option value="otro">Otro</option>
+            </select>
+          </Field>
+          <Field label="Descripción (opcional)">
+            <textarea
+              name="description"
+              defaultValue={initial.description || ""}
+              maxLength={2000}
+            />
+          </Field>
+          <label className="check">
+            <input
+              name="is_enabled"
+              type="checkbox"
+              defaultChecked={initial.is_enabled ?? true}
+            />
+            Unidad habilitada
+          </label>
+          <label className="check">
+            <input
+              name="maintenance"
+              type="checkbox"
+              defaultChecked={initial.maintenance ?? false}
+            />
+            En mantenimiento
+          </label>
+          <Field label="Observaciones (opcional)">
+            <textarea
+              name="notes"
+              defaultValue={initial.notes || ""}
+              maxLength={2000}
+            />
+          </Field>
+        </div>
+        <p className="muted">
+          Usa un número o código visible único en la casa. La disponibilidad
+          combina estos estados con los contratos y las reservas.
+        </p>
+        <FormActions saving={saving} onCancel={onCancel} />
+      </form>
+      {addingHouse && createHouse && (
+        <ContextDialog
+          label="Registrar casa"
+          onCancel={() => setAddingHouse(false)}
+        >
+          <PropertyForm
+            property={{}}
+            people={createHouse.people}
+            users={createHouse.users}
+            general
+            onCancel={() => setAddingHouse(false)}
+            onSaved={async (house) => {
+              if (form.current) form.current.dataset.dirty = "true";
+              createHouse.onCreated(house);
+              setPropertyId(house.id);
+              setAddingHouse(false);
+            }}
+          />
+        </ContextDialog>
+      )}
+    </section>
+  );
 }

@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase, openSection } from "./helpers";
+import { authenticate, apiBase, openSection, selectRecord } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -87,9 +87,10 @@ type Fixture = Awaited<ReturnType<typeof setup>>;
 async function enter(page: Page, f: Fixture) {
   await page.goto("/");
   await openSection(page, "Alquileres", "Anticréticos");
-  await page
-    .getByLabel("Casa de los anticréticos")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Casa de los anticréticos"),
+    String(f.house.id),
+  );
   await page
     .getByRole("button", { name: `Ver capital del contrato ${f.c.id}` })
     .click();
@@ -111,21 +112,24 @@ async function conditions(page: Page, f: Fixture) {
   await page
     .getByLabel("El acuerdo permite devolver antes de la fecha pactada")
     .check();
-  await page
-    .getByRole("combobox", { name: "Titular 1", exact: true })
-    .selectOption(String(f.tenant.id));
-  await page
-    .getByRole("combobox", {
+  await selectRecord(
+    page.getByRole("combobox", { name: "Titular 1", exact: true }),
+    String(f.tenant.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", {
       name: "Persona autorizada a recibir por titular 1",
       exact: true,
-    })
-    .selectOption(String(f.tenant.id));
+    }),
+    String(f.tenant.id),
+  );
   await page
     .getByLabel("Importe acordado de titular 1", { exact: true })
     .fill("70000");
-  await page
-    .getByRole("combobox", { name: "Responsable 1", exact: true })
-    .selectOption(String(f.owner.id));
+  await selectRecord(
+    page.getByRole("combobox", { name: "Responsable 1", exact: true }),
+    String(f.owner.id),
+  );
   await page
     .getByLabel("Importe acordado de responsable 1", { exact: true })
     .fill("70000");
@@ -169,19 +173,18 @@ async function cash(
     )
     .fill(amount);
   await page.getByLabel("Fecha real del movimiento").fill(date);
-  await page
-    .getByLabel("Método de entrega o devolución")
-    .selectOption(String(f.method.id));
-  await page
-    .getByLabel("Persona que efectivamente entrega o paga")
-    .selectOption(
-      String(payer || (kind === "delivery" ? f.tenant.id : f.owner.id)),
-    );
-  await page
-    .getByLabel("Persona que efectivamente recibe el dinero")
-    .selectOption(
-      String(receiver || (kind === "delivery" ? f.owner.id : f.tenant.id)),
-    );
+  await selectRecord(
+    page.getByLabel("Método de entrega o devolución"),
+    String(f.method.id),
+  );
+  await selectRecord(
+    page.getByLabel("Persona que efectivamente entrega o paga"),
+    String(payer || (kind === "delivery" ? f.tenant.id : f.owner.id)),
+  );
+  await selectRecord(
+    page.getByLabel("Persona que efectivamente recibe el dinero"),
+    String(receiver || (kind === "delivery" ? f.owner.id : f.tenant.id)),
+  );
   await page.getByLabel("Importe de la parte 1", { exact: true }).fill(amount);
 }
 async function confirmCash(page: Page) {
@@ -288,15 +291,17 @@ test("titulares y responsables expresos, sin deducir importes de copropiedad", a
     [1, f.tenant.id, "40000"],
     [2, f.other.id, "30000"],
   ] as const) {
-    await page
-      .getByRole("combobox", { name: `Titular ${i}`, exact: true })
-      .selectOption(String(person));
-    await page
-      .getByRole("combobox", {
+    await selectRecord(
+      page.getByRole("combobox", { name: `Titular ${i}`, exact: true }),
+      String(person),
+    );
+    await selectRecord(
+      page.getByRole("combobox", {
         name: `Persona autorizada a recibir por titular ${i}`,
         exact: true,
-      })
-      .selectOption(String(f.other.id));
+      }),
+      String(f.other.id),
+    );
     await page
       .getByLabel(`Importe acordado de titular ${i}`, { exact: true })
       .fill(amount);
@@ -305,9 +310,10 @@ test("titulares y responsables expresos, sin deducir importes de copropiedad", a
     [1, f.owner.id, "40000"],
     [2, f.other.id, "30000"],
   ] as const) {
-    await page
-      .getByRole("combobox", { name: `Responsable ${i}`, exact: true })
-      .selectOption(String(person));
+    await selectRecord(
+      page.getByRole("combobox", { name: `Responsable ${i}`, exact: true }),
+      String(person),
+    );
     await page
       .getByLabel(`Importe acordado de responsable ${i}`, { exact: true })
       .fill(amount);
@@ -326,22 +332,32 @@ test("titulares y responsables expresos, sin deducir importes de copropiedad", a
     .click();
   await saved(page);
   await cash(page, f, "50000", "delivery", f.other.id);
-  await page
-    .getByRole("combobox", { name: "Titular de la parte 1", exact: true })
-    .selectOption(String(f.tenant.id));
-  await page
-    .getByRole("combobox", { name: "Responsable de la parte 1", exact: true })
-    .selectOption(String(f.owner.id));
+  await selectRecord(
+    page.getByRole("combobox", { name: "Titular de la parte 1", exact: true }),
+    String(f.tenant.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", {
+      name: "Responsable de la parte 1",
+      exact: true,
+    }),
+    String(f.owner.id),
+  );
   await page.getByLabel("Importe de la parte 1", { exact: true }).fill("30000");
   await page
     .getByRole("button", { name: "Agregar parte", exact: true })
     .click();
-  await page
-    .getByRole("combobox", { name: "Titular de la parte 2", exact: true })
-    .selectOption(String(f.other.id));
-  await page
-    .getByRole("combobox", { name: "Responsable de la parte 2", exact: true })
-    .selectOption(String(f.other.id));
+  await selectRecord(
+    page.getByRole("combobox", { name: "Titular de la parte 2", exact: true }),
+    String(f.other.id),
+  );
+  await selectRecord(
+    page.getByRole("combobox", {
+      name: "Responsable de la parte 2",
+      exact: true,
+    }),
+    String(f.other.id),
+  );
   await page.getByLabel("Importe de la parte 2", { exact: true }).fill("20000");
   await confirmCash(page);
   await page

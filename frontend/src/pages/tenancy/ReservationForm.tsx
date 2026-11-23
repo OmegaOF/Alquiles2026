@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../../api";
 import type { Person, Property, User } from "../../types";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
 import { localToday, modeNames } from "../../tenancy";
 import type { Mode, Reservation } from "../../tenancy";
 import { usePropertyData, NewContact } from "./Shared";
+import {
+  SearchSelect,
+  personOption,
+  unitOption,
+} from "../../components/SearchSelect";
+import { PropertySelect } from "../../components/PropertySelect";
+import { ContextDialog } from "../../components/ContextDialog";
+import { useRegistrySearch } from "../../components/registrySearch";
+import { PropertyForm } from "../Properties";
 
 function localExpiry(value: string | null | undefined) {
   if (!value) return "";
@@ -16,7 +31,8 @@ function localExpiry(value: string | null | undefined) {
 
 export function ReservationForm({
   user,
-  properties,
+  properties: registeredProperties,
+  users = [],
   people,
   initial,
   onCancel,
@@ -25,12 +41,19 @@ export function ReservationForm({
 }: {
   user: User;
   properties: Property[];
+  users?: User[];
   people: Person[];
   initial: Partial<Reservation>;
   onCancel: () => void;
   onSaved: () => Promise<void>;
   refreshPeople: () => Promise<void>;
 }) {
+  const [newHouse, setNewHouse] = useState<Property>();
+  const properties =
+    newHouse && !registeredProperties.some((house) => house.id === newHouse.id)
+      ? [...registeredProperties, newHouse]
+      : registeredProperties;
+  const form = useRef<HTMLFormElement>(null);
   const [propertyId, setPropertyId] = useState(
       initial.resolved_property_id || properties[0]?.id || 0,
     ),
@@ -44,27 +67,31 @@ export function ReservationForm({
     [notes, setNotes] = useState(initial.notes || "");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [adding, setAdding] = useState(false);
+    [adding, setAdding] = useState<"person" | "property" | null>(null),
+    [newPerson, setNewPerson] = useState<Person>();
   const data = usePropertyData(
     propertyId,
     people,
     user.role === "general_admin",
   );
-  if (adding)
-    return (
-      <NewContact
-        propertyId={propertyId}
-        onCancel={() => setAdding(false)}
-        onAdded={async (person) => {
-          await data.reload();
-          await refreshPeople();
-          setPersonId(person.id);
-          setAdding(false);
-        }}
-      />
-    );
+  const candidates =
+    newPerson && !data.candidates.some((person) => person.id === newPerson.id)
+      ? [...data.candidates, newPerson]
+      : data.candidates;
+  const findPeople = useRegistrySearch(
+    user.role === "general_admin" ? "people" : "contacts",
+    candidates.length,
+    propertyId,
+  );
+  function chooseProperty(id: number) {
+    setPropertyId(id);
+    setUnitId(0);
+    setPersonId(0);
+    setNewPerson(undefined);
+  }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     if (
       !window.confirm(
         "¿Guardar esta reserva? Bloqueará las fechas hasta su cancelación, vencimiento o conversión en contrato.",
@@ -105,59 +132,57 @@ export function ReservationForm({
         deudas.
       </p>
       <ErrorMessage message={error || data.error} />
-      <form onSubmit={save}>
+      <form
+        ref={form}
+        onSubmit={save}
+        data-guard-changes
+        onChange={markFormChanged}
+      >
         <div className="form-grid">
-          <Field label="Casa de la reserva">
-            <select
-              value={propertyId || ""}
+          <div>
+            <PropertySelect
+              label="Casa de la reserva"
               required
               disabled={!!initial.id}
-              onChange={(e) => {
-                setPropertyId(Number(e.target.value));
-                setUnitId(0);
-                setPersonId(0);
-              }}
-            >
-              <option value="">Seleccionar casa</option>
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Espacio reservado">
-            <select
-              value={unitId}
-              onChange={(e) => setUnitId(Number(e.target.value))}
-            >
-              <option value={0}>Casa completa</option>
-              {data.units.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.code} · {u.name}
-                  {!u.is_enabled
-                    ? " · Deshabilitado"
-                    : u.maintenance
-                      ? " · En mantenimiento"
-                      : ""}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Persona que reserva">
-            <select
-              value={personId || ""}
-              required
-              onChange={(e) => setPersonId(Number(e.target.value))}
-            >
-              <option value="">Seleccionar persona</option>
-              {data.candidates.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          </Field>
+              activeOnly={!initial.id}
+              properties={properties}
+              value={propertyId || ""}
+              onChange={(id) => chooseProperty(Number(id))}
+            />
+            {!initial.id && user.role === "general_admin" && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAdding("property")}
+              >
+                + Registrar casa
+              </button>
+            )}
+          </div>
+          <SearchSelect
+            label="Espacio reservado"
+            disabled={!propertyId}
+            value={unitId}
+            options={[
+              { value: 0, label: "Casa completa" },
+              ...data.units.map((unit) => ({
+                ...unitOption(unit),
+                disabled: !unit.is_enabled || unit.maintenance,
+              })),
+            ]}
+            onChange={(id) => setUnitId(Number(id))}
+            placeholder="Buscar cuarto por nombre o código"
+          />
+          <SearchSelect
+            label="Persona que reserva"
+            required
+            disabled={!propertyId}
+            value={personId || ""}
+            options={candidates.map(personOption)}
+            load={findPeople}
+            onChange={(id) => setPersonId(Number(id))}
+            placeholder="Buscar por nombre, documento o teléfono"
+          />
           <Field label="Modalidad prevista">
             <select
               value={mode}
@@ -223,7 +248,7 @@ export function ReservationForm({
           className="secondary"
           type="button"
           disabled={!propertyId}
-          onClick={() => setAdding(true)}
+          onClick={() => setAdding("person")}
         >
           Registrar nueva persona
         </button>
@@ -234,13 +259,52 @@ export function ReservationForm({
           <button
             type="button"
             className="secondary"
-            onClick={onCancel}
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
             disabled={busy}
           >
             Cancelar registro
           </button>
         </div>
       </form>
+      {adding === "person" && (
+        <ContextDialog
+          label="Registrar persona para la reserva"
+          onCancel={() => setAdding(null)}
+        >
+          <NewContact
+            propertyId={propertyId}
+            onCancel={() => setAdding(null)}
+            onAdded={async (person) => {
+              setNewPerson(person);
+              setPersonId(person.id);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(null);
+              void data.reload();
+              void refreshPeople().catch(() => {});
+            }}
+          />
+        </ContextDialog>
+      )}
+      {adding === "property" && (
+        <ContextDialog label="Registrar casa" onCancel={() => setAdding(null)}>
+          <PropertyForm
+            property={{}}
+            people={people}
+            users={users}
+            general
+            onCancel={() => setAdding(null)}
+            onSaved={async (house) => {
+              setNewHouse(house);
+              chooseProperty(house.id);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(null);
+              void refreshPeople().catch(() => {});
+            }}
+          />
+        </ContextDialog>
+      )}
     </section>
   );
 }

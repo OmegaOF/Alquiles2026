@@ -22,7 +22,9 @@ export async function authenticate(page: Page) {
 
 export async function openSection(page: Page, group: string, section: string) {
   const groups = page.getByRole("navigation", { name: "Navegación principal" });
-  const submenu = page.getByRole("navigation", { name: `Opciones de ${group}` });
+  const submenu = page.getByRole("navigation", {
+    name: `Opciones de ${group}`,
+  });
   await groups.waitFor();
   if (!(await submenu.isVisible())) {
     const mobile = groups.getByRole("button", { name: /Cambiar grupo/ });
@@ -30,4 +32,24 @@ export async function openSection(page: Page, group: string, section: string) {
     await groups.getByRole("button", { name: group, exact: true }).click();
   }
   await submenu.getByRole("button", { name: section, exact: true }).click();
+}
+
+export async function selectRecord(
+  field: import("@playwright/test").Locator,
+  value: string | { label: string },
+) {
+  if (await field.evaluate((control) => control.tagName === "SELECT")) {
+    await field.selectOption(value);
+    return;
+  }
+  await field.click();
+  await field.fill(typeof value === "string" ? value : value.label);
+  const options = field.page().getByRole("option");
+  const result =
+    typeof value === "string"
+      ? options.and(
+          field.page().locator(`[data-value=${JSON.stringify(value)}]`),
+        )
+      : options.filter({ hasText: value.label });
+  await result.click();
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { PropertySelect } from "../components/PropertySelect";
+import { SearchSelect } from "../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../components/Form";
 import type { Person, Property, User } from "../types";
 import type { FinanceCatalogs } from "../finances";
@@ -58,6 +60,7 @@ export function Anticreticos({
     [view, setView] = useState("list"),
     [detailTab, setDetailTab] = useState("capital"),
     [filter, setFilter] = useState("all"),
+    [contractFilter, setContractFilter] = useState(""),
     [horizon, setHorizon] = useState(30),
     [action, setAction] = useState<Action | null>(null),
     [error, setError] = useState(""),
@@ -163,23 +166,17 @@ export function Anticreticos({
         Consulta capital recibido, devoluciones y responsabilidades sin
         mezclarlos con alquileres, garantías ni servicios.
       </p>
-      <Field label="Casa de los anticréticos">
-        <select
-          value={propertyId || ""}
-          onChange={(e) => {
-            setSelected(null);
-            setAction(null);
-            setPropertyId(Number(e.target.value));
-          }}
-        >
-          <option value="">Seleccionar casa</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySelect
+        label="Casa de los anticréticos"
+        properties={properties}
+        value={propertyId || ""}
+        disabled={!!action}
+        onChange={(id) => {
+          setSelected(null);
+          setContractFilter("");
+          setPropertyId(Number(id));
+        }}
+      />
       <div className="form-actions">
         <button
           className="secondary"
@@ -232,6 +229,8 @@ export function Anticreticos({
               book={book}
               base={`/properties/${propertyId}/anticreticos/${book.contract.id}`}
               people={related.candidates}
+              propertyId={propertyId}
+              onAdded={() => void related.reload()}
               onSaved={saved}
               onCancel={() => setAction(null)}
             />
@@ -647,6 +646,16 @@ export function Anticreticos({
             </>
           ) : (
             <>
+              <SearchSelect
+                label="Buscar contrato anticrético"
+                options={data.items.map(({ contract }) => ({
+                  value: contract.id,
+                  label: `${contract.target_label} · ${name(contract.responsible_person_id)} · ${showDate(contract.start_date)}`,
+                }))}
+                value={contractFilter}
+                onChange={setContractFilter}
+                placeholder="Buscar por casa, cuarto, inquilino o número de contrato"
+              />
               <Field label="Filtrar situación del anticrético">
                 <select
                   value={filter}
@@ -685,42 +694,54 @@ export function Anticreticos({
                   </p>
                 </>
               )}
-              {data.items.filter(matches).map((b) => (
-                <article className="panel" key={b.contract.id}>
-                  <h2>Anticrético · {b.contract.target_label}</h2>
-                  <p>
-                    {name(b.contract.responsible_person_id)} · Contrato{" "}
-                    {b.contract.id} · {capitalStates[b.state]}
-                  </p>
-                  <p>
-                    Capital acordado: {money(b.capital_agreed, b.currency)} ·
-                    Recibido: {money(b.capital_received, b.currency)} ·
-                    Devuelto: {money(b.capital_returned, b.currency)}
-                  </p>
-                  <p>
-                    <strong>
-                      Pendiente de devolución:{" "}
-                      {money(b.capital_pending, b.currency)}
-                    </strong>
-                  </p>
-                  <p>
-                    Final de ocupación pactado: {showDate(b.contract.end_date)}{" "}
-                    · Restitución:{" "}
-                    {b.conditions?.restitution_on
-                      ? showDate(b.conditions.restitution_on)
-                      : "Información pendiente"}
-                  </p>
-                  <button
-                    onClick={() => {
-                      setSelected(b.contract.id);
-                      setDetailTab("capital");
-                    }}
-                  >
-                    Ver capital del contrato {b.contract.id}
-                  </button>
-                </article>
-              ))}
-              {!data.items.filter(matches).length && (
+              {data.items
+                .filter(
+                  (item) =>
+                    matches(item) &&
+                    (!contractFilter ||
+                      String(item.contract.id) === contractFilter),
+                )
+                .map((b) => (
+                  <article className="panel" key={b.contract.id}>
+                    <h2>Anticrético · {b.contract.target_label}</h2>
+                    <p>
+                      {name(b.contract.responsible_person_id)} · Contrato{" "}
+                      {b.contract.id} · {capitalStates[b.state]}
+                    </p>
+                    <p>
+                      Capital acordado: {money(b.capital_agreed, b.currency)} ·
+                      Recibido: {money(b.capital_received, b.currency)} ·
+                      Devuelto: {money(b.capital_returned, b.currency)}
+                    </p>
+                    <p>
+                      <strong>
+                        Pendiente de devolución:{" "}
+                        {money(b.capital_pending, b.currency)}
+                      </strong>
+                    </p>
+                    <p>
+                      Final de ocupación pactado:{" "}
+                      {showDate(b.contract.end_date)} · Restitución:{" "}
+                      {b.conditions?.restitution_on
+                        ? showDate(b.conditions.restitution_on)
+                        : "Información pendiente"}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSelected(b.contract.id);
+                        setDetailTab("capital");
+                      }}
+                    >
+                      Ver capital del contrato {b.contract.id}
+                    </button>
+                  </article>
+                ))}
+              {!data.items.filter(
+                (item) =>
+                  matches(item) &&
+                  (!contractFilter ||
+                    String(item.contract.id) === contractFilter),
+              ).length && (
                 <p>
                   No hay anticréticos en esta selección. Los contratos se
                   registran desde Contratos, sin duplicar la ocupación aquí.

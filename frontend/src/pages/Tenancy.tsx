@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { PropertySelect } from "../components/PropertySelect";
 import type { Person, Property, User } from "../types";
 import { Field, ErrorMessage, errorText } from "../components/Form";
 import {
@@ -25,6 +26,8 @@ type Props = {
   refreshPeople: () => Promise<void>;
   onCapital?: (contract: Contract) => void;
   initialContractId?: number;
+  initialPropertyId?: number;
+  users?: User[];
 };
 export function Tenancy({
   view,
@@ -34,6 +37,8 @@ export function Tenancy({
   refreshPeople,
   onCapital,
   initialContractId,
+  initialPropertyId,
+  users,
 }: Props) {
   const [contracts, setContracts] = useState<Contract[]>([]),
     [reservations, setReservations] = useState<Reservation[]>([]);
@@ -50,7 +55,9 @@ export function Tenancy({
     } | null>(null),
     [reservationForm, setReservationForm] =
       useState<Partial<Reservation> | null>(null);
-  const [filter, setFilter] = useState(""),
+  const [filter, setFilter] = useState(
+      initialPropertyId ? String(initialPropertyId) : "",
+    ),
     [action, setAction] = useState(""),
     [busy, setBusy] = useState(false);
   const canWrite = user.role !== "owner",
@@ -182,7 +189,9 @@ export function Tenancy({
       <ContractWizard
         user={user}
         properties={properties}
+        users={users}
         people={people}
+        initialPropertyId={Number(filter) || undefined}
         initial={wizard.contract}
         reservation={wizard.reservation}
         onCancel={() => setWizard(null)}
@@ -195,6 +204,7 @@ export function Tenancy({
       <ReservationForm
         user={user}
         properties={properties}
+        users={users}
         people={people}
         initial={reservationForm}
         onCancel={() => setReservationForm(null)}
@@ -499,7 +509,12 @@ export function Tenancy({
       </section>
     );
   if (view === "availability")
-    return <AvailabilityScreen properties={properties} />;
+    return (
+      <AvailabilityScreen
+        properties={properties}
+        initialPropertyId={initialPropertyId}
+      />
+    );
   if (view === "occupancy")
     return <OccupancyScreen properties={properties} people={people} />;
   return (
@@ -517,7 +532,11 @@ export function Tenancy({
         {canWrite && (
           <button
             onClick={() =>
-              view === "contracts" ? setWizard({}) : setReservationForm({})
+              view === "contracts"
+                ? setWizard({})
+                : setReservationForm({
+                    resolved_property_id: Number(filter) || undefined,
+                  })
             }
           >
             {view === "contracts" ? "Registrar contrato" : "Registrar reserva"}
@@ -530,16 +549,13 @@ export function Tenancy({
           {notice}
         </p>
       )}
-      <Field label="Filtrar por propiedad">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="">Todas mis propiedades</option>
-          {properties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <PropertySelect
+        label="Filtrar por propiedad"
+        properties={properties}
+        value={filter}
+        onChange={setFilter}
+        hint="Si no eliges una casa, se muestran todas las autorizadas."
+      />
       {loading ? (
         <p role="status">Cargando información…</p>
       ) : error ? (

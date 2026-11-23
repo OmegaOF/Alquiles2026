@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase, openSection } from "./helpers";
+import { authenticate, apiBase, openSection, selectRecord } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ timezoneId: "America/La_Paz", locale: "es-BO" });
@@ -49,7 +49,6 @@ async function finishWizard(page: Page, button = "Guardar contrato") {
   await expect(
     page.getByRole("heading", { name: "Revisar el resumen" }),
   ).toBeVisible();
-  await next(page);
   await page.getByLabel("He revisado los datos y confirmo el contrato").check();
   await page.getByRole("button", { name: button, exact: true }).click();
   await expect(
@@ -96,30 +95,27 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
   await page
     .getByRole("button", { name: "Registrar contrato", exact: true })
     .click();
-  await page.getByLabel("Casa del contrato").selectOption(String(f.house.id));
+  await selectRecord(page.getByLabel("Casa del contrato"), String(f.house.id));
+  await selectRecord(page.getByLabel("Espacio a alquilar"), String(f.first.id));
+  await selectRecord(page.getByLabel("Modalidad de alquiler"), "daily");
+  await page.getByLabel("Fecha de entrada", { exact: true }).fill("2031-01-01");
+  await page.getByLabel("Fecha de salida", { exact: true }).fill("2031-01-03");
   await next(page);
-  await page.getByLabel("Espacio a alquilar").selectOption(String(f.first.id));
-  await next(page);
-  await page.getByLabel("Modalidad de alquiler").selectOption("daily");
-  await next(page);
-  await page
-    .getByLabel("Persona responsable del contrato")
-    .selectOption(String(f.tenant.id));
+  await selectRecord(
+    page.getByLabel("Persona responsable del contrato"),
+    String(f.tenant.id),
+  );
   await page
     .getByRole("group", { name: "Ocupantes adicionales (opcional)" })
     .getByLabel(f.occupant.full_name, { exact: true })
     .check();
   await next(page);
-  await page.getByLabel("Fecha de entrada", { exact: true }).fill("2031-01-01");
-  await page.getByLabel("Fecha de salida", { exact: true }).fill("2031-01-03");
-  await next(page);
   await page.getByLabel("Precio por día o noche acordado").fill("75.50");
   await expect(page.getByLabel("Servicios básicos incluidos")).toBeChecked();
   await expect(page.getByLabel("Servicios básicos incluidos")).toBeDisabled();
-  await page.getByLabel("Estado al guardar").selectOption("active");
+  await selectRecord(page.getByLabel("Estado al guardar"), "active");
   await next(page);
   await capture(page, info, "resumen");
-  await next(page);
   await page.getByLabel("He revisado los datos y confirmo el contrato").check();
   await page
     .getByRole("button", { name: "Guardar contrato", exact: true })
@@ -130,7 +126,7 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
   await page
     .getByRole("button", { name: "Modificar contrato", exact: true })
     .click();
-  for (let step = 1; step < 6; step++) await next(page);
+  for (let step = 1; step < 3; step++) await next(page);
   await page
     .getByLabel("Observaciones (opcional)", { exact: true })
     .fill("Condiciones revisadas con las personas contratantes");
@@ -156,9 +152,10 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
   ).toBeVisible();
   await capture(page, info, "contrato");
   await openSection(page, "Casas y cuartos", "Disponibilidad");
-  await page
-    .getByLabel("Propiedad a consultar")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Propiedad a consultar"),
+    String(f.house.id),
+  );
   await page.getByLabel("Consultar desde").fill("2031-01-01");
   await page.getByLabel("Consultar hasta").fill("2031-01-20");
   await page
@@ -194,8 +191,8 @@ test("reserva desde React, persona sin cuenta, confirmación y conversión en co
   await page
     .getByRole("button", { name: "Registrar reserva", exact: true })
     .click();
-  await page.getByLabel("Casa de la reserva").selectOption(String(f.house.id));
-  await page.getByLabel("Espacio reservado").selectOption(String(f.first.id));
+  await selectRecord(page.getByLabel("Casa de la reserva"), String(f.house.id));
+  await selectRecord(page.getByLabel("Espacio reservado"), String(f.first.id));
   await page
     .getByRole("button", { name: "Registrar nueva persona", exact: true })
     .click();
@@ -231,7 +228,7 @@ test("reserva desde React, persona sin cuenta, confirmación y conversión en co
   await expect(row.getByText("Confirmada", { exact: true })).toBeVisible();
   await capture(page, info, "reservas");
   await row.getByRole("button", { name: /^Convertir reserva/ }).click();
-  for (let step = 1; step < 6; step++) await next(page);
+  for (let step = 1; step < 3; step++) await next(page);
   await expect(page.getByLabel("Estado al guardar")).toHaveValue("active");
   await page.getByLabel("Precio por día o noche acordado").fill("80");
   await finishWizard(page, "Crear contrato desde la reserva");
@@ -286,7 +283,6 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
   await page
     .getByRole("button", { name: "Modificar contrato", exact: true })
     .click();
-  await next(page);
   await expect(page.getByLabel("Espacio a alquilar")).toBeDisabled();
   await page
     .getByRole("button", { name: "Cancelar registro", exact: true })
@@ -311,9 +307,10 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
     page.getByRole("button", { name: "Modificar contrato", exact: true }),
   ).toHaveCount(0);
   await openSection(page, "Alquileres", "Inquilinos");
-  await page
-    .getByLabel("Propiedad del historial")
-    .selectOption(String(f.house.id));
+  await selectRecord(
+    page.getByLabel("Propiedad del historial"),
+    String(f.house.id),
+  );
   await expect(
     page.getByRole("heading", {
       name: `Contrato ${contract.id} · Finalizado`,
@@ -334,4 +331,59 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
     ),
   ).toBeVisible();
   await capture(page, info, "historial");
+});
+
+test("crea un inquilino dentro del asistente y recupera el contrato guardado como borrador", async ({
+  page,
+}) => {
+  await authenticate(page);
+  page.on("dialog", (dialog) => dialog.accept());
+  const f = await houseFixture(page);
+  await page.goto("/");
+  await openSection(page, "Alquileres", "Contratos");
+  await page
+    .getByRole("button", { name: "Registrar contrato", exact: true })
+    .click();
+  await selectRecord(page.getByLabel("Casa del contrato"), String(f.house.id));
+  await selectRecord(page.getByLabel("Espacio a alquilar"), String(f.first.id));
+  await page.getByLabel("Fecha de entrada", { exact: true }).fill("2033-05-01");
+  await page.getByLabel("Fecha de salida", { exact: true }).fill("2033-05-03");
+  await next(page);
+  await page
+    .getByRole("button", { name: "+ Registrar inquilino", exact: true })
+    .click();
+  const name = `Inquilino nuevo ${f.house.id}`;
+  await page.getByLabel("Nombre completo de la nueva persona").fill(name);
+  await page
+    .getByRole("button", { name: "Guardar persona", exact: true })
+    .click();
+  await expect(page.getByLabel("Persona responsable del contrato")).toHaveValue(
+    name,
+  );
+  await next(page);
+  await page.getByLabel("Precio por día o noche acordado").fill("120");
+  await finishWizard(page);
+  const saved = await page.request.get(
+    `${apiBase}/api/v1/contracts?property_id=${f.house.id}`,
+  );
+  expect(saved.ok()).toBe(true);
+  const rows = await saved.json();
+  expect(rows).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        status: "draft",
+        mode: "daily",
+        start_date: "2033-05-01",
+        end_date: "2033-05-03",
+        unit_id: f.first.id,
+      }),
+    ]),
+  );
+  await page.reload();
+  await openSection(page, "Alquileres", "Contratos");
+  const draft = page
+    .locator("article")
+    .filter({ hasText: f.house.name })
+    .filter({ hasText: name });
+  await expect(draft).toContainText("Borrador");
 });

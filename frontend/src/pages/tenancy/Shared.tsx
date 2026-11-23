@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import type { Person } from "../../types";
-import { Field, ErrorMessage, errorText } from "../../components/Form";
+import {
+  Field,
+  ErrorMessage,
+  errorText,
+  confirmFormDiscard,
+  markFormChanged,
+} from "../../components/Form";
 import { modeNames, showDate, stateNames } from "../../tenancy";
 import type { HistoryEntry } from "../../tenancy";
 
@@ -204,7 +210,7 @@ export function NewContact({
     <section className="panel">
       <h2>Registrar persona para esta casa</h2>
       <ErrorMessage message={error} />
-      <form onSubmit={save}>
+      <form onSubmit={save} data-guard-changes onChange={markFormChanged}>
         <Field label="Nombre completo de la nueva persona">
           <input name="name" minLength={2} maxLength={160} required />
         </Field>
@@ -216,7 +222,13 @@ export function NewContact({
         </Field>
         <div className="actions">
           <button disabled={busy}>Guardar persona</button>
-          <button type="button" className="secondary" onClick={onCancel}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={(event) => {
+              if (confirmFormDiscard(event.currentTarget.form)) onCancel();
+            }}
+          >
             Volver al formulario
           </button>
         </div>
