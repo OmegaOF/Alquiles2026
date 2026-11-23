@@ -106,7 +106,7 @@ test("propietario no ve acciones para registrar ni gestionar usuarios", async ()
     screen.queryByRole("button", { name: "Registrar cuarto" }),
   ).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Configuración" }));
-  expect(screen.queryByRole("button", { name: "Usuarios", exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Usuarios" })).not.toBeInTheDocument();
 });
 
 test("administrador de propiedades edita sin enviar campos de permisos", async () => {

@@ -431,3 +431,35 @@ def test_large_unicode_audit_preserves_full_before_after(admin, db):
         details = json.loads(audit.details)
         assert details['before']['description'] == first_text
         assert details['after']['notes'] == second_text
+
+
+def test_paginated_lookup_respects_property_and_contact_scope(admin):
+    first = post(admin, '/persons', {
+        'full_name': 'Ines Sur', 'document': 'CI-ALFA', 'phone': '+591 777 09090', 'is_owner': True,
+    })
+    foreign = person(admin, 'Elena Privada', 'CI-BETA')
+    visible = property_(admin, first, 'Casa distrito visible')
+    hidden = property_(admin, foreign, 'Casa distrito reservado')
+    room = post(admin, f"/properties/{visible['id']}/units", {
+        'code': 'UX-701', 'name': 'Patio', 'unit_type': 'cuarto',
+    })
+    for index in range(13):
+        person(admin, f'Persona paginada {index:02}')
+    first_page = admin.get('/api/v1/lookup/people', params={'q': 'paginada'}).json()
+    last_page = admin.get('/api/v1/lookup/people', params={'q': 'paginada', 'page': 2}).json()
+    assert len(first_page['options']) == 12 and first_page['hasMore']
+    assert len(last_page['options']) == 1 and not last_page['hasMore']
+    authority = user(admin, 'operator', property_ids=[visible['id']])
+    login_as(admin, authority)
+
+    def lookup(kind, query='', **scope):
+        return admin.get(f'/api/v1/lookup/{kind}', params={'q': query, **scope})
+
+    assert [option['value'] for option in lookup('properties', 'distrito').json()['options']] == [visible['id']]
+    assert lookup('properties', str(hidden['id'])).json()['options'] == []
+    for query in ('ines', 'CI-ALFA', '77709090'):
+        assert [option['value'] for option in lookup('people', query).json()['options']] == [first['id']]
+    assert lookup('people', 'CI-BETA').json()['options'] == []
+    assert lookup('units', 'UX-701', property_id=visible['id']).json()['options'][0]['value'] == room['id']
+    assert lookup('units', property_id=hidden['id']).status_code == 404
+    assert lookup('contacts', property_id=hidden['id']).status_code == 404

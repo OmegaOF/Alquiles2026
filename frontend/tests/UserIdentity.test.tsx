@@ -200,7 +200,7 @@ test("editar nombre en Personas actualiza la cuenta y conserva su alias", async 
   );
   await screen.findByRole("status");
   await userEvent.click(
-    screen.getByRole("button", { name: "Usuarios", exact: true }),
+    screen.getByRole("button", { name: "Usuarios" }),
   );
   expect(
     await screen.findByRole("heading", { name: "Elena Vargas Corregida" }),

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Person, Property, Unit, User } from "../types";
 import { api } from "../api";
+import { SearchSelect, propertyOption } from "../components/SearchSelect";
+import { useRegistrySearch } from "../components/registrySearch";
 import { stateNames } from "../tenancy";
 import type { Availability } from "../tenancy";
 import {
@@ -33,6 +35,7 @@ export function Properties({
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
   const general = user.role === "general_admin";
   const canEdit = general || user.role === "property_admin";
+  const findProperties = useRegistrySearch("properties", properties.length);
   const property = properties.find((p) => p.id === selected);
   if (editing)
     return (
@@ -54,12 +57,13 @@ export function Properties({
     return (
       <section>
         <h1>Cuartos</h1>
-        <Field label="Casa de los cuartos">
-          <select value={selected ?? ""} onChange={(event) => setSelected(Number(event.target.value) || null)}>
-            <option value="">Seleccionar casa</option>
-            {properties.map((house) => <option key={house.id} value={house.id}>{house.name}</option>)}
-          </select>
-        </Field>
+        <SearchSelect label="Casa de los cuartos"
+          placeholder="Buscar por nombre, dirección o ID"
+          options={properties.map(propertyOption)}
+          load={findProperties}
+          value={selected ?? ""}
+          onChange={(id) => setSelected(Number(id) || null)}
+        />
         {property ? (
           <Units key={property.id} property={property} onChanged={() => {}}
             canEdit={canEdit || user.role === "operator"} />

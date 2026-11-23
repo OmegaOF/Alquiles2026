@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, select
+from typing import Literal
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 from app.api.auth import current_user
 from app.core.security import hash_password
@@ -10,17 +11,98 @@ from app.services.registry import ADMIN, apply_fields, commit, person_dict, prop
 
 router = APIRouter(tags=["Propiedades y personas"])
 
-@router.get("/persons")
-def persons(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    query = select(Person).order_by(Person.full_name, Person.id)
+def visible_people(db: Session, user: User):
+    query = select(Person)
     if user.role != ADMIN:
         from app.services.tenancy import contact_ids
-        ids = list(db.scalars(visible_properties(db, user).with_only_columns(Property.id)))
+
+        ids = db.scalars(visible_properties(db, user).with_only_columns(Property.id))
         people = set()
         for property_id in ids:
             people.update(db.scalars(contact_ids(db, property_id)))
         query = query.where(Person.id.in_(people))
+    return query
+
+
+@router.get("/persons")
+def persons(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    query = visible_people(db, user).order_by(Person.full_name, Person.id)
     return [person_dict(p) for p in db.scalars(query)]
+
+
+def trimmed_digits(column):
+    for char in " +()-.":
+        column = func.replace(column, char, "")
+    return column
+
+
+@router.get("/lookup/{kind}")
+def lookup(
+    kind: Literal["properties", "people", "owners", "contacts", "units"],
+    q: str = Query("", max_length=200),
+    page: int = Query(1, ge=1, le=10000),
+    property_id: int | None = Query(None, gt=0),
+    active_only: bool = False,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    if kind == "properties":
+        model = Property
+        query = visible_properties(db, user)
+        fields = [Property.name, Property.address, Property.zone, Property.city]
+        if active_only:
+            query = query.where(Property.is_active.is_(True))
+        order = Property.name
+    elif kind == "units":
+        model = Unit
+        if property_id is None:
+            raise HTTPException(422, "Selecciona la casa para buscar sus cuartos.")
+        property_for_user(db, user, property_id)
+        query = select(Unit).where(Unit.property_id == property_id)
+        fields = [Unit.code, Unit.name]
+        order = Unit.code
+    else:
+        model = Person
+        if kind == "contacts":
+            from app.services.tenancy import contact_ids
+
+            if property_id is None:
+                raise HTTPException(422, "Selecciona la casa para buscar sus contactos.")
+            property_for_user(db, user, property_id)
+            query = select(Person).where(Person.id.in_(contact_ids(db, property_id)))
+        else:
+            query = visible_people(db, user)
+        if kind == "owners":
+            query = query.where(Person.is_owner.is_(True))
+        fields = [
+            Person.full_name, Person.document, Person.phone, Person.whatsapp,
+            Person.email, Person.address, trimmed_digits(Person.phone),
+            trimmed_digits(Person.whatsapp),
+        ]
+        order = Person.full_name
+
+    for token in q.lower().split():
+        matches = [func.lower(column).contains(token, autoescape=True) for column in fields]
+        if token.isascii() and token.isdecimal() and len(token) <= 10:
+            matches.append(model.id == int(token))
+        query = query.where(or_(*matches))
+    size = 12
+    rows = list(db.scalars(query.order_by(order, model.id).offset((page - 1) * size).limit(size + 1)))
+    options = []
+    for row in rows[:size]:
+        if isinstance(row, Property):
+            details = [row.name, row.address, row.zone, row.city]
+            disabled = False
+        elif isinstance(row, Unit):
+            status = "Deshabilitado" if not row.is_enabled else "En mantenimiento" if row.maintenance else None
+            details = [row.code, row.name, status]
+            disabled = not row.is_enabled or row.maintenance
+        else:
+            details = [row.full_name, row.document or row.phone or row.email]
+            disabled = False
+        options.append({"value": row.id, "label": " · ".join(filter(None, details)), "disabled": disabled})
+    return {"options": options, "hasMore": len(rows) > size}
+
 
 @router.post("/persons", status_code=201)
 def create_person(data: PersonCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
