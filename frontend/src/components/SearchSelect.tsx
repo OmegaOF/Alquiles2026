@@ -100,7 +100,7 @@ export function SearchSelect({
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(-1);
   const [page, setPage] = useState(1);
-  const [remote, setRemote] = useState<SearchPage>();
+  const [remote, setRemote] = useState<SearchPage & { page: number }>();
   const [failed, setFailed] = useState(false);
   const expanded = open && !disabled;
   const search = normalizeSearch(query);
@@ -131,8 +131,10 @@ export function SearchSelect({
   const results = load
     ? (remote?.options ?? [])
     : local.slice(0, page * pageSize);
-  const more = load ? remote?.hasMore : local.length > page * pageSize;
-  const loading = expanded && Boolean(load) && !failed && !remote;
+  const loading = expanded && Boolean(load) && !failed && remote?.page !== page;
+  const more = load
+    ? !loading && !failed && remote?.hasMore
+    : local.length > page * pageSize;
 
   useEffect(() => {
     input.current?.setCustomValidity(
@@ -153,6 +155,7 @@ export function SearchSelect({
                     ? next.options
                     : [...(previous?.options ?? []), ...next.options],
                 hasMore: next.hasMore,
+                page,
               }));
             }
           })
@@ -241,6 +244,7 @@ export function SearchSelect({
         aria-required={required || undefined}
         disabled={disabled}
         autoComplete="off"
+        maxLength={200}
         placeholder={placeholder}
         value={expanded ? query : (selected?.label ?? "")}
         onFocus={(event) => {

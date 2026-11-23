@@ -534,6 +534,14 @@ test("vacío, error recuperable, teclado y ausencia de desbordamiento", async ({
   await enter(page, f);
   await page.getByRole("combobox", { name: "Propiedad", exact: true }).focus();
   await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Cambiar propiedad", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Quitar propiedad", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(page.getByLabel("Fecha inicial", { exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Mes anterior", exact: true }).click();
   await page

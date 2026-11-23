@@ -514,6 +514,7 @@ test("pago directo documentado del inquilino no inventa caja del propietario", a
     .getByLabel(`Aplicar a Electricidad gastos ${f.house.id} n.º ${o.id}`)
     .fill("150");
   await submit(page);
+  await openSection(page, "Cobros y gastos", "Gastos");
   await page
     .getByRole("button", { name: "Pagos realizados", exact: true })
     .click();

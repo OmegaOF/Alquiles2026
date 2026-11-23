@@ -26,3 +26,16 @@ def test_cors_restricts_unknown_origin():
 
 def test_documented_api():
     assert "/api/v1/ready" in client.get("/openapi.json").json()["paths"]
+
+
+def test_mysql_conflict_returns_user_safe_retry_message():
+    import asyncio
+    from fastapi import Request
+    from app.main import concurrent_database_update
+
+    request = Request({"type": "http"})
+    error = OperationalError("sensitive SQL", {}, Exception(1213, "sensitive database detail"))
+    response = asyncio.run(concurrent_database_update(request, error))
+    assert response.status_code == 409
+    assert "vuelve a intentarlo" in response.body.decode()
+    assert b"sensitive" not in response.body

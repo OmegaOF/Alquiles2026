@@ -128,6 +128,9 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
     .click();
   for (let step = 1; step < 3; step++) await next(page);
   await page
+    .getByText("Condiciones adicionales y observaciones", { exact: true })
+    .click();
+  await page
     .getByLabel("Observaciones (opcional)", { exact: true })
     .fill("Condiciones revisadas con las personas contratantes");
   await finishWizard(page);
@@ -386,4 +389,54 @@ test("crea un inquilino dentro del asistente y recupera el contrato guardado com
     .filter({ hasText: f.house.name })
     .filter({ hasText: name });
   await expect(draft).toContainText("Borrador");
+});
+
+test("registra un cuarto desde una reserva y conserva las fechas introducidas", async ({
+  page,
+}) => {
+  await authenticate(page);
+  page.on("dialog", (dialog) => dialog.accept());
+  const f = await houseFixture(page);
+  await page.goto("/");
+  await openSection(page, "Alquileres", "Reservas");
+  await page
+    .getByRole("button", { name: "Registrar reserva", exact: true })
+    .click();
+  await selectRecord(page.getByLabel("Casa de la reserva"), String(f.house.id));
+  await page.getByLabel("Entrada de la reserva").fill("2033-07-01");
+  await page.getByLabel("Salida de la reserva").fill("2033-07-03");
+  await page
+    .getByRole("button", { name: "+ Registrar cuarto", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Registrar cuarto para la reserva",
+  });
+  await dialog
+    .getByLabel("Número o identificador", { exact: true })
+    .fill("UX-R");
+  await dialog
+    .getByLabel("Nombre del cuarto o unidad")
+    .fill("Cuarto desde reserva");
+  await dialog
+    .getByRole("button", { name: "Guardar cambios", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Espacio reservado" }),
+  ).toHaveValue(/UX-R · Cuarto desde reserva/);
+  await expect(page.getByLabel("Entrada de la reserva")).toHaveValue(
+    "2033-07-01",
+  );
+  await expect(page.getByLabel("Salida de la reserva")).toHaveValue(
+    "2033-07-03",
+  );
+  await selectRecord(
+    page.getByRole("combobox", { name: "Persona que reserva" }),
+    String(f.tenant.id),
+  );
+  await page
+    .getByRole("button", { name: "Guardar reserva", exact: true })
+    .click();
+  await expect(
+    page.getByText(/La reserva se guardó correctamente/),
+  ).toBeVisible();
 });

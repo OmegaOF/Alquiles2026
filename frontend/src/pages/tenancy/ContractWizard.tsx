@@ -24,7 +24,10 @@ import {
   unitOption,
 } from "../../components/SearchSelect";
 import { PropertySelect } from "../../components/PropertySelect";
-import { useRegistrySearch } from "../../components/registrySearch";
+import {
+  useRegistrySearch,
+  useUnitSearch,
+} from "../../components/registrySearch";
 import { ContextDialog } from "../../components/ContextDialog";
 import { PropertyForm, RoomForm } from "../Properties";
 
@@ -122,6 +125,7 @@ export function ContractWizard({
     newPerson && !data.candidates.some((person) => person.id === newPerson.id)
       ? [...data.candidates, newPerson]
       : data.candidates;
+  const findUnits = useUnitSearch(propertyId, data.units.length);
   const findPeople = useRegistrySearch(
     user.role === "general_admin" ? "people" : "contacts",
     candidates.length,
@@ -295,6 +299,7 @@ export function ContractWizard({
             )}
             <SearchSelect
               label="Espacio a alquilar"
+              load={findUnits}
               value={unitId}
               disabled={
                 !propertyId ||
@@ -619,28 +624,44 @@ export function ContractWizard({
                 />
                 Servicios básicos incluidos
               </label>
-              <Field label="Condiciones de los servicios (opcional)">
-                <textarea
-                  value={serviceTerms}
-                  maxLength={3000}
-                  onChange={(e) => setServiceTerms(e.target.value)}
-                />
-              </Field>
-              <Field label="Condiciones adicionales">
-                <textarea
-                  value={conditions}
-                  required={mode === "mixed"}
-                  maxLength={5000}
-                  onChange={(e) => setConditions(e.target.value)}
-                />
-              </Field>
-              <Field label="Observaciones (opcional)">
-                <textarea
-                  value={notes}
-                  maxLength={3000}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </Field>
+              {mode === "mixed" && (
+                <Field label="Condiciones adicionales">
+                  <textarea
+                    value={conditions}
+                    required
+                    maxLength={5000}
+                    onChange={(event) => setConditions(event.target.value)}
+                  />
+                </Field>
+              )}
+              <details className="form-options">
+                <summary>Condiciones adicionales y observaciones</summary>
+                <div className="form-grid">
+                  <Field label="Condiciones de los servicios (opcional)">
+                    <textarea
+                      value={serviceTerms}
+                      maxLength={3000}
+                      onChange={(event) => setServiceTerms(event.target.value)}
+                    />
+                  </Field>
+                  {mode !== "mixed" && (
+                    <Field label="Condiciones adicionales">
+                      <textarea
+                        value={conditions}
+                        maxLength={5000}
+                        onChange={(event) => setConditions(event.target.value)}
+                      />
+                    </Field>
+                  )}
+                  <Field label="Observaciones (opcional)">
+                    <textarea
+                      value={notes}
+                      maxLength={3000}
+                      onChange={(event) => setNotes(event.target.value)}
+                    />
+                  </Field>
+                </div>
+              </details>
               <Field label="Estado al guardar">
                 <select
                   value={status}

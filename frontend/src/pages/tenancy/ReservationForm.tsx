@@ -18,8 +18,11 @@ import {
 } from "../../components/SearchSelect";
 import { PropertySelect } from "../../components/PropertySelect";
 import { ContextDialog } from "../../components/ContextDialog";
-import { useRegistrySearch } from "../../components/registrySearch";
-import { PropertyForm } from "../Properties";
+import {
+  useRegistrySearch,
+  useUnitSearch,
+} from "../../components/registrySearch";
+import { PropertyForm, RoomForm } from "../Properties";
 
 function localExpiry(value: string | null | undefined) {
   if (!value) return "";
@@ -67,7 +70,7 @@ export function ReservationForm({
     [notes, setNotes] = useState(initial.notes || "");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [adding, setAdding] = useState<"person" | "property" | null>(null),
+    [adding, setAdding] = useState<"person" | "property" | "unit" | null>(null),
     [newPerson, setNewPerson] = useState<Person>();
   const data = usePropertyData(
     propertyId,
@@ -78,6 +81,7 @@ export function ReservationForm({
     newPerson && !data.candidates.some((person) => person.id === newPerson.id)
       ? [...data.candidates, newPerson]
       : data.candidates;
+  const findUnits = useUnitSearch(propertyId, data.units.length);
   const findPeople = useRegistrySearch(
     user.role === "general_admin" ? "people" : "contacts",
     candidates.length,
@@ -159,20 +163,32 @@ export function ReservationForm({
               </button>
             )}
           </div>
-          <SearchSelect
-            label="Espacio reservado"
-            disabled={!propertyId}
-            value={unitId}
-            options={[
-              { value: 0, label: "Casa completa" },
-              ...data.units.map((unit) => ({
-                ...unitOption(unit),
-                disabled: !unit.is_enabled || unit.maintenance,
-              })),
-            ]}
-            onChange={(id) => setUnitId(Number(id))}
-            placeholder="Buscar cuarto por nombre o código"
-          />
+          <div>
+            <SearchSelect
+              label="Espacio reservado"
+              load={findUnits}
+              disabled={!propertyId}
+              value={unitId}
+              options={[
+                { value: 0, label: "Casa completa" },
+                ...data.units.map((unit) => ({
+                  ...unitOption(unit),
+                  disabled: !unit.is_enabled || unit.maintenance,
+                })),
+              ]}
+              onChange={(id) => setUnitId(Number(id))}
+              placeholder="Buscar cuarto por nombre o código"
+            />
+            {!!propertyId && !initial.id && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setAdding("unit")}
+              >
+                + Registrar cuarto
+              </button>
+            )}
+          </div>
           <SearchSelect
             label="Persona que reserva"
             required
@@ -301,6 +317,26 @@ export function ReservationForm({
               if (form.current) form.current.dataset.dirty = "true";
               setAdding(null);
               void refreshPeople().catch(() => {});
+            }}
+          />
+        </ContextDialog>
+      )}
+      {adding === "unit" && (
+        <ContextDialog
+          label="Registrar cuarto para la reserva"
+          onCancel={() => setAdding(null)}
+        >
+          <RoomForm
+            house={properties.find((house) => house.id === propertyId)}
+            fixedHouse
+            properties={properties}
+            initial={{}}
+            onCancel={() => setAdding(null)}
+            onSaved={(_houseId, room) => {
+              setUnitId(room.id);
+              if (form.current) form.current.dataset.dirty = "true";
+              setAdding(null);
+              void data.reload();
             }}
           />
         </ContextDialog>

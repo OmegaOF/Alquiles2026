@@ -119,6 +119,7 @@ export function usePropertyData(
   general: boolean,
 ) {
   const requestId = useRef(0);
+  const [loadedPropertyId, setLoadedPropertyId] = useState(0);
   const [units, setUnits] = useState<
       {
         id: number;
@@ -146,6 +147,7 @@ export function usePropertyData(
       if (request === requestId.current) {
         setUnits(u);
         setContacts(c);
+        setLoadedPropertyId(propertyId);
       }
     } catch (e) {
       if (request === requestId.current) setError(errorText(e));
@@ -161,10 +163,18 @@ export function usePropertyData(
   }, [propertyId]);
   const candidates = [
     ...new Map(
-      [...(general ? people : []), ...contacts].map((p) => [p.id, p]),
+      [
+        ...(general ? people : []),
+        ...(loadedPropertyId === propertyId ? contacts : []),
+      ].map((p) => [p.id, p]),
     ).values(),
   ];
-  return { units, candidates, error, reload: load };
+  return {
+    units: loadedPropertyId === propertyId ? units : [],
+    candidates,
+    error,
+    reload: load,
+  };
 }
 
 export function NewContact({
