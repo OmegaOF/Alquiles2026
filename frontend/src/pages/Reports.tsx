@@ -285,13 +285,21 @@ function RowDetail({
   );
 }
 
-export function Reports({ view }: { view: "dashboard" | "reports" }) {
+export function Reports({
+  view,
+  section,
+}: {
+  view: "dashboard" | "reports";
+  section?: "occupancy" | "history" | "pdf";
+}) {
+  const sectionTitle = section === "occupancy" ? "Ocupación" : section === "history" ? "Historial" : section === "pdf" ? "PDF" : undefined;
+  const initialKind = section === "history" ? "collections" : "economic";
   const [options, setOptions] = useState<ReportOptions | null>(null);
   const [draft, setDraft] = useState<Filters>({});
-  const [kind, setKind] = useState<ReportKind>("economic");
+  const [kind, setKind] = useState<ReportKind>(initialKind);
   const [applied, setApplied] = useState({
     filters: {} as Filters,
-    kind: "economic" as ReportKind,
+    kind: initialKind as ReportKind,
   });
   const [data, setData] = useState<ReportData | null>(null);
   const [currency, setCurrency] = useState("");
@@ -462,7 +470,12 @@ export function Reports({ view }: { view: "dashboard" | "reports" }) {
   return (
     <section className="reports-page">
       <p className="eyebrow">INFORMACIÓN DE TUS PROPIEDADES</p>
-      <h1>{view === "dashboard" ? "Resumen general" : "Reportes"}</h1>
+      <h1>{sectionTitle ?? (view === "dashboard" ? "Resumen general" : "Reportes")}</h1>
+      {section && data && (section !== "occupancy" || selected) && (
+        <p><a href={`#report-${section}`}>
+          {section === "pdf" ? "Ir a la descarga" : section === "history" ? "Ir a los registros" : "Ir al gráfico de ocupación"}
+        </a></p>
+      )}
       <p className="intro">
         Consulta tus resultados, revisa los detalles y guarda un documento para
         leer con tranquilidad.
@@ -729,7 +742,7 @@ export function Reports({ view }: { view: "dashboard" | "reports" }) {
               {data.properties.map((p) => p.name).join(" · ") ||
                 "No hay propiedades autorizadas."}
             </p>
-            <div className="report-export">
+            <div className="report-export" id="report-pdf">
               <Field label="Tamaño de papel">
                 <select
                   value={paper}
@@ -855,7 +868,7 @@ export function Reports({ view }: { view: "dashboard" | "reports" }) {
                     "Capital acumulado al cierre; independiente del alquiler",
                     ["capital_received", "capital_returned", "capital_pending"],
                   )}
-                  <ReportChart
+                  <div id="report-occupancy"><ReportChart
                     title="Ocupación registrada"
                     description="Fechas de contratos válidos en su versión actual; no reconstruye cambios históricos"
                     unit="% de días de cuartos"
@@ -866,7 +879,7 @@ export function Reports({ view }: { view: "dashboard" | "reports" }) {
                         values: data.occupancy.map((p) => p.occupancy_percent),
                       },
                     ]}
-                  />
+                  /></div>
                 </div>
                 <Field label="Medida para ver su evolución">
                   <select
@@ -896,7 +909,7 @@ export function Reports({ view }: { view: "dashboard" | "reports" }) {
               </Suspense>
             </section>
           )}
-          <section aria-label="Detalle del reporte">
+          <section aria-label="Detalle del reporte" id="report-history">
             <h2>Revisar los registros</h2>
             <p>
               {data.total_rows} registros · Página {data.page}

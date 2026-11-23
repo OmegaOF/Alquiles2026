@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase } from "./helpers";
+import { authenticate, apiBase, openSection } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ timezoneId: "America/La_Paz", locale: "es-BO" });
@@ -92,7 +92,7 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
   page.on("dialog", (dialog) => dialog.accept());
   const f = await houseFixture(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Contratos", exact: true }).click();
+  await openSection(page, "Alquileres", "Contratos");
   await page
     .getByRole("button", { name: "Registrar contrato", exact: true })
     .click();
@@ -155,9 +155,7 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
     page.getByText("Motivo: Ampliación acordada de la estancia"),
   ).toBeVisible();
   await capture(page, info, "contrato");
-  await page
-    .getByRole("button", { name: "Disponibilidad", exact: true })
-    .click();
+  await openSection(page, "Casas y cuartos", "Disponibilidad");
   await page
     .getByLabel("Propiedad a consultar")
     .selectOption(String(f.house.id));
@@ -192,7 +190,7 @@ test("reserva desde React, persona sin cuenta, confirmación y conversión en co
   page.on("dialog", (dialog) => dialog.accept());
   const f = await houseFixture(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Reservas", exact: true }).click();
+  await openSection(page, "Alquileres", "Reservas");
   await page
     .getByRole("button", { name: "Registrar reserva", exact: true })
     .click();
@@ -275,13 +273,13 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
     .slice(0, 10);
   const contract = await post(page, "/contracts", dailyBody(f, start, end));
   await page.goto("/");
-  await page.getByRole("button", { name: "Propiedades", exact: true }).click();
+  await openSection(page, "Casas y cuartos", "Mis casas");
   await page
     .getByRole("button", { name: `Ver propiedad ${f.house.name}`, exact: true })
     .click();
   await expect(page.getByText(/Casa completa: Ocupado/)).toBeVisible();
   await expect(page.getByText("Cuartos disponibles: 1 de 2.")).toBeVisible();
-  await page.getByRole("button", { name: "Contratos", exact: true }).click();
+  await openSection(page, "Alquileres", "Contratos");
   await page
     .getByRole("button", { name: `Ver contrato ${contract.id}`, exact: true })
     .click();
@@ -312,9 +310,7 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
   await expect(
     page.getByRole("button", { name: "Modificar contrato", exact: true }),
   ).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "Ocupantes e historial", exact: true })
-    .click();
+  await openSection(page, "Alquileres", "Inquilinos");
   await page
     .getByLabel("Propiedad del historial")
     .selectOption(String(f.house.id));

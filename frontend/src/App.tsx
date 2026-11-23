@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError, checkConnection } from "./api";
 import type { Person, Property, User } from "./types";
 import { roleNames } from "./types";
@@ -6,6 +6,7 @@ import { Properties } from "./pages/Properties";
 import { People } from "./pages/People";
 import { Users } from "./pages/Users";
 import { Tenancy } from "./pages/Tenancy";
+import { OccupancyScreen } from "./pages/tenancy/Screens";
 import { Utilities } from "./pages/Utilities";
 import { Finances } from "./pages/Finances";
 import { Anticreticos } from "./pages/Anticreticos";
@@ -14,6 +15,10 @@ import { Reminders } from "./pages/Reminders";
 import type { ReminderTarget } from "./reminders";
 import { Reports } from "./pages/Reports";
 import { ErrorMessage, Field, errorText } from "./components/Form";
+import { WorkspaceNavigation } from "./components/WorkspaceNavigation";
+import type { WorkspacePage } from "./components/WorkspaceNavigation";
+import { WorkspaceHome } from "./pages/WorkspaceHome";
+import "./workspace.css";
 export { PhaseZero } from "./PhaseZero";
 
 export function App() {
@@ -166,21 +171,6 @@ function Login({
   );
 }
 
-type Page =
-  | "home"
-  | "dashboard"
-  | "properties"
-  | "persons"
-  | "users"
-  | "contracts"
-  | "reservations"
-  | "availability"
-  | "occupancy"
-  | "utilities"
-  | "finances"
-  | "anticreticos"
-  | "reminders"
-  | "reports";
 function Workspace({
   user,
   onLogout,
@@ -190,7 +180,13 @@ function Workspace({
   onLogout: () => void;
   onUserChange: (user: User) => void;
 }) {
-  const [page, setPage] = useState<Page>("properties");
+  const [page, setPage] = useState<WorkspacePage>("home");
+  const main = useRef<HTMLElement>(null);
+  function navigate(target: WorkspacePage) {
+    if (target === page) return;
+    setPage(target);
+    requestAnimationFrame(() => main.current?.focus());
+  }
   const [capitalTarget, setCapitalTarget] = useState<CapitalTarget | null>(
     null,
   );
@@ -254,60 +250,12 @@ function Workspace({
       setLogoutBusy(false);
     }
   }
-  const links: [Page, string][] = [
-    ["dashboard", "Resumen general"],
-    ["reports", "Reportes"],
-    ["home", "Inicio"],
-    ["properties", "Propiedades"],
-    ["persons", "Personas"],
-    ["contracts", "Contratos"],
-    ["reservations", "Reservas"],
-    ["availability", "Disponibilidad"],
-    ["occupancy", "Ocupantes e historial"],
-    ["utilities", "Servicios básicos"],
-    ["finances", "Pagos y gastos"],
-    ["anticreticos", "Anticréticos"],
-    ["reminders", "Recordatorios"],
-  ];
-  if (general) links.push(["users", "Usuarios y permisos"]);
   return (
-    <div className="layout">
-      <a href="#contenido" className="skip">
-        Ir al contenido
-      </a>
-      <aside>
-        <p className="brand">
-          <span aria-hidden="true">⌂</span> Mi Casa
-        </p>
-        <p className="brand-note">Administración de propiedades</p>
-        <nav aria-label="Navegación principal">
-          {links.map(([id, label]) => (
-            <button
-              key={id}
-              className={`nav-button ${page === id ? "selected" : ""}`}
-              aria-current={page === id ? "page" : undefined}
-              onClick={() => {
-                if (id === "anticreticos") setCapitalTarget(null);
-                if (id === "finances") setFinanceTarget(null);
-                if (id === "reminders") setReminderTarget(null);
-                if (id === "contracts") setContractTarget(null);
-                if (id === "utilities") setUtilityTarget(null);
-                setPage(id);
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-note">
-          Paso a paso,
-          <br />
-          todo en su lugar.
-        </div>
-      </aside>
-      <div className="workspace">
-        <header>
-          <div>
+    <div className="app-shell">
+      <a href="#contenido" className="skip">Ir al contenido</a>
+      <header className="app-header">
+        <div className="app-brand"><span aria-hidden="true">⌂</span> Mi Casa</div>
+          <div className="app-account">
             <strong>{user.full_name}</strong>
             {user.display_name && (
               <span className="role-label">
@@ -324,7 +272,8 @@ function Workspace({
             {logoutBusy ? "Cerrando…" : "Cerrar sesión"}
           </button>
         </header>
-        <main id="contenido" tabIndex={-1}>
+        <WorkspaceNavigation page={page} general={general} navigate={navigate} />
+        <main ref={main} id="contenido" className="app-content" tabIndex={-1}>
           <ErrorMessage message={error} />
           {loading ? (
             <p role="status">Cargando tu información…</p>
@@ -332,16 +281,21 @@ function Workspace({
             <button className="secondary" onClick={() => void load()}>
               Volver a cargar
             </button>
-          ) : page === "dashboard" || page === "reports" ? (
-            <Reports key={page} view={page === "dashboard" ? "dashboard" : "reports"} />
-          ) : page === "properties" ? (
+          ) : page === "dashboard" || page === "reports" || page.startsWith("report-") ? (
+            <Reports key={page} view={page === "dashboard" ? "dashboard" : "reports"}
+              section={page === "report-occupancy" ? "occupancy" : page === "report-history" ? "history" : page === "report-pdf" ? "pdf" : undefined} />
+          ) : page === "properties" || page === "rooms" ? (
             <Properties
+              key={page}
+              rooms={page === "rooms"}
               properties={properties}
               people={people}
               users={users}
               user={user}
               refresh={refresh}
             />
+          ) : page === "tenants" ? (
+            <OccupancyScreen heading="Inquilinos" properties={properties} people={people} />
           ) : page === "persons" ? (
             <People people={people} canEdit={general} refresh={refresh} />
           ) : [
@@ -379,8 +333,8 @@ function Workspace({
               people={people}
               initialPropertyId={utilityTarget || undefined}
             />
-          ) : page === "finances" ? (
-            <Finances
+          ) : page === "finances" || page === "debts" || page === "expenses" ? (
+            <Finances key={page} section={page === "debts" ? "debts" : page === "expenses" ? "expenses" : "receivable"}
               user={user}
               properties={properties}
               people={people}
@@ -406,8 +360,8 @@ function Workspace({
                 setPage("finances");
               }}
             />
-          ) : page === "reminders" ? (
-            <Reminders
+          ) : page === "reminders" || page === "pending" ? (
+            <Reminders key={page} pending={page === "pending"}
               user={user}
               properties={properties}
               initialTarget={reminderTarget}
@@ -438,20 +392,17 @@ function Workspace({
               currentUser={user}
               refresh={refresh}
             />
+          ) : page === "security" ? (
+            <Security user={user} />
           ) : (
-            <Home user={user} properties={properties} />
+            <WorkspaceHome user={user} properties={properties} navigate={navigate} />
           )}
-          <footer>
-            Mi Casa · Una administración más sencilla
-            <span>Propiedades, personas y acceso</span>
-          </footer>
         </main>
-      </div>
     </div>
   );
 }
 
-function Home({ user, properties }: { user: User; properties: Property[] }) {
+function Security({ user }: { user: User }) {
   const [state, setState] = useState<"idle" | "loading" | "ok" | "error">(
     "idle",
   );
@@ -466,22 +417,11 @@ function Home({ user, properties }: { user: User; properties: Property[] }) {
   }
   return (
     <section>
-      <p className="eyebrow">TU ESPACIO DE ADMINISTRACIÓN</p>
-      <h1>Bienvenido, {user.full_name}.</h1>
-      <p className="intro">
-        Organiza tus propiedades con claridad y tranquilidad.
-      </p>
+      <h1>Seguridad</h1>
       <div className="panel">
-        <h2>Tu información disponible</h2>
-        <p>
-          Tienes acceso a {properties.length}{" "}
-          {properties.length === 1 ? "propiedad" : "propiedades"}. Usa el menú
-          para consultar sus datos y cuartos.
-        </p>
-        <p>
-          Consulta contratos, servicios, pagos, anticréticos y recordatorios desde
-          el menú. Resumen general y Reportes reúnen las cifras de tus propiedades.
-        </p>
+        <h2>Tu cuenta</h2>
+        <p>{user.username} · {roleNames[user.role]}</p>
+        <p>Si necesitas recuperar tu contraseña o cambiar tu acceso, comunícate con el administrador general.</p>
       </div>
       <section className="connection" aria-labelledby="connection-title">
         <div>

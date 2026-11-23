@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase } from "./helpers";
+import { authenticate, apiBase, openSection } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -67,9 +67,7 @@ async function setup(page: Page, createService = true, method = "equal") {
 }
 async function enter(page: Page, house: number) {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Servicios básicos", exact: true })
-    .click();
+  await openSection(page, "Cobros y gastos", "Servicios");
   await page
     .getByLabel("Casa de los servicios básicos")
     .selectOption(String(house));
@@ -341,9 +339,7 @@ test("lecturas válidas e inválidas, reemplazo y consumo de dos medidores", asy
     .click();
   // Se vuelve a cargar el módulo para consultar el recibo externo recién registrado.
   await page.reload();
-  await page
-    .getByRole("button", { name: "Servicios básicos", exact: true })
-    .click();
+  await openSection(page, "Cobros y gastos", "Servicios");
   await page
     .getByLabel("Casa de los servicios básicos")
     .selectOption(String(f.house.id));

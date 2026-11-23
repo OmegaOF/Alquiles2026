@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase, credentials } from "./helpers";
+import { authenticate, apiBase, credentials, openSection } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -131,9 +131,7 @@ async function pay(page: Page, f: Fixture, amount: string, oid = f.oid) {
 }
 async function enter(page: Page, f: Fixture) {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Recordatorios", exact: true })
-    .click();
+  await openSection(page, "Inicio", "Avisos");
   await page
     .getByLabel("Casa de los recordatorios")
     .selectOption(String(f.house.id));
@@ -227,9 +225,7 @@ test("saldo parcial, vencimientos y atención no crean otra deuda", async ({
   expect(finance.obligations[0].pending).toBe("500.00");
   expect(finance.movements).toHaveLength(1);
   await page.reload();
-  await page
-    .getByRole("button", { name: "Recordatorios", exact: true })
-    .click();
+  await openSection(page, "Inicio", "Avisos");
   await page
     .getByLabel("Casa de los recordatorios")
     .selectOption(String(f.house.id));

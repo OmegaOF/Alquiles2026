@@ -185,7 +185,7 @@ test("editar nombre en Personas actualiza la cuenta y conserva su alias", async 
   vi.spyOn(window, "confirm").mockReturnValue(true);
   render(<App />);
   await userEvent.click(
-    await screen.findByRole("button", { name: "Personas" }),
+    await screen.findByRole("button", { name: "Configuración" }),
   );
   await userEvent.click(
     screen.getByRole("button", { name: `Editar a ${person.full_name}` }),
@@ -200,7 +200,7 @@ test("editar nombre en Personas actualiza la cuenta y conserva su alias", async 
   );
   await screen.findByRole("status");
   await userEvent.click(
-    screen.getByRole("button", { name: "Usuarios y permisos" }),
+    screen.getByRole("button", { name: "Usuarios", exact: true }),
   );
   expect(
     await screen.findByRole("heading", { name: "Elena Vargas Corregida" }),

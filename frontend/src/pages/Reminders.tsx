@@ -28,10 +28,12 @@ export function Reminders({
   user,
   properties,
   initialTarget,
+  pending = false,
   onOrigin,
 }: {
   user: User;
   properties: Property[];
+  pending?: boolean;
   initialTarget?: ReminderTarget | null;
   onOrigin: (propertyId: number, origin: ReminderOrigin) => void;
 }) {
@@ -40,7 +42,7 @@ export function Reminders({
     ),
     [data, setData] = useState<ReminderData | null>(null),
     [people, setPeople] = useState<Person[]>([]),
-    [view, setView] = useState("all"),
+    [view, setView] = useState(pending ? "reports" : "all"),
     [selectedKey, setSelectedKey] = useState<string | null>(
       initialTarget?.noticeKey || null,
     ),
@@ -237,7 +239,7 @@ export function Reminders({
   return (
     <section>
       <p className="eyebrow">AVISOS BASADOS EN SALDOS Y FECHAS REALES</p>
-      <h1>Recordatorios</h1>
+      <h1>{pending ? "Pendientes" : "Recordatorios"}</h1>
       <p>
         Revisa qué requiere atención, quién es responsable y qué comunicación
         registraste. Los avisos no crean pagos ni deudas.

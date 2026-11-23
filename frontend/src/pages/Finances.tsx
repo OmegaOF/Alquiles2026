@@ -41,6 +41,7 @@ export function Finances({
   properties,
   people,
   initialPropertyId,
+  section,
   onCapital,
   onReminders,
 }: {
@@ -48,13 +49,14 @@ export function Finances({
   properties: Property[];
   people: Person[];
   initialPropertyId?: number;
+  section?: "receivable" | "debts" | "expenses";
   onCapital?: (propertyId: number) => void;
   onReminders?: (propertyId: number) => void;
 }) {
   const [propertyId, setPropertyId] = useState(
       initialPropertyId || properties[0]?.id || 0,
     ),
-    [tab, setTab] = useState("summary"),
+    [tab, setTab] = useState(section ?? "summary"),
     [data, setData] = useState<FinanceData>(empty),
     [catalogs, setCatalogs] = useState<FinanceCatalogs>({
       methods: [],

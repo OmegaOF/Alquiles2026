@@ -12,6 +12,7 @@ import {
 } from "../components/Form";
 
 type Props = {
+  rooms?: boolean;
   properties: Property[];
   people: Person[];
   users: User[];
@@ -19,6 +20,7 @@ type Props = {
   refresh: () => Promise<void>;
 };
 export function Properties({
+  rooms = false,
   properties,
   people,
   users,
@@ -47,6 +49,22 @@ export function Properties({
           setNotice("La propiedad se guardó correctamente.");
         }}
       />
+    );
+  if (rooms)
+    return (
+      <section>
+        <h1>Cuartos</h1>
+        <Field label="Casa de los cuartos">
+          <select value={selected ?? ""} onChange={(event) => setSelected(Number(event.target.value) || null)}>
+            <option value="">Seleccionar casa</option>
+            {properties.map((house) => <option key={house.id} value={house.id}>{house.name}</option>)}
+          </select>
+        </Field>
+        {property ? (
+          <Units key={property.id} property={property} onChanged={() => {}}
+            canEdit={canEdit || user.role === "operator"} />
+        ) : <p>Selecciona una casa para consultar sus cuartos.</p>}
+      </section>
     );
   if (property)
     return (

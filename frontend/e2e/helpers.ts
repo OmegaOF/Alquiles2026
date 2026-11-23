@@ -19,3 +19,15 @@ export async function authenticate(page: Page) {
       `No se pudo autenticar la cuenta de pruebas (${response.status()}).`,
     );
 }
+
+export async function openSection(page: Page, group: string, section: string) {
+  const groups = page.getByRole("navigation", { name: "Navegación principal" });
+  const submenu = page.getByRole("navigation", { name: `Opciones de ${group}` });
+  await groups.waitFor();
+  if (!(await submenu.isVisible())) {
+    const mobile = groups.getByRole("button", { name: /Cambiar grupo/ });
+    if (await mobile.isVisible()) await mobile.click();
+    await groups.getByRole("button", { name: group, exact: true }).click();
+  }
+  await submenu.getByRole("button", { name: section, exact: true }).click();
+}

@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase } from "./helpers";
+import { authenticate, apiBase, openSection } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -86,7 +86,7 @@ async function setup(
 type Fixture = Awaited<ReturnType<typeof setup>>;
 async function enter(page: Page, f: Fixture) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Anticréticos", exact: true }).click();
+  await openSection(page, "Alquileres", "Anticréticos");
   await page
     .getByLabel("Casa de los anticréticos")
     .selectOption(String(f.house.id));

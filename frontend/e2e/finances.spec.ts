@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { authenticate, apiBase } from "./helpers";
+import { authenticate, apiBase, openSection } from "./helpers";
 
 test.setTimeout(90000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
@@ -98,9 +98,7 @@ async function rent(
 }
 async function enter(page: Page, f: Fixture, tab = "Resumen económico") {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Pagos y gastos", exact: true })
-    .click();
+  await openSection(page, "Cobros y gastos", "Cobros");
   await page
     .getByLabel("Casa de los pagos y gastos")
     .selectOption(String(f.house.id));

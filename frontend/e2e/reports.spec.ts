@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { authenticate, apiBase } from "./helpers";
+import { authenticate, apiBase, openSection } from "./helpers";
 test.setTimeout(180000);
 test.use({ locale: "es-BO", timezoneId: "America/La_Paz" });
 const key = () => crypto.randomUUID().replaceAll("-", "");
@@ -296,12 +296,11 @@ async function setup(page: Page, extended = false) {
 type Fixture = Awaited<ReturnType<typeof setup>>;
 async function enter(page: Page, f: Fixture, dashboard = false) {
   await page.goto("/");
-  await page
-    .getByRole("button", {
-      name: dashboard ? "Resumen general" : "Reportes",
-      exact: true,
-    })
-    .click();
+  if (dashboard) {
+    await page.getByRole("button", { name: "Ver resumen detallado" }).click();
+  } else {
+    await openSection(page, "Reportes", "Ingresos");
+  }
   await expect(
     page.getByRole("combobox", { name: "Propiedad", exact: true }),
   ).toBeEnabled();
@@ -576,7 +575,7 @@ test("operador no obtiene reportes ni PDF de otra propiedad", async ({
     expect(r.status()).toBe(404);
   }
   await page.goto("/");
-  await page.getByRole("button", { name: "Reportes", exact: true }).click();
+  await openSection(page, "Reportes", "Ingresos");
   await expect(
     page.getByRole("combobox", { name: "Propiedad", exact: true }),
   ).not.toContainText(other.house.name);

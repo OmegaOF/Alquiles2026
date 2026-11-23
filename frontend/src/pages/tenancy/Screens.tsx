@@ -126,9 +126,11 @@ export function AvailabilityScreen({ properties }: { properties: Property[] }) {
 export function OccupancyScreen({
   properties,
   people,
+  heading = "Ocupantes e historial",
 }: {
   properties: Property[];
   people: Person[];
+  heading?: string;
 }) {
   const requestId = useRef(0);
   const [propertyId, setPropertyId] = useState(properties[0]?.id || 0),
@@ -165,7 +167,7 @@ export function OccupancyScreen({
     `Persona registrada n.º ${id}`;
   return (
     <section>
-      <h1>Ocupantes e historial</h1>
+      <h1>{heading}</h1>
       <p>
         Los contratos finalizados conservan sus personas y sus cambios
         anteriores.

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { authenticate, credentials, apiBase } from "./helpers";
+import { authenticate, credentials, apiBase, openSection } from "./helpers";
 
 test("iniciar sesión, cerrar sesión y rechazar credenciales incorrectas", async ({
   page,
@@ -47,7 +47,7 @@ test("registrar y editar persona, propiedad y cuartos desde React", async ({
   const owner = `Propietaria de prueba ${suffix}`;
   const house = `Casa de prueba ${suffix}`;
   await page.goto("/");
-  await page.getByRole("button", { name: "Personas", exact: true }).click();
+  await openSection(page, "Configuración", "Personas");
   await page
     .getByRole("button", { name: "Registrar persona", exact: true })
     .click();
@@ -58,7 +58,7 @@ test("registrar y editar persona, propiedad y cuartos desde React", async ({
   await expect(
     page.getByRole("heading", { name: owner, exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Propiedades", exact: true }).click();
+  await openSection(page, "Casas y cuartos", "Mis casas");
   await page
     .getByRole("button", { name: "Registrar propiedad", exact: true })
     .click();
@@ -150,13 +150,13 @@ test("el propietario solo ve sus casas y no acciones de administración", async 
     data: { username, password: credentials().password },
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Propiedades", exact: true }).click();
+  await openSection(page, "Casas y cuartos", "Mis casas");
   await expect(page.getByRole("heading", { name: house.name })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Registrar propiedad", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Usuarios y permisos", exact: true }),
+    page.getByRole("button", { name: "Usuarios", exact: true }),
   ).toHaveCount(0);
   await page
     .getByRole("button", { name: new RegExp(`Ver propiedad ${house.name}`) })
@@ -214,9 +214,7 @@ test("administrar una cuenta y asignar permisos desde React", async ({
   );
   expect(propertyResponse.ok()).toBe(true);
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Usuarios y permisos", exact: true })
-    .click();
+  await openSection(page, "Configuración", "Usuarios");
   await page
     .getByRole("button", { name: "Registrar usuario", exact: true })
     .click();
@@ -284,7 +282,7 @@ test("el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
     expect(result.ok()).toBe(true);
   }
   await page.goto("/");
-  await page.getByRole("button", { name: "Personas", exact: true }).click();
+  await openSection(page, "Configuración", "Personas");
   await page
     .getByRole("button", { name: "Editar a " + original, exact: true })
     .click();
@@ -295,9 +293,7 @@ test("el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
   await expect(
     page.getByRole("heading", { name: corrected, exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Usuarios y permisos", exact: true })
-    .click();
+  await openSection(page, "Configuración", "Usuarios");
   await expect(
     page.getByRole("heading", { name: corrected, exact: true }),
   ).toHaveCount(2);
