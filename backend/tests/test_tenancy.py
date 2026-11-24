@@ -988,3 +988,113 @@ def test_mysql_parallel_conversion_creates_only_one_contract(
     ) == [200, 201]
     with Session(db) as session:
         assert session.scalar(select(func.count()).select_from(Contract)) == 1
+
+
+@pytest.mark.parametrize("count", [0, 1, 10, 20, 21, 50, 75])
+def test_unit_lists_paginate_and_search_the_full_property(admin, db, count):
+    owner = person(admin, "Titular de inventario")
+    prop = property_(admin, owner, "Casa de inventario")
+    path = f"/api/v1/properties/{prop['id']}"
+    with Session(db) as session:
+        session.add_all(
+            Unit(
+                property_id=prop["id"],
+                code=f"C-{i:03}",
+                name="Último espacio" if i == count else "Unidad interior",
+                unit_type="local" if i == count else "cuarto",
+                is_enabled=i != count,
+                maintenance=i == count,
+            )
+            for i in range(1, count + 1)
+        )
+        session.commit()
+
+    availability = admin.get(path + "/availability", params={"page": 1}).json()
+    inventory = admin.get(path + "/unit-inventory").json()
+    assert availability["total"] == inventory["total"] == count
+    assert len(availability["units"]) == len(inventory["items"]) == min(20, count)
+    assert availability["summary"] == {
+        "available": max(0, count - 1), "disabled": min(1, count),
+        "occupied": 0, "reserved": 0, "maintenance": 0,
+    }
+    assert availability["whole"]["state"] == ("disabled" if count else "available")
+
+    page = (max(1, count) - 1) // 20 + 1
+    last_availability = admin.get(path + "/availability", params={"page": page}).json()
+    last_inventory = admin.get(path + "/unit-inventory", params={"page": page}).json()
+    expected = count - (page - 1) * 20
+    assert len(last_availability["units"]) == len(last_inventory["items"]) == expected
+    if count:
+        assert last_inventory["items"][-1]["code"] == f"C-{count:03}"
+        assert last_availability["units"][-1]["code"] == f"C-{count:03}"
+
+    filtered = admin.get(path + "/availability", params={
+        "page": 1, "q": "ultimo espacio", "state": "disabled",
+    }).json()
+    assert filtered["total"] == min(1, count)
+    if count:
+        assert filtered["units"][0]["other_reasons"] == ["El cuarto está en mantenimiento."]
+    assert filtered["summary"] == availability["summary"]
+    filtered_inventory = admin.get(path + "/unit-inventory", params={
+        "q": f"c-{count:03}", "unit_type": "local", "enabled": False, "maintenance": True,
+    }).json()
+    assert filtered_inventory["total"] == min(1, count)
+    assert admin.get(path + "/unit-inventory", params={"q": "sin coincidencia"}).json()["total"] == 0
+    assert len(admin.get(path + "/units").json()) == count  # Consumidores existentes.
+
+
+def test_availability_keeps_exact_blockers_dates_and_role_scope(admin, home, monkeypatch):
+    monkeypatch.setattr(service, "utc_now", lambda: datetime(2031, 1, 3, 16))
+    property_id = home["property"]["id"]
+    endpoint = f"/api/v1/properties/{property_id}"
+    contract = post(admin, "/contracts", contract_body(
+        home, owner_parties=[{"person_id": home["owner"]["id"], "share": 100}],
+    ))
+    booking = post(admin, "/reservations", reserve_body(
+        home, start_date="2031-01-04", end_date="2031-01-06",
+    ))
+    maintenance = post(admin, f"/properties/{property_id}/units", {
+        "code": "03", "name": "Intervención", "unit_type": "local", "maintenance": True,
+    })
+    post(admin, f"/properties/{property_id}/units", {
+        "code": "04", "name": "Deshabilitado", "unit_type": "cuarto", "is_enabled": False,
+    })
+
+    availability = admin.get(endpoint + "/availability", params={
+        "start": "2031-01-03", "end": "2031-01-04", "page": 1,
+    }).json()
+    first, second, third, fourth = availability["units"]
+    assert [first["state"], second["state"], third["state"], fourth["state"]] == [
+        "occupied", "available", "maintenance", "disabled",
+    ]
+    assert [(item["kind"], item["id"], item["start_date"], item["end_date"]) for item in first["blockers"]] == [
+        ("contract", contract["id"], "2031-01-01", "2031-01-03"),
+        ("reservation", booking["id"], "2031-01-04", "2031-01-06"),
+    ]
+    assert admin.get(endpoint + "/availability", params={
+        "start": "2031-01-04", "end": "2031-01-04", "state": "reserved", "page": 1,
+    }).json()["units"][0]["state"] == "reserved"
+    first_row = admin.get(endpoint + "/unit-inventory").json()["items"][0]
+    assert first_row["is_enabled"] and first_row["occupied_today"]
+
+    outsider = property_(admin, person(admin, "Otro titular"), "Otra casa")
+    owner_account = user(admin, "owner", home["owner"]["id"])
+    login_as(admin, owner_account)
+    assert admin.get(endpoint + "/availability?page=1").status_code == 200
+    assert admin.get(endpoint + f"/units/{maintenance['id']}").status_code == 200
+    assert admin.get(f"/api/v1/properties/{outsider['id']}/unit-inventory").status_code == 404
+    assert admin.post("/api/v1/contracts?check_availability=true", json=contract_body(home, status="draft")).status_code == 403
+
+
+def test_contract_from_availability_rechecks_before_creating_even_a_draft(admin, home):
+    initial = admin.get(f"/api/v1/properties/{home['property']['id']}/availability", params={
+        "start": "2031-01-01", "end": "2031-01-03", "page": 1,
+    }).json()
+    assert initial["units"][0]["state"] == "available"
+    booking = post(admin, "/reservations", reserve_body(home))
+    body = contract_body(home, status="draft")
+    response = admin.post("/api/v1/contracts?check_availability=true", json=body)
+    assert response.status_code == 409
+    assert f"Reserva {booking['id']}" in response.json()["detail"]
+    assert admin.get("/api/v1/contracts").json() == []
+    assert post(admin, "/contracts", body)["status"] == "draft"

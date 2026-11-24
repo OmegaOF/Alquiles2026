@@ -5,7 +5,9 @@ lectura de snapshot tras esperar el bloqueo: MySQL usa REPEATABLE READ.
 """
 
 import json
+from collections import Counter, defaultdict
 from datetime import date
+from unicodedata import combining, normalize
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -96,7 +98,15 @@ def effective_reservation_status(obj):
     return obj.status
 
 
-def blockers(
+def overlapping_contracts(start, end):
+    return select(Contract).where(
+        Contract.status.in_(["active", "finished"]),
+        Contract.start_date <= end,
+        func.coalesce(Contract.actual_end_date, Contract.end_date) >= start,
+    )
+
+
+def conflicting_records(
     db,
     property_id,
     unit_id,
@@ -106,11 +116,8 @@ def blockers(
     exclude_reservation=None,
     locked=False,
 ):
-    contracts = select(Contract).where(
-        target_filter(Contract, property_id, unit_id),
-        Contract.status.in_(["active", "finished"]),
-        Contract.start_date <= end,
-        func.coalesce(Contract.actual_end_date, Contract.end_date) >= start,
+    contracts = overlapping_contracts(start, end).where(
+        target_filter(Contract, property_id, unit_id)
     )
     reservations = select(Reservation).where(
         target_filter(Reservation, property_id, unit_id),
@@ -130,28 +137,38 @@ def blockers(
         reservations = reservations.with_for_update().execution_options(
             populate_existing=True
         )
-    result = []
-    for obj in db.scalars(contracts):
-        result.append(
-            {
-                "kind": "contract",
-                "id": obj.id,
-                "start_date": obj.start_date.isoformat(),
-                "end_date": (obj.actual_end_date or obj.end_date).isoformat(),
-                "reason": f"Contrato {obj.id}: del {obj.start_date} al {obj.actual_end_date or obj.end_date}.",
-            }
+    for obj in db.scalars(contracts.order_by(Contract.id)):
+        yield obj.unit_id, blocker_detail(
+            "contract", obj, obj.actual_end_date or obj.end_date
         )
-    for obj in db.scalars(reservations):
-        result.append(
-            {
-                "kind": "reservation",
-                "id": obj.id,
-                "start_date": obj.start_date.isoformat(),
-                "end_date": obj.end_date.isoformat(),
-                "reason": f"Reserva {obj.id}: del {obj.start_date} al {obj.end_date}.",
-            }
+    for obj in db.scalars(reservations.order_by(Reservation.id)):
+        yield obj.unit_id, blocker_detail("reservation", obj, obj.end_date)
+
+
+def blocker_detail(kind, obj, end):
+    label = "Contrato" if kind == "contract" else "Reserva"
+    return {
+        "kind": kind,
+        "id": obj.id,
+        "start_date": obj.start_date.isoformat(),
+        "end_date": end.isoformat(),
+        "reason": f"{label} {obj.id}: del {obj.start_date} al {end}.",
+    }
+
+
+def blockers(
+    db, property_id, unit_id, start, end,
+    exclude_contract=None, exclude_reservation=None, locked=False,
+):
+    return [
+        detail
+        for _, detail in conflicting_records(
+            db, property_id, unit_id, start, end,
+            exclude_contract=exclude_contract,
+            exclude_reservation=exclude_reservation,
+            locked=locked,
         )
-    return result
+    ]
 
 
 def resource_state(db, prop, unit_id, locked=False):
@@ -165,19 +182,25 @@ def resource_state(db, prop, unit_id, locked=False):
     units = list(db.scalars(query))
     if unit_id is not None and not units:
         raise HTTPException(404, "El cuarto no pertenece a esta propiedad.")
+    states = unit_resource_states(units, whole=unit_id is None)
+    return states[0] if states else (None, None)
+
+
+def unit_resource_states(units, *, whole):
+    states = []
     if any(not unit.is_enabled for unit in units):
-        return "disabled", (
-            "El cuarto está deshabilitado."
-            if unit_id
-            else "La casa completa incluye unidades deshabilitadas."
-        )
+        states.append((
+            "disabled",
+            "La casa completa incluye unidades deshabilitadas."
+            if whole else "El cuarto está deshabilitado.",
+        ))
     if any(unit.maintenance for unit in units):
-        return "maintenance", (
-            "El cuarto está en mantenimiento."
-            if unit_id
-            else "La casa completa incluye unidades en mantenimiento."
-        )
-    return None, None
+        states.append((
+            "maintenance",
+            "La casa completa incluye unidades en mantenimiento."
+            if whole else "El cuarto está en mantenimiento.",
+        ))
+    return states
 
 
 def require_available(
@@ -192,8 +215,8 @@ def require_available(
         unit_id,
         start,
         end,
-        exclude_contract,
-        exclude_reservation,
+        exclude_contract=exclude_contract,
+        exclude_reservation=exclude_reservation,
         locked=True,
     )
     if conflicts:
@@ -395,12 +418,12 @@ def check_version(obj, expected):
         )
 
 
-def create_contract(db, user, data, source=None, do_commit=True):
+def create_contract(db, user, data, source=None, do_commit=True, *, check_availability=False):
     manage(user, active=data.status == "active")
     prop_id = target_property(db, data.property_id, data.unit_id)
     prop = lock_property(db, user, prop_id)
     validate_people(db, user, prop_id, [data.responsible_person_id] + data.occupant_ids)
-    if data.status == "active":
+    if data.status == "active" or check_availability:
         require_available(
             db,
             prop,
@@ -800,42 +823,97 @@ def convert_reservation(db, user, id, data):
     return contract, True
 
 
-def availability(db, user, property_id, start, end):
-    prop = read_property(db, user, property_id)
-    units = list(
-        db.scalars(
-            select(Unit).where(Unit.property_id == property_id).order_by(Unit.code)
-        )
+def search_text(value):
+    return "".join(
+        char for char in normalize("NFD", value.lower()) if not combining(char)
     )
 
-    def item(unit):
-        unit_id = unit.id if unit else None
-        state, reason = resource_state(db, prop, unit_id)
-        conflicts = blockers(db, prop.id, unit_id, start, end)
-        if not state:
-            state = (
-                "occupied"
-                if any(c["kind"] == "contract" for c in conflicts)
-                else "reserved" if conflicts else "available"
+
+def availability(db, user, property_id, start, end, *, page=None, q="", state=None):
+    prop = read_property(db, user, property_id)
+    units = db.execute(
+        select(Unit.id, Unit.code, Unit.name, Unit.is_enabled, Unit.maintenance)
+        .where(Unit.property_id == property_id)
+        .order_by(Unit.code, Unit.id)
+    ).all()
+    whole_conflicts = []
+    by_unit = defaultdict(list)
+    for unit_id, detail in conflicting_records(db, prop.id, None, start, end):
+        if page is None or not whole_conflicts:
+            whole_conflicts.append(detail)
+        by_unit[unit_id].append(detail)
+    house_conflicts = by_unit[None]
+    house_disabled = (
+        [] if prop.is_active else [("disabled", "La propiedad está deshabilitada.")]
+    )
+
+    def result_state(resources, conflict):
+        if resources:
+            return resources[0]
+        if conflict:
+            return (
+                "occupied" if conflict["kind"] == "contract" else "reserved",
+                conflict["reason"],
             )
-            reason = (
-                conflicts[0]["reason"]
-                if conflicts
-                else "Disponible para las fechas consultadas."
-            )
+        return "available", "Disponible para las fechas consultadas."
+
+    def item(unit, status, reason, conflicts):
         return {
-            "unit_id": unit_id,
+            "unit_id": unit.id if unit else None,
             "label": f"{unit.code} · {unit.name}" if unit else "Casa completa",
-            "state": state,
+            "state": status,
             "reason": reason,
             "blockers": conflicts,
+            **({"code": unit.code, "name": unit.name} if unit else {}),
         }
+
+    whole_status, whole_reason = result_state(
+        house_disabled or unit_resource_states(units, whole=True),
+        whole_conflicts[0] if whole_conflicts else None,
+    )
+    summary = Counter()
+    rows = []
+    total = 0
+    page_size = 20
+    offset = ((page or 1) - 1) * page_size
+    tokens = search_text(q).split()
+    for unit in units:
+        own = by_unit.get(unit.id, [])
+        # Los contratos tienen prioridad sobre las reservas, también a nivel casa.
+        first = min(
+            (records[0] for records in (house_conflicts, own) if records),
+            key=lambda detail: (detail["kind"], detail["id"]),
+            default=None,
+        )
+        resources = house_disabled + unit_resource_states([unit], whole=False)
+        status, reason = result_state(resources, first)
+        summary[status] += 1
+        if state and status != state:
+            continue
+        if tokens:
+            searchable = search_text(f"{unit.code} {unit.name}")
+            if not all(token in searchable for token in tokens):
+                continue
+        if page is None or offset <= total < offset + page_size:
+            conflicts = sorted(
+                house_conflicts + own, key=lambda detail: (detail["kind"], detail["id"])
+            )
+            rows.append({
+                **item(unit, status, reason, conflicts),
+                "other_reasons": [description for _, description in resources[1:]],
+            })
+        total += 1
 
     return {
         "property_id": prop.id,
         "property_name": prop.name,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        "whole": item(None),
-        "units": [item(unit) for unit in units],
+        "whole": item(None, whole_status, whole_reason, whole_conflicts),
+        "units": rows,
+        "summary": {
+            key: summary[key]
+            for key in ("available", "occupied", "reserved", "maintenance", "disabled")
+        },
+        "total": total,
     }

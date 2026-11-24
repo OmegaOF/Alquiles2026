@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
@@ -46,10 +47,13 @@ def contracts(
 @router.post("/contracts", status_code=201)
 def create_contract(
     data: ContractInput,
+    check_availability: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    return service.contract_dict(db, service.create_contract(db, user, data))
+    return service.contract_dict(
+        db, service.create_contract(db, user, data, check_availability=check_availability)
+    )
 
 
 @router.get("/contracts/{contract_id}")
@@ -264,6 +268,9 @@ def availability(
     property_id: int,
     start: date | None = None,
     end: date | None = None,
+    page: int | None = Query(None, ge=1),
+    q: str = Query("", max_length=200),
+    state: Literal["available", "occupied", "reserved", "maintenance", "disabled"] | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
@@ -271,7 +278,7 @@ def availability(
     end = end or start
     if end < start:
         raise HTTPException(422, "La salida no puede ser anterior a la entrada.")
-    return service.availability(db, user, property_id, start, end)
+    return service.availability(db, user, property_id, start, end, page=page, q=q, state=state)
 
 
 @router.get("/properties/{property_id}/occupancy")

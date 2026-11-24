@@ -6,6 +6,7 @@ from app.api.auth import current_user
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.entities import AuthSession, Person, Property, PropertyOwner, Unit, User
+from app.models.tenancy import Contract
 from app.schemas.registry import PersonCreate, PersonPatch, PropertyCreate, PropertyPatch, UnitCreate, UnitPatch, UserCreate, UserPatch
 from app.services.registry import ADMIN, apply_fields, commit, person_dict, property_dict, property_for_user, replace_access, replace_managers, replace_owners, require_admin, unit_dict, user_dict, validate_user_person, visible_properties, snapshot, person_for_account, account_alias, record_audit
 
@@ -169,6 +170,73 @@ def units(property_id: int, db: Session = Depends(get_db), user: User = Depends(
     property_for_user(db, user, property_id)
     return [unit_dict(unit) for unit in db.scalars(select(Unit).where(Unit.property_id == property_id).order_by(Unit.code, Unit.id))]
 
+@router.get("/properties/{property_id}/unit-inventory")
+def unit_inventory(
+    property_id: int,
+    page: int = Query(1, ge=1),
+    q: str = Query("", max_length=200),
+    unit_type: str | None = Query(None, max_length=80),
+    enabled: bool | None = None,
+    maintenance: bool | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    from app.services.tenancy import overlapping_contracts, today
+
+    property_for_user(db, user, property_id)
+    scope = Unit.property_id == property_id
+    filters = [scope]
+    for token in q.lower().split():
+        filters.append(or_(
+            func.lower(Unit.code).contains(token, autoescape=True),
+            func.lower(Unit.name).contains(token, autoescape=True),
+        ))
+    if unit_type is not None:
+        filters.append(Unit.unit_type == unit_type)
+    if enabled is not None:
+        filters.append(Unit.is_enabled == enabled)
+    if maintenance is not None:
+        filters.append(Unit.maintenance == maintenance)
+
+    page_size = 20
+    total = db.scalar(select(func.count(Unit.id)).where(*filters))
+    rows = list(db.scalars(
+        select(Unit).where(*filters).order_by(Unit.code, Unit.id)
+        .offset((page - 1) * page_size).limit(page_size)
+    ))
+    occupied = set()
+    if rows:
+        date = today()
+        occupied = set(db.scalars(
+            overlapping_contracts(date, date).with_only_columns(Contract.unit_id)
+            .where(or_(Contract.property_id == property_id, Contract.unit_id.in_([unit.id for unit in rows])))
+        ))
+    types = db.scalars(
+        select(Unit.unit_type).where(scope).distinct().order_by(Unit.unit_type)
+    ).all()
+    return {
+        "items": [
+            {**unit_dict(unit), "occupied_today": None in occupied or unit.id in occupied}
+            for unit in rows
+        ],
+        "total": total,
+        "types": types,
+    }
+
+
+def unit_in_property(db, property_id, unit_id):
+    obj = db.scalar(select(Unit).where(Unit.id == unit_id, Unit.property_id == property_id))
+    if obj is None:
+        raise HTTPException(404, "El cuarto no existe en esta propiedad.")
+    return obj
+
+
+@router.get("/properties/{property_id}/units/{unit_id}")
+def unit_detail(property_id: int, unit_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    property_for_user(db, user, property_id)
+    return unit_dict(unit_in_property(db, property_id, unit_id))
+
+
 @router.post("/properties/{property_id}/units", status_code=201)
 def create_unit(property_id: int, data: UnitCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
     property_for_user(db, user, property_id, write=True, units=True)
@@ -180,9 +248,7 @@ def create_unit(property_id: int, data: UnitCreate, db: Session = Depends(get_db
 @router.patch("/properties/{property_id}/units/{unit_id}")
 def update_unit(property_id: int, unit_id: int, data: UnitPatch, db: Session = Depends(get_db), user: User = Depends(current_user)):
     property_for_user(db, user, property_id, write=True, units=True)
-    obj = db.scalar(select(Unit).where(Unit.id == unit_id, Unit.property_id == property_id))
-    if obj is None:
-        raise HTTPException(404, "El cuarto no existe en esta propiedad.")
+    obj = unit_in_property(db, property_id, unit_id)
     before = snapshot(obj)
     values = data.model_dump(exclude_unset=True)
     apply_fields(obj, values)
