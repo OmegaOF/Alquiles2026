@@ -5,9 +5,13 @@ import { api } from "../api";
 import {
   SearchSelect,
   personOption,
-  normalizeSearch,
   propertyOption,
 } from "../components/SearchSelect";
+import {
+  ListPagination,
+  ListSearch,
+  useLocalList,
+} from "../components/RecordList";
 import { useRegistrySearch } from "../components/registrySearch";
 import {
   Field,
@@ -32,8 +36,6 @@ export function Users({
   refresh: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Partial<User> | null>(null);
-  const [accessQuery, setAccessQuery] = useState("");
-  const [query, setQuery] = useState("");
   const [role, setRole] = useState<Role>("operator");
   const [assigned, setAssigned] = useState<number[]>([]);
   const [personChoice, setPersonChoice] = useState("");
@@ -47,8 +49,17 @@ export function Users({
     role === "owner" ? "owners" : "people",
     candidates.length,
   );
+  const access = useLocalList(
+    properties,
+    (house) => propertyOption(house).label,
+  );
+  const listing = useLocalList(
+    users,
+    (account) =>
+      `${account.full_name} ${account.username} ${account.display_name ?? ""} ${roleNames[account.role]}`,
+  );
   function edit(user: Partial<User>) {
-    setAccessQuery("");
+    access.search.onChange("");
     setEditing(user);
     setRole(user.role || "operator");
     setAssigned(user.property_ids || []);
@@ -280,36 +291,31 @@ export function Users({
                   propiedades y asignarlas después.
                 </p>
               )}
-              <Field label="Buscar casa para asignar acceso">
-                <input
-                  type="search"
-                  placeholder="Nombre o dirección"
-                  value={accessQuery}
-                  onChange={(event) => setAccessQuery(event.target.value)}
-                />
-              </Field>
-              {properties
-                .filter((house) =>
-                  normalizeSearch(propertyOption(house).label).includes(
-                    normalizeSearch(accessQuery),
-                  ),
-                )
-                .map((p) => (
-                  <label key={p.id} className="check">
-                    <input
-                      type="checkbox"
-                      checked={assigned.includes(p.id)}
-                      onChange={(e) =>
-                        setAssigned(
-                          e.target.checked
-                            ? [...assigned, p.id]
-                            : assigned.filter((id) => id !== p.id),
-                        )
-                      }
-                    />
-                    {p.name}
-                  </label>
-                ))}
+              <ListSearch
+                label="Buscar casa para asignar acceso"
+                placeholder="Nombre o dirección"
+                {...access.search}
+              />
+              {access.rows.map((p) => (
+                <label key={p.id} className="check">
+                  <input
+                    type="checkbox"
+                    checked={assigned.includes(p.id)}
+                    onChange={(e) =>
+                      setAssigned(
+                        e.target.checked
+                          ? [...assigned, p.id]
+                          : assigned.filter((id) => id !== p.id),
+                      )
+                    }
+                  />
+                  {p.name}
+                </label>
+              ))}
+              <ListPagination
+                label="casas para asignar acceso"
+                {...access.pagination}
+              />
             </fieldset>
           )}
           {editing.id === currentUser.id && (
@@ -334,48 +340,40 @@ export function Users({
         </div>
         <button onClick={() => edit({})}>Registrar usuario</button>
       </div>
-      <Field label="Buscar cuentas">
-        <input
-          type="search"
-          value={query}
-          placeholder="Nombre, usuario o rol"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </Field>
+      <ListSearch
+        label="Buscar cuentas"
+        placeholder="Nombre, usuario o rol"
+        {...listing.search}
+      />
       {notice && (
         <p role="status" className="success-message">
           {notice}
         </p>
       )}
       <div className="record-list">
-        {users
-          .filter((account) =>
-            normalizeSearch(
-              `${account.full_name} ${account.username} ${account.display_name ?? ""} ${roleNames[account.role]}`,
-            ).includes(normalizeSearch(query)),
-          )
-          .map((u) => (
-            <article key={u.id}>
-              <div className="record-main">
-                <h2>{u.full_name}</h2>
-                {u.display_name && <p>Alias de la cuenta: {u.display_name}</p>}
-                <p>
-                  Usuario: {u.username} · {roleNames[u.role]}
-                </p>
-                <p>
-                  {u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"}
-                </p>
-                {(u.role === "property_admin" || u.role === "operator") && (
-                  <p>{u.property_ids.length} propiedades autorizadas</p>
-                )}
-              </div>
-              <button className="secondary" onClick={() => edit(u)}>
-                Editar permisos{" "}
-                <span className="sr-only">de {u.full_name}</span>
-              </button>
-            </article>
-          ))}
+        {listing.rows.map((u) => (
+          <article key={u.id}>
+            <div className="record-main">
+              <h2>{u.full_name}</h2>
+              {u.display_name && <p>Alias de la cuenta: {u.display_name}</p>}
+              <p>
+                Usuario: {u.username} · {roleNames[u.role]}
+              </p>
+              <p>
+                {u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"}
+              </p>
+              {(u.role === "property_admin" || u.role === "operator") && (
+                <p>{u.property_ids.length} propiedades autorizadas</p>
+              )}
+            </div>
+            <button className="secondary" onClick={() => edit(u)}>
+              Editar permisos <span className="sr-only">de {u.full_name}</span>
+            </button>
+          </article>
+        ))}
       </div>
+      {!listing.rows.length && <p>No se encontraron cuentas.</p>}
+      <ListPagination label="cuentas" {...listing.pagination} />
     </section>
   );
 }

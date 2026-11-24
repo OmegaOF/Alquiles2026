@@ -1,7 +1,12 @@
 import { useState } from "react";
 import type { Person } from "../types";
 import { api } from "../api";
-import { normalizeSearch, personOption } from "../components/SearchSelect";
+import { personOption } from "../components/SearchSelect";
+import {
+  ListPagination,
+  ListSearch,
+  useLocalList,
+} from "../components/RecordList";
 import {
   Field,
   ErrorMessage,
@@ -22,17 +27,22 @@ export function People({
 }) {
   const [editing, setEditing] = useState<Partial<Person> | null>(null);
   const [notice, setNotice] = useState("");
-  const [query, setQuery] = useState("");
-  const matches = people.filter((person) => {
+  const listing = useLocalList(people, (person) => {
     const option = personOption(person);
-    return normalizeSearch(`${option.label} ${option.search} ${option.value}`).includes(normalizeSearch(query));
+    return `${option.label} ${option.search ?? ""} ${option.value}`;
   });
   if (editing)
-    return <PersonForm person={editing} onCancel={() => setEditing(null)} onSaved={async () => {
-      await refresh();
-      setEditing(null);
-      setNotice("Los datos de la persona se guardaron correctamente.");
-    }} />;
+    return (
+      <PersonForm
+        person={editing}
+        onCancel={() => setEditing(null)}
+        onSaved={async () => {
+          await refresh();
+          setEditing(null);
+          setNotice("Los datos de la persona se guardaron correctamente.");
+        }}
+      />
+    );
   return (
     <section>
       <div className="page-heading">
@@ -61,20 +71,21 @@ export function People({
           {notice}
         </p>
       )}
-      <Field label="Buscar personas">
-        <input type="search" value={query} placeholder="Nombre, documento o contacto"
-          onChange={(event) => setQuery(event.target.value)} />
-      </Field>
+      <ListSearch
+        label="Buscar personas"
+        placeholder="Nombre, documento o contacto"
+        {...listing.search}
+      />
       {people.length === 0 ? (
         <div className="empty">
           Todavía no hay personas para mostrar.
           {canEdit && " Comienza registrando un propietario."}
         </div>
-      ) : matches.length === 0 ? (
+      ) : listing.rows.length === 0 ? (
         <p role="status">No se encontraron personas.</p>
       ) : (
         <div className="record-list">
-          {matches.map((person) => (
+          {listing.rows.map((person) => (
             <article key={person.id}>
               <div className="record-main">
                 <h2>{person.full_name}</h2>
@@ -95,7 +106,7 @@ export function People({
                   className="secondary"
                   onClick={() => {
                     setEditing(person);
-                        }}
+                  }}
                 >
                   Editar <span className="sr-only">a {person.full_name}</span>
                 </button>
@@ -104,6 +115,7 @@ export function People({
           ))}
         </div>
       )}
+      <ListPagination label="personas" {...listing.pagination} />
     </section>
   );
 }

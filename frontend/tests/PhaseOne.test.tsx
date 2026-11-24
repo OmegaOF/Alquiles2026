@@ -91,7 +91,9 @@ test("propietario no ve acciones para registrar ni gestionar usuarios", async ()
   );
   render(<App />);
   expect(await screen.findByRole("heading", { name: "Inicio" })).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: "Casas y cuartos" }));
+  await userEvent.click(
+    screen.getByRole("button", { name: "Casas y cuartos" }),
+  );
   expect(
     await screen.findByRole("heading", { name: "Casa Jardín" }),
   ).toBeVisible();
@@ -106,7 +108,9 @@ test("propietario no ve acciones para registrar ni gestionar usuarios", async ()
     screen.queryByRole("button", { name: "Registrar cuarto" }),
   ).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Configuración" }));
-  expect(screen.queryByRole("button", { name: "Usuarios" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Usuarios" }),
+  ).not.toBeInTheDocument();
 });
 
 test("administrador de propiedades edita sin enviar campos de permisos", async () => {
@@ -164,9 +168,11 @@ test("registro de persona no obliga a tener teléfono, correo ni cuenta", async 
     screen.getByRole("button", { name: "Guardar cambios" }),
   );
   await waitFor(() => expect(refresh).toHaveBeenCalled());
-  expect(await screen.findByRole("status")).toHaveTextContent(
-    "se guardaron correctamente",
-  );
+  expect(
+    await screen.findByText(
+      "Los datos de la persona se guardaron correctamente.",
+    ),
+  ).toBeVisible();
 });
 
 test("cancelar confirmación no modifica personas", async () => {

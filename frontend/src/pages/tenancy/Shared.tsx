@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
+import {
+  ListPagination,
+  ListSearch,
+  useLocalList,
+} from "../../components/RecordList";
 import type { Person } from "../../types";
 import {
   Field,
@@ -30,10 +35,32 @@ export function History({
   events: HistoryEntry[];
   personName: (id: number) => string;
 }) {
+  const history = useLocalList(events, (event) =>
+    [
+      actionNames[event.action],
+      showDate(event.created_at),
+      event.details.reason,
+      event.details.before?.responsible_person_id &&
+        personName(event.details.before.responsible_person_id),
+      event.details.after.responsible_person_id &&
+        personName(event.details.after.responsible_person_id),
+      ...(event.details.before?.occupant_ids ?? []).map(personName),
+      ...(event.details.after.occupant_ids ?? []).map(personName),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
   return (
     <section className="panel">
       <h2>Historial de cambios</h2>
-      {events.map((event) => (
+      {!!events.length && (
+        <ListSearch
+          label="Buscar cambios del contrato"
+          placeholder="Acción, fecha, persona o motivo"
+          {...history.search}
+        />
+      )}
+      {history.rows.map((event) => (
         <article className="history-item" key={event.id}>
           <h3>
             {actionNames[event.action] || "Cambio registrado"} ·{" "}
@@ -108,7 +135,16 @@ export function History({
           )}
         </article>
       ))}
-      {!events.length && <p>Sin cambios registrados.</p>}
+      {!history.rows.length && (
+        <p>
+          {events.length
+            ? "No se encontraron cambios."
+            : "Sin cambios registrados."}
+        </p>
+      )}
+      {!!events.length && (
+        <ListPagination label="cambios del contrato" {...history.pagination} />
+      )}
     </section>
   );
 }

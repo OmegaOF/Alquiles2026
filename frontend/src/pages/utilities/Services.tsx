@@ -1,4 +1,9 @@
 import { useState } from "react";
+import {
+  ListPagination,
+  ListSearch,
+  useLocalList,
+} from "../../components/RecordList";
 import { api } from "../../api";
 import type { Person, Property, User } from "../../types";
 import type {
@@ -33,6 +38,12 @@ export function Services(props: Props) {
     [typesOpen, setTypesOpen] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const services = useLocalList(
+    accounts,
+    (account) =>
+      `${account.label} ${account.type_name} ${account.provider ?? ""} ${account.account_number ?? ""}`,
+  );
+  const serviceTypes = useLocalList(types, (type) => type.name);
   if (editing)
     return (
       <ServiceForm
@@ -124,8 +135,12 @@ export function Services(props: Props) {
             </Field>
             <button disabled={busy}>Guardar tipo de servicio</button>
           </form>
+          <ListSearch
+            label="Buscar tipos de servicio"
+            {...serviceTypes.search}
+          />
           <ul>
-            {types.map((t) => (
+            {serviceTypes.rows.map((t) => (
               <li key={t.id}>
                 {t.name} · {t.is_active ? "Activo" : "Inactivo"}{" "}
                 <button
@@ -138,10 +153,22 @@ export function Services(props: Props) {
               </li>
             ))}
           </ul>
+          {!serviceTypes.rows.length && (
+            <p>No se encontraron tipos de servicio.</p>
+          )}
+          <ListPagination
+            label="tipos de servicio"
+            {...serviceTypes.pagination}
+          />
         </section>
       )}
+      <ListSearch
+        label="Buscar suministros"
+        placeholder="Servicio, proveedor o número de cuenta"
+        {...services.search}
+      />
       <div className="record-list">
-        {accounts.map((a) => (
+        {services.rows.map((a) => (
           <article key={a.id}>
             <div className="record-main">
               <h3>{a.label}</h3>
@@ -178,12 +205,15 @@ export function Services(props: Props) {
             )}
           </article>
         ))}
-        {!accounts.length && (
+        {!services.rows.length && (
           <p className="empty">
-            Todavía no hay servicios registrados en esta casa.
+            {accounts.length
+              ? "No se encontraron servicios."
+              : "Todavía no hay servicios registrados en esta casa."}
           </p>
         )}
       </div>
+      <ListPagination label="suministros" {...services.pagination} />
     </section>
   );
 }

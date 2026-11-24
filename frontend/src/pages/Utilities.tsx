@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { PropertySelect } from "../components/PropertySelect";
-import { SearchSelect } from "../components/SearchSelect";
+import {
+  ListPagination,
+  ListSearch,
+  useLocalList,
+} from "../components/RecordList";
 import type { Person, Property, User } from "../types";
 import type { Receipt, ServiceAccount, UtilityType } from "../utilities";
 import { distributionStates, money } from "../utilities";
@@ -35,7 +39,6 @@ export function Utilities({
       initialPropertyId || properties[0]?.id || 0,
     ),
     [tab, setTab] = useState(initialReceiptId ? "receipts" : "services"),
-    [receiptFilter, setReceiptFilter] = useState(""),
     [accounts, setAccounts] = useState<ServiceAccount[]>([]),
     [types, setTypes] = useState<UtilityType[]>([]),
     [receipts, setReceipts] = useState<Receipt[]>([]),
@@ -49,6 +52,11 @@ export function Utilities({
   currentProperty.current = propertyId;
   const property = properties.find((p) => p.id === propertyId),
     data = usePropertyData(propertyId, people, user.role === "general_admin");
+  const receiptList = useLocalList(
+    receipts,
+    (receipt) =>
+      `${receipt.id} ${receipt.account_label} ${receipt.provider} ${receipt.external_reference ?? ""} ${showDate(receipt.issued_on)}`,
+  );
   async function load() {
     if (!propertyId || propertyId !== currentProperty.current) return;
     const request = ++seq.current;
@@ -83,7 +91,7 @@ export function Utilities({
     setReceipts([]);
     setSelected(null);
     setCreating(false);
-    setReceiptFilter("");
+    receiptList.search.onChange("");
     void load();
     return () => {
       seq.current++;
@@ -211,59 +219,51 @@ export function Utilities({
                   </button>
                 )}
               </div>
-              <SearchSelect
+              <ListSearch
                 label="Buscar recibo"
-                value={receiptFilter}
-                onChange={setReceiptFilter}
-                options={receipts.map((receipt) => ({
-                  value: receipt.id,
-                  label: `${receipt.account_label} · ${receipt.provider} · ${showDate(receipt.issued_on)}`,
-                  search: receipt.external_reference || "",
-                }))}
-                placeholder="Buscar por referencia, suministro o proveedor"
+                placeholder="Referencia, suministro o proveedor"
+                {...receiptList.search}
               />
               <div className="record-list">
-                {receipts
-                  .filter(
-                    (receipt) =>
-                      !receiptFilter || String(receipt.id) === receiptFilter,
-                  )
-                  .map((r) => (
-                    <article key={r.id}>
-                      <div className="record-main">
-                        <h3>
-                          {r.account_label}: {money(r.amount, r.currency)}
-                        </h3>
-                        <p>
-                          {r.provider} ·{" "}
-                          {r.external_reference || "Sin referencia externa"}
-                        </p>
-                        <p>
-                          Consumo: {showDate(r.period_start)} al{" "}
-                          {showDate(r.period_end)} · Límite de pago:{" "}
-                          {showDate(r.due_on)}
-                        </p>
-                        <p>
-                          <strong>
-                            {distributionStates[r.distribution_status]}
-                          </strong>{" "}
-                          · Sin pago registrado aquí
-                        </p>
-                      </div>
-                      <button
-                        className="secondary"
-                        onClick={() => setSelected(r)}
-                      >
-                        Ver recibo {r.id} y reparto
-                      </button>
-                    </article>
-                  ))}
-                {!receipts.length && (
+                {receiptList.rows.map((r) => (
+                  <article key={r.id}>
+                    <div className="record-main">
+                      <h3>
+                        {r.account_label}: {money(r.amount, r.currency)}
+                      </h3>
+                      <p>
+                        {r.provider} ·{" "}
+                        {r.external_reference || "Sin referencia externa"}
+                      </p>
+                      <p>
+                        Consumo: {showDate(r.period_start)} al{" "}
+                        {showDate(r.period_end)} · Límite de pago:{" "}
+                        {showDate(r.due_on)}
+                      </p>
+                      <p>
+                        <strong>
+                          {distributionStates[r.distribution_status]}
+                        </strong>{" "}
+                        · Sin pago registrado aquí
+                      </p>
+                    </div>
+                    <button
+                      className="secondary"
+                      onClick={() => setSelected(r)}
+                    >
+                      Ver recibo {r.id} y reparto
+                    </button>
+                  </article>
+                ))}
+                {!receiptList.rows.length && (
                   <p className="empty">
-                    Todavía no hay recibos registrados para esta casa.
+                    {receipts.length
+                      ? "No se encontraron recibos."
+                      : "Todavía no hay recibos registrados para esta casa."}
                   </p>
                 )}
               </div>
+              <ListPagination label="recibos" {...receiptList.pagination} />
             </section>
           )}
         </div>
