@@ -16,7 +16,13 @@ import {
   showDate,
   stateNames,
 } from "../../tenancy";
-import type { Availability, Contract, Mode, Reservation } from "../../tenancy";
+import type {
+  Availability,
+  Contract,
+  Mode,
+  RentalPreset,
+  Reservation,
+} from "../../tenancy";
 import { usePropertyData, NewContact } from "./Shared";
 import {
   SearchSelect,
@@ -36,6 +42,7 @@ export function ContractWizard({
   properties: registeredProperties,
   users = [],
   initialPropertyId,
+  preset,
   people,
   initial,
   reservation,
@@ -47,6 +54,7 @@ export function ContractWizard({
   properties: Property[];
   users?: User[];
   initialPropertyId?: number;
+  preset?: RentalPreset;
   people: Person[];
   initial?: Contract;
   reservation?: Reservation;
@@ -68,12 +76,13 @@ export function ContractWizard({
     [propertyId, setPropertyId] = useState(
       initial?.resolved_property_id ||
         reservation?.resolved_property_id ||
+        preset?.resolved_property_id ||
         initialPropertyId ||
         properties[0]?.id ||
         0,
     ),
     [unitId, setUnitId] = useState(
-      initial?.unit_id || reservation?.unit_id || 0,
+      initial?.unit_id || reservation?.unit_id || preset?.unit_id || 0,
     );
   const [mode, setMode] = useState<Mode>(
       initial?.mode || reservation?.mode || "daily",
@@ -83,10 +92,16 @@ export function ContractWizard({
     ),
     [occupants, setOccupants] = useState<number[]>(initial?.occupant_ids || []);
   const [start, setStart] = useState(
-      initial?.start_date || reservation?.start_date || localToday(),
+      initial?.start_date ||
+        reservation?.start_date ||
+        preset?.start_date ||
+        localToday(),
     ),
     [end, setEnd] = useState(
-      initial?.end_date || reservation?.end_date || localToday(),
+      initial?.end_date ||
+        reservation?.end_date ||
+        preset?.end_date ||
+        localToday(),
     );
   const [ownerParties, setOwnerParties] = useState<
     { person_id: number; share: string | number | null }[]
@@ -227,7 +242,9 @@ export function ContractWizard({
           ? `/reservations/${reservation.id}/convert`
           : initial
             ? `/contracts/${initial.id}`
-            : "/contracts",
+            : preset
+              ? "/contracts?check_availability=true"
+              : "/contracts",
         initial ? "PATCH" : "POST",
         body,
       );

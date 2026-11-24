@@ -58,10 +58,11 @@ test("registra propietario, casa y cuarto sin perder los formularios abiertos", 
   await expect(code).toHaveValue("UX-14");
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(
-    page.getByRole("heading", { name: "UX-14 · Cuarto con sol" }),
+    page.getByRole("row").filter({ hasText: /UX-14.*Cuarto con sol/ }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Mis casas", exact: true }).click();
+  await page.getByRole("searchbox", { name: "Buscar casas" }).fill(house);
   await page
     .getByRole("button", { name: `Ver propiedad ${house}`, exact: true })
     .click();
@@ -77,7 +78,7 @@ test("registra propietario, casa y cuarto sin perder los formularios abiertos", 
   await page.getByLabel("Nombre del cuarto o unidad").fill("Cuarto con balcón");
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(
-    page.getByRole("heading", { name: "UX-15 · Cuarto con balcón" }),
+    page.getByRole("row").filter({ hasText: /UX-15.*Cuarto con balcón/ }),
   ).toBeVisible();
 
   await openSection(page, "Casas y cuartos", "Cuartos");

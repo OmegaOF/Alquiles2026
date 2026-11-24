@@ -77,13 +77,32 @@ export interface Reservation extends Target {
   expires_at: string | null;
   notes: string | null;
 }
+export type AvailabilityState =
+  | "available"
+  | "occupied"
+  | "reserved"
+  | "maintenance"
+  | "disabled";
+
+export interface AvailabilityBlocker {
+  kind: "contract" | "reservation";
+  id: number;
+  reason: string;
+  start_date: string;
+  end_date: string;
+}
+
 export interface AvailabilityItem {
   unit_id: number | null;
   label: string;
-  state: string;
+  code?: string;
+  name?: string;
+  state: AvailabilityState;
   reason: string;
-  blockers: { kind: string; id: number; reason: string }[];
+  blockers: AvailabilityBlocker[];
+  other_reasons?: string[];
 }
+
 export interface Availability {
   property_id: number;
   property_name: string;
@@ -91,7 +110,30 @@ export interface Availability {
   end_date: string;
   whole: AvailabilityItem;
   units: AvailabilityItem[];
+  summary: Record<AvailabilityState, number>;
+  total: number;
 }
+
+export type RentalPreset = Pick<
+  Target,
+  "resolved_property_id" | "unit_id" | "start_date" | "end_date"
+>;
+export type AvailabilityAction =
+  | { kind: "reserve" | "createContract"; preset: RentalPreset }
+  | {
+      kind: "contract" | "reservation" | "unit";
+      id: number;
+      propertyId: number;
+    };
+export type AvailabilityQuery = {
+  propertyId: number;
+  start: string;
+  end: string;
+  query: string;
+  state: AvailabilityState | "";
+  page: number;
+};
+
 export interface HistoryEntry {
   id: number;
   action: string;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, checkConnection } from "./api";
 import type { Person, Property, User } from "./types";
+import type { AvailabilityAction, AvailabilityQuery } from "./tenancy";
 import { roleNames } from "./types";
 import { Properties } from "./pages/Properties";
 import { People } from "./pages/People";
@@ -187,7 +188,17 @@ function Workspace({
 }) {
   const [page, setPage] = useState<WorkspacePage>("home");
   const main = useRef<HTMLElement>(null);
-  function navigate(target: WorkspacePage) {
+  const [availabilityContext, setAvailabilityContext] = useState<{
+    action: AvailabilityAction;
+    query: AvailabilityQuery;
+  } | null>(null);
+  const [availabilityQuery, setAvailabilityQuery] =
+    useState<AvailabilityQuery>();
+  function navigate(
+    target: WorkspacePage,
+    context: typeof availabilityContext = null,
+    restoreQuery?: AvailabilityQuery,
+  ) {
     if (
       target === page ||
       !confirmFormDiscard(
@@ -195,8 +206,22 @@ function Workspace({
       )
     )
       return;
+    setAvailabilityContext(context);
+    setAvailabilityQuery(restoreQuery);
     setPage(target);
     requestAnimationFrame(() => main.current?.focus());
+  }
+  function openAvailabilityAction(
+    action: AvailabilityAction,
+    query: AvailabilityQuery,
+  ) {
+    const target =
+      action.kind === "unit"
+        ? "rooms"
+        : action.kind === "reservation" || action.kind === "reserve"
+          ? "reservations"
+          : "contracts";
+    navigate(target, { action, query });
   }
   const [capitalTarget, setCapitalTarget] = useState<CapitalTarget | null>(
     null,
@@ -309,6 +334,17 @@ function Workspace({
       <WorkspaceNavigation page={page} general={general} navigate={navigate} />
       <main ref={main} id="contenido" className="app-content" tabIndex={-1}>
         <ErrorMessage message={error} />
+        {availabilityContext &&
+          ["rooms", "contracts", "reservations"].includes(page) && (
+            <button
+              className="text-button"
+              onClick={() =>
+                navigate("availability", null, availabilityContext.query)
+              }
+            >
+              ← Volver a disponibilidad
+            </button>
+          )}
         {loading ? (
           <p role="status">Cargando tu información…</p>
         ) : error ? (
@@ -335,6 +371,11 @@ function Workspace({
           <Properties
             key={page}
             rooms={page === "rooms"}
+            initialRoom={
+              availabilityContext?.action.kind === "unit"
+                ? availabilityContext.action
+                : undefined
+            }
             properties={properties}
             people={people}
             users={users}
@@ -380,13 +421,18 @@ function Workspace({
             refreshPeople={refresh}
             users={users}
             initialPropertyId={tenancyProperty}
-            initialContractId={contractTarget || undefined}
+            initialContractId={
+              availabilityContext ? undefined : contractTarget || undefined
+            }
+            availabilityAction={availabilityContext?.action}
+            availabilityQuery={availabilityQuery}
+            onAvailabilityAction={openAvailabilityAction}
             onCapital={(contract) => {
               setCapitalTarget({
                 propertyId: contract.resolved_property_id,
                 contractId: contract.id,
               });
-              setPage("anticreticos");
+              navigate("anticreticos");
             }}
           />
         ) : page === "utilities" ? (

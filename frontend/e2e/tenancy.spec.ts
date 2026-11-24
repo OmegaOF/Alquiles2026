@@ -1,3 +1,4 @@
+import { AxeBuilder } from "@axe-core/playwright";
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { authenticate, apiBase, openSection, selectRecord } from "./helpers";
@@ -164,17 +165,10 @@ test("contrato diario guiado, modificación, prórroga y disponibilidad por cuar
   await page
     .getByRole("button", { name: "Consultar disponibilidad", exact: true })
     .click();
-  await expect(page.getByText("Cuartos disponibles: 1 de 2.")).toBeVisible();
-  const whole = page.locator("article").filter({
-    has: page.getByRole("heading", { name: "Casa completa", exact: true }),
-  });
-  await expect(whole.getByText("Ocupado", { exact: true })).toBeVisible();
-  const free = page.locator("article").filter({
-    has: page.getByRole("heading", {
-      name: "B · Cuarto con ventana",
-      exact: true,
-    }),
-  });
+  await expect(page.getByText("1 disponible", { exact: true })).toBeVisible();
+  const whole = page.locator(".whole-availability");
+  await expect(whole.getByText("No disponible", { exact: true })).toBeVisible();
+  const free = page.getByRole("row").filter({ hasText: "Cuarto con ventana" });
   await expect(free.getByText("Disponible", { exact: true })).toBeVisible();
   await capture(page, info, "disponibilidad");
   await expect(page.locator("body")).toHaveJSProperty(
@@ -275,11 +269,21 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
   await page.goto("/");
   await openSection(page, "Casas y cuartos", "Mis casas");
   await page
+    .getByRole("searchbox", { name: "Buscar casas" })
+    .fill(f.house.name);
+  await page
     .getByRole("button", { name: `Ver propiedad ${f.house.name}`, exact: true })
     .click();
-  await expect(page.getByText(/Casa completa: Ocupado/)).toBeVisible();
-  await expect(page.getByText("Cuartos disponibles: 1 de 2.")).toBeVisible();
+  await expect(
+    page
+      .locator(".whole-availability")
+      .getByText("No disponible", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("1 disponible", { exact: true })).toBeVisible();
   await openSection(page, "Alquileres", "Contratos");
+  await page
+    .getByRole("searchbox", { name: "Buscar contratos" })
+    .fill(f.house.name);
   await page
     .getByRole("button", { name: `Ver contrato ${contract.id}`, exact: true })
     .click();
@@ -439,4 +443,287 @@ test("registra un cuarto desde una reserva y conserva las fechas introducidas", 
   await expect(
     page.getByText(/La reserva se guardó correctamente/),
   ).toBeVisible();
+});
+
+test("consulta e inventario paginan y enlazan los formularios y los impedimentos correctos", async ({
+  page,
+}) => {
+  await authenticate(page);
+  page.on("dialog", (dialog) => dialog.accept());
+  const f = await houseFixture(page);
+  const path = `/properties/${f.house.id}`;
+  for (let i = 1; i <= 21; i++) {
+    await post(page, `${path}/units`, {
+      code: `C-${String(i).padStart(2, "0")}`,
+      name: i === 21 ? "Último local" : `Cuarto interior ${i}`,
+      unit_type: i === 21 ? "local" : "cuarto",
+      maintenance: i === 21,
+      is_enabled: i !== 20,
+      notes: i === 21 ? "Detalle de la reparación programada" : null,
+    });
+  }
+  const contract = await post(
+    page,
+    "/contracts",
+    dailyBody(f, "2033-01-01", "2033-01-03"),
+  );
+  const reserve = (unit_id: number, start_date: string, end_date: string) =>
+    post(page, "/reservations", {
+      unit_id,
+      start_date,
+      end_date,
+      mode: "daily",
+      status: "pending",
+      person_id: f.tenant.id,
+    });
+  const other = await reserve(f.first.id, "2033-01-04", "2033-01-05");
+  const reserved = await reserve(f.second.id, "2033-01-01", "2033-01-05");
+
+  await page.goto("/");
+  await openSection(page, "Casas y cuartos", "Disponibilidad");
+  await selectRecord(page.getByLabel("Propiedad a consultar"), {
+    label: f.house.name,
+  });
+  await page.getByLabel("Consultar desde").fill("2033-01-03");
+  await page.getByLabel("Consultar hasta").fill("2033-01-04");
+  await page.getByRole("button", { name: "Consultar disponibilidad" }).click();
+  await expect(
+    page.getByRole("heading", { name: /03\/01\/2033 al 04\/01\/2033/ }),
+  ).toBeVisible();
+  const table = page.getByRole("table", {
+    name: "Disponibilidad de cuartos y unidades",
+  });
+  await expect(table.getByRole("row")).toHaveCount(21);
+  await expect(page.getByText("23 resultados · 1–20")).toBeVisible();
+  const first = table.getByRole("row").filter({ hasText: "Cuarto con patio" });
+  await expect(first.getByText("Ocupado", { exact: true })).toBeVisible();
+  await expect(first.getByText("01/01/2033 al 03/01/2033")).toBeVisible();
+  await first.getByText("Otros impedimentos (1)").click();
+  await first
+    .getByRole("button", { name: `Ver reserva ${other.id}`, exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: `Reserva ${other.id} · ${f.house.name}`,
+    }),
+  ).toBeVisible();
+  const back = page.getByRole("button", { name: "Volver a disponibilidad" });
+  await back.click();
+  await first
+    .getByRole("button", { name: `Ver contrato ${contract.id}` })
+    .click();
+  await expect(page.getByText(`CONTRATO N.º ${contract.id}`)).toBeVisible();
+  await back.click();
+  await expect(
+    table.getByRole("button", { name: `Ver reserva ${reserved.id}` }),
+  ).toBeVisible();
+
+  const nextPage = page
+    .getByRole("navigation", { name: "Paginación de disponibilidad" })
+    .getByRole("button", { name: "Siguiente" });
+  await nextPage.focus();
+  await page.keyboard.press("Enter");
+  await expect(table.getByRole("row")).toHaveCount(4);
+  await expect(page.getByText("23 resultados · 21–23")).toBeVisible();
+  const search = page.getByRole("searchbox", {
+    name: "Buscar en disponibilidad",
+  });
+  await search.fill("ultimo local");
+  await page.getByLabel("Estado de disponibilidad").selectOption("maintenance");
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(page.getByText("1 resultado", { exact: true })).toBeVisible();
+  await table
+    .getByRole("button", { name: "Ver detalle del cuarto C-21" })
+    .click();
+  await expect(
+    page.getByText("Detalle de la reparación programada"),
+  ).toBeVisible();
+  await back.click();
+  await expect(search).toHaveValue("ultimo local");
+  await expect(page.getByLabel("Estado de disponibilidad")).toHaveValue(
+    "maintenance",
+  );
+  await expect(page.getByLabel("Consultar desde")).toHaveValue("2033-01-03");
+
+  await page.getByLabel("Estado de disponibilidad").selectOption("available");
+  await expect(
+    page.getByText("No se encontraron cuartos para la consulta."),
+  ).toBeVisible();
+  await search.fill("C-19");
+  await table.getByRole("button", { name: "Crear contrato C-19" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Registrar contrato" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Casa del contrato")).toHaveValue(
+    new RegExp(f.house.name),
+  );
+  await expect(page.getByLabel("Espacio a alquilar")).toHaveValue(/C-19/);
+  await expect(
+    page.getByLabel("Fecha de entrada", { exact: true }),
+  ).toHaveValue("2033-01-03");
+  await expect(page.getByLabel("Fecha de salida", { exact: true })).toHaveValue(
+    "2033-01-04",
+  );
+  await back.click();
+
+  await table.getByRole("button", { name: "Reservar cuarto C-19" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Registrar reserva" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Casa de la reserva")).toHaveValue(
+    new RegExp(f.house.name),
+  );
+  await expect(page.getByLabel("Espacio reservado")).toHaveValue(/C-19/);
+  await expect(page.getByLabel("Entrada de la reserva")).toHaveValue(
+    "2033-01-03",
+  );
+  await expect(page.getByLabel("Salida de la reserva")).toHaveValue(
+    "2033-01-04",
+  );
+  await selectRecord(page.getByLabel("Persona que reserva"), {
+    label: f.tenant.full_name,
+  });
+  const units = await (
+    await page.request.get(`${apiBase}/api/v1${path}/units`)
+  ).json();
+  const lateBlocker = await reserve(
+    units.find((unit: { code: string }) => unit.code === "C-19").id,
+    "2033-01-04",
+    "2033-01-04",
+  );
+  await page.getByRole("button", { name: "Guardar reserva" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    `Reserva ${lateBlocker.id}`,
+  );
+
+  await back.click();
+  await openSection(page, "Casas y cuartos", "Cuartos");
+  await selectRecord(page.getByLabel("Casa de los cuartos"), {
+    label: f.house.name,
+  });
+  const inventory = page.getByRole("table", {
+    name: "Inventario de cuartos y unidades",
+  });
+  await expect(inventory.getByRole("row")).toHaveCount(21);
+  await page.getByLabel("Tipo de unidad").selectOption("local");
+  await page.getByLabel("Habilitación", { exact: true }).selectOption("true");
+  await page.getByLabel("Mantenimiento", { exact: true }).selectOption("true");
+  const local = inventory.getByRole("row").filter({ hasText: "C-21" });
+  await expect(local.getByText("Habilitado", { exact: true })).toBeVisible();
+  await expect(
+    local.getByText("En mantenimiento", { exact: true }),
+  ).toBeVisible();
+  await expect(local.getByText("Sin ocupación", { exact: true })).toBeVisible();
+  await expect(
+    inventory.getByText("Detalle de la reparación programada"),
+  ).toHaveCount(0);
+  const region = page.getByRole("region", {
+    name: "Inventario de cuartos y unidades",
+  });
+  await region.focus();
+  await expect(region).toBeFocused();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    const results = await new AxeBuilder({ page })
+      .include(".compact-table")
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  }
+
+  await openSection(page, "Casas y cuartos", "Disponibilidad");
+  await selectRecord(page.getByLabel("Propiedad a consultar"), {
+    label: f.house.name,
+  });
+  await page.getByLabel("Consultar desde").fill("2033-01-03");
+  await page.getByLabel("Consultar hasta").fill("2033-01-04");
+  await page.getByRole("button", { name: "Consultar disponibilidad" }).click();
+  await expect(page.getByText("1 ocupado", { exact: true })).toBeVisible();
+  const labels = [
+    "disponibles",
+    "ocupado",
+    "reservados",
+    "en mantenimiento",
+    "deshabilitado",
+  ];
+  const light = [
+    "rgb(21, 86, 48)",
+    "rgb(138, 24, 37)",
+    "rgb(105, 72, 0)",
+    "rgb(88, 43, 128)",
+    "rgb(67, 73, 82)",
+  ];
+  const dark = [
+    "rgb(168, 242, 194)",
+    "rgb(255, 210, 215)",
+    "rgb(255, 229, 161)",
+    "rgb(234, 212, 255)",
+    "rgb(236, 238, 241)",
+  ];
+  const summary = page.getByRole("list", {
+    name: "Resumen de cuartos por estado",
+  });
+  for (const [scheme, colors] of [
+    ["light", light],
+    ["dark", dark],
+  ] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const [index, label] of labels.entries()) {
+      const status = summary
+        .locator(".property-status")
+        .filter({ hasText: new RegExp(`\\d+ ${label}$`) });
+      await expect(status).toHaveCSS("color", colors[index]);
+      await expect(status.locator('[aria-hidden="true"]')).toBeVisible();
+    }
+  }
+});
+
+test("un propietario consulta la disponibilidad sin accesos de escritura", async ({
+  page,
+}) => {
+  await authenticate(page);
+  const f = await houseFixture(page);
+  const contract = await post(
+    page,
+    "/contracts",
+    dailyBody(f, "2033-01-01", "2033-01-03"),
+  );
+  const login = {
+    username: `ux_owner_${Date.now()}`,
+    password: crypto.randomUUID(),
+  };
+  await post(page, "/users", {
+    ...login,
+    person_id: f.owner.id,
+    role: "owner",
+  });
+  const response = await page.request.post(`${apiBase}/api/v1/auth/login`, {
+    data: login,
+  });
+  expect(response.ok()).toBe(true);
+  await page.goto("/");
+  await openSection(page, "Casas y cuartos", "Disponibilidad");
+  await page.getByLabel("Consultar desde").fill("2033-01-02");
+  await page.getByLabel("Consultar hasta").fill("2033-01-02");
+  await page.getByRole("button", { name: "Consultar disponibilidad" }).click();
+  const table = page.getByRole("table", {
+    name: "Disponibilidad de cuartos y unidades",
+  });
+  await expect(table.getByText("Disponible", { exact: true })).toBeVisible();
+  await expect(
+    table.getByRole("button", { name: /Reservar cuarto|Crear contrato/ }),
+  ).toHaveCount(0);
+  await table
+    .getByRole("button", { name: `Ver contrato ${contract.id}` })
+    .click();
+  await expect(page.getByText(`CONTRATO N.º ${contract.id}`)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Modificar contrato" }),
+  ).toHaveCount(0);
 });

@@ -3,15 +3,25 @@ import type { Person, Property, Unit, User } from "../types";
 import { api } from "../api";
 import {
   SearchSelect,
-  normalizeSearch,
   personOption,
   propertyOption,
 } from "../components/SearchSelect";
 import { ContextDialog } from "../components/ContextDialog";
 import { PersonForm } from "./People";
 import { useRegistrySearch } from "../components/registrySearch";
-import { stateNames } from "../tenancy";
 import type { Availability } from "../tenancy";
+import {
+  AvailabilitySummary,
+  PropertyStatus,
+  WholePropertyAvailability,
+} from "../components/PropertyStatus";
+import {
+  ListPagination,
+  ListSearch,
+  lastPage,
+  useListRequest,
+  useLocalList,
+} from "../components/RecordList";
 import {
   Field,
   ErrorMessage,
@@ -23,6 +33,7 @@ import {
 
 type Props = {
   rooms?: boolean;
+  initialRoom?: { propertyId: number; id: number };
   properties: Property[];
   people: Person[];
   users: User[];
@@ -35,6 +46,7 @@ type Props = {
 };
 export function Properties({
   rooms = false,
+  initialRoom,
   properties,
   people,
   users,
@@ -44,8 +56,9 @@ export function Properties({
 }: Props) {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [newHouses, setNewHouses] = useState<Property[]>([]);
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(
+    initialRoom?.propertyId ?? null,
+  );
   const [editing, setEditing] = useState<Partial<Property> | null>(null);
   const [notice, setNotice] = useState("");
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
@@ -59,11 +72,11 @@ export function Properties({
   ];
   const findProperties = useRegistrySearch("properties", houses.length);
   const property = houses.find((p) => p.id === selected);
-  const matchingHouses = properties.filter((house) =>
-    normalizeSearch(`${propertyOption(house).label} ${house.id}`).includes(
-      normalizeSearch(query),
-    ),
+  const listing = useLocalList(
+    houses,
+    (house) => `${propertyOption(house).label} ${house.id}`,
   );
+  const [unitTarget, setUnitTarget] = useState(initialRoom?.id);
   if (editing)
     return (
       <PropertyForm
@@ -133,13 +146,16 @@ export function Properties({
               options={houses.map(propertyOption)}
               load={findProperties}
               value={selected ?? ""}
-              onChange={(id) => setSelected(Number(id) || null)}
+              onChange={(id) => {
+                setUnitTarget(undefined);
+                setSelected(Number(id) || null);
+              }}
             />
             {property ? (
               <Units
                 key={property.id}
                 property={property}
-                onChanged={() => {}}
+                initialUnitId={unitTarget}
                 canEdit={canEdit || user.role === "operator"}
                 canCreate={false}
               />
@@ -169,9 +185,7 @@ export function Properties({
             <p>
               {property.address} · {property.zone} · {property.city}
             </p>
-            <span className="badge">
-              {property.is_active ? "Habilitada" : "Deshabilitada"}
-            </span>
+            <HouseStatus property={property} />
           </div>
           {canEdit && (
             <button onClick={() => setEditing(property)}>
@@ -187,34 +201,12 @@ export function Properties({
         <div className="panel details">
           <h2>Datos de la propiedad</h2>
           <p>{property.description || "Sin descripción adicional."}</p>
-          <h3>Propietarios</h3>
-          <ul>
-            {property.owners.map((owner) => (
-              <li key={owner.person_id}>
-                {people.find((p) => p.id === owner.person_id)?.full_name ||
-                  `Persona ${owner.person_id}`}
-                {owner.share != null
-                  ? ` · ${owner.share}% de participación`
-                  : " · Participación no especificada"}
-              </li>
-            ))}
-          </ul>
-          {general && (
-            <>
-              <h3>Administradores autorizados</h3>
-              <p>
-                {property.manager_ids.length
-                  ? property.manager_ids
-                      .map(
-                        (id) =>
-                          users.find((u) => u.id === id)?.full_name ||
-                          `Usuario ${id}`,
-                      )
-                      .join(", ")
-                  : "Sin administradores asignados."}
-              </p>
-            </>
-          )}
+          <PropertyPeople
+            property={property}
+            people={people}
+            users={users}
+            general={general}
+          />
         </div>
         {onHouseAction && (
           <div className="actions">
@@ -264,10 +256,7 @@ export function Properties({
       <div className="page-heading">
         <div>
           <p className="eyebrow">TU ESPACIO DE ADMINISTRACIÓN</p>
-          <h1>Propiedades</h1>
-          <p className="muted">
-            Consulta las casas y unidades que tienes autorizadas.
-          </p>
+          <h1>Mis casas</h1>
         </div>
         {general && (
           <button
@@ -285,30 +274,25 @@ export function Properties({
           {notice}
         </p>
       )}
-      <Field label="Buscar casas">
-        <input
-          type="search"
-          value={query}
-          placeholder="Nombre, dirección o zona"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </Field>
-      {!properties.length ? (
+      <ListSearch
+        label="Buscar casas"
+        placeholder="Nombre, dirección o zona"
+        {...listing.search}
+      />
+      {!houses.length ? (
         <div className="empty">
           Todavía no hay propiedades para mostrar.
           {general
             ? " Puedes registrar a un propietario al crear la casa."
             : "Solicita al administrador general que te asigne una propiedad."}
         </div>
-      ) : matchingHouses.length === 0 ? (
+      ) : listing.rows.length === 0 ? (
         <p role="status">No se encontraron casas.</p>
       ) : (
         <div className="property-grid">
-          {matchingHouses.map((p) => (
+          {listing.rows.map((p) => (
             <article key={p.id}>
-              <span className="badge">
-                {p.is_active ? "Habilitada" : "Deshabilitada"}
-              </span>
+              <HouseStatus property={p} />
               <h2>{p.name}</h2>
               <p>{p.address}</p>
               <p>{[p.zone, p.city].filter(Boolean).join(" · ")}</p>
@@ -329,7 +313,101 @@ export function Properties({
           ))}
         </div>
       )}
+      <ListPagination label="casas" {...listing.pagination} />
     </section>
+  );
+}
+
+function HouseStatus({ property }: { property: Property }) {
+  return (
+    <PropertyStatus
+      state={property.is_active ? "enabled" : "disabled"}
+      label={property.is_active ? "Habilitada" : "Deshabilitada"}
+    />
+  );
+}
+
+const managerExplanation =
+  "Asigna administradores de propiedades a casas específicas.";
+const noManagers =
+  "No hay administradores adicionales asignados. El administrador general conserva acceso a esta propiedad.";
+
+function PropertyPeople({
+  property,
+  people,
+  users,
+  general,
+}: {
+  property: Property;
+  people: Person[];
+  users: User[];
+  general: boolean;
+}) {
+  const owners = useLocalList(
+    property.owners.map((owner) => ({
+      ...owner,
+      name:
+        people.find((person) => person.id === owner.person_id)?.full_name ??
+        `Persona ${owner.person_id}`,
+    })),
+    (owner) => owner.name,
+  );
+  const managers = useLocalList(
+    property.manager_ids.map((id) => ({
+      id,
+      name: users.find((user) => user.id === id)?.full_name ?? `Usuario ${id}`,
+    })),
+    (manager) => manager.name,
+  );
+  return (
+    <>
+      <h3>Propietarios</h3>
+      <ListSearch label="Buscar propietarios" {...owners.search} />
+      {owners.rows.length ? (
+        <ul>
+          {owners.rows.map((owner) => (
+            <li key={owner.person_id}>
+              {owner.name} ·{" "}
+              {owner.share != null
+                ? `${owner.share}% de participación`
+                : "Participación no especificada"}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No se encontraron propietarios.</p>
+      )}
+      <ListPagination label="propietarios de la casa" {...owners.pagination} />
+      {general && (
+        <>
+          <h3>Administradores autorizados</h3>
+          <p>{managerExplanation}</p>
+          {property.manager_ids.length ? (
+            <>
+              <ListSearch
+                label="Buscar administradores asignados"
+                {...managers.search}
+              />
+              {managers.rows.length ? (
+                <ul>
+                  {managers.rows.map((manager) => (
+                    <li key={manager.id}>{manager.name}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No se encontraron administradores.</p>
+              )}
+              <ListPagination
+                label="administradores de la casa"
+                {...managers.pagination}
+              />
+            </>
+          ) : (
+            <p>{noManagers}</p>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
@@ -340,60 +418,71 @@ function PropertyAvailability({
   propertyId: number;
   version: number;
 }) {
-  const requestId = useRef(0);
-  const [data, setData] = useState<Availability | null>(null);
-  const [error, setError] = useState("");
-  async function load() {
-    const request = ++requestId.current;
-    setError("");
-    try {
-      const result = await api<Availability>(
-        `/properties/${propertyId}/availability`,
-      );
-      if (request === requestId.current) setData(result);
-    } catch (e) {
-      if (request === requestId.current) setError(errorText(e));
-    }
-  }
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const params = new URLSearchParams({ page: String(page), q: query });
+  const { data, previousData, loading, error, reload } =
+    useListRequest<Availability>(
+      `/properties/${propertyId}/availability?${params}`,
+      150,
+      version,
+    );
   useEffect(() => {
-    setData(null);
-    void load();
-    return () => {
-      requestId.current++;
-    };
-  }, [propertyId, version]);
+    if (data && page > lastPage(data.total)) setPage(lastPage(data.total));
+  }, [data, page]);
+  const meta = data ?? previousData;
   return (
     <section className="panel">
       <h2>Disponibilidad de hoy</h2>
+      {meta?.summary && (
+        <>
+          <AvailabilitySummary summary={meta.summary} />
+          <WholePropertyAvailability whole={meta.whole} />
+        </>
+      )}
+      <ListSearch
+        label="Buscar en disponibilidad de hoy"
+        placeholder="Código o nombre"
+        value={query}
+        onChange={(value) => {
+          setQuery(value);
+          setPage(1);
+        }}
+      />
       <ErrorMessage message={error} />
       {error && (
-        <button className="secondary" onClick={() => void load()}>
+        <button className="secondary" onClick={reload}>
           Volver a consultar disponibilidad
         </button>
       )}
-      {data?.whole && (
+      {loading && <p role="status">Consultando disponibilidad…</p>}
+      {data?.summary && (
         <>
-          <p>
-            <strong>Casa completa: {stateNames[data.whole.state]}</strong>.{" "}
-            {data.whole.reason}
-          </p>
-          <p>
-            Cuartos disponibles:{" "}
-            {data.units.filter((unit) => unit.state === "available").length} de{" "}
-            {data.units.length}.
-          </p>
-          <ul>
-            {data.units.map((unit) => (
-              <li key={unit.unit_id}>
-                {unit.label}: <strong>{stateNames[unit.state]}</strong>.{" "}
-                {unit.reason}
-              </li>
-            ))}
-          </ul>
-          <p>Para otras fechas, abre “Disponibilidad”.</p>
+          {data.units.length ? (
+            <ul
+              className="room-status-grid"
+              aria-label="Disponibilidad de los cuartos hoy"
+            >
+              {data.units.map((unit) => (
+                <li key={unit.unit_id}>
+                  <strong title={unit.name}>{unit.code ?? unit.label}</strong>
+                  <PropertyStatus state={unit.state} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No se encontraron cuartos.</p>
+          )}
         </>
       )}
-      {!data && !error && <p role="status">Consultando disponibilidad…</p>}
+      {meta?.summary && (
+        <ListPagination
+          label="cuartos de hoy"
+          total={meta.total}
+          page={Math.min(page, lastPage(meta.total))}
+          onPage={setPage}
+        />
+      )}
     </section>
   );
 }
@@ -428,6 +517,14 @@ export function PropertyForm({
   );
   const [managers, setManagers] = useState<number[]>(
     property.manager_ids || [],
+  );
+  const managerCandidates = useLocalList(
+    users.filter(
+      (user) =>
+        user.role === "property_admin" &&
+        (user.is_active || managers.includes(user.id)),
+    ),
+    (user) => `${user.full_name} ${user.username} ${user.display_name ?? ""}`,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -633,32 +730,38 @@ export function PropertyForm({
             </fieldset>
             <fieldset>
               <legend>Administradores autorizados</legend>
-              <p>Podrán consultar y editar esta propiedad y sus cuartos.</p>
-              {users
-                .filter(
-                  (u) =>
-                    u.role === "property_admin" &&
-                    (u.is_active || managers.includes(u.id)),
-                )
-                .map((u) => (
-                  <label key={u.id} className="check">
-                    <input
-                      type="checkbox"
-                      checked={managers.includes(u.id)}
-                      disabled={!u.is_active && !managers.includes(u.id)}
-                      onChange={(e) =>
-                        setManagers(
-                          e.target.checked
-                            ? [...managers, u.id]
-                            : managers.filter((id) => id !== u.id),
-                        )
-                      }
-                    />
-                    {u.full_name}
-                    {!u.is_active &&
-                      " · Cuenta deshabilitada; quitar la autorización antes de guardar"}
-                  </label>
-                ))}
+              <p>
+                {managerExplanation} Podrán consultar y editar esta propiedad y
+                sus cuartos.
+              </p>
+              {!managers.length && <p>{noManagers}</p>}
+              <ListSearch
+                label="Buscar administradores de propiedades"
+                {...managerCandidates.search}
+              />
+              {managerCandidates.rows.map((u) => (
+                <label key={u.id} className="check">
+                  <input
+                    type="checkbox"
+                    checked={managers.includes(u.id)}
+                    disabled={!u.is_active && !managers.includes(u.id)}
+                    onChange={(e) =>
+                      setManagers(
+                        e.target.checked
+                          ? [...managers, u.id]
+                          : managers.filter((id) => id !== u.id),
+                      )
+                    }
+                  />
+                  {u.full_name}
+                  {!u.is_active &&
+                    " · Cuenta deshabilitada; quitar la autorización antes de guardar"}
+                </label>
+              ))}
+              <ListPagination
+                label="administradores disponibles"
+                {...managerCandidates.pagination}
+              />
               {!users.some(
                 (u) => u.role === "property_admin" && u.is_active,
               ) && (
@@ -704,67 +807,154 @@ export function PropertyForm({
   );
 }
 
+type Inventory = {
+  items: (Unit & { occupied_today: boolean })[];
+  total: number;
+  types: string[];
+};
+const unitTypes: Record<string, string> = {
+  cuarto: "Cuarto",
+  departamento: "Departamento",
+  local: "Local",
+  otro: "Otro",
+};
+
 function Units({
   property,
   canEdit,
   canCreate = true,
+  initialUnitId,
   onChanged,
 }: {
   property: Property;
   canEdit: boolean;
   canCreate?: boolean;
-  onChanged: () => void;
+  initialUnitId?: number;
+  onChanged?: () => void;
 }) {
-  const [units, setUnits] = useState<Unit[]>([]);
+  const [selected, setSelected] = useState<Unit>();
+  const [target, setTarget] = useState(initialUnitId);
   const [editing, setEditing] = useState<Partial<Unit> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      setUnits(await api<Unit[]>(`/properties/${property.id}/units`));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setLoading(false);
-    }
+  const [filters, setFilters] = useState({
+    q: "",
+    unit_type: "",
+    enabled: "",
+    maintenance: "",
+  });
+  const [page, setPage] = useState(1);
+  const params = new URLSearchParams({ page: String(page) });
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
   }
+  const base = `/properties/${property.id}`;
+  const inventory = useListRequest<Inventory>(
+    !target && !selected && !editing
+      ? `${base}/unit-inventory?${params}`
+      : null,
+    150,
+  );
+  const detail = useListRequest<Unit>(
+    target ? `${base}/units/${target}` : null,
+  );
+  const unit = selected ?? detail.data;
+  const listMeta = inventory.data ?? inventory.previousData;
   useEffect(() => {
-    void load();
-  }, [property.id]);
-  if (editing)
+    if (inventory.data && page > lastPage(inventory.data.total))
+      setPage(lastPage(inventory.data.total));
+  }, [inventory.data, page]);
+  function updateFilter(key: keyof typeof filters, value: string) {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  }
+  function closeDetail() {
+    setTarget(undefined);
+    setSelected(undefined);
+  }
+  if (editing) {
     return (
       <RoomForm
         initial={editing}
         house={property}
         fixedHouse
         properties={[property]}
-        onCancel={() => {
-          setEditing(null);
-          setError("");
-        }}
-        onSaved={() => {
+        onCancel={() => setEditing(null)}
+        onSaved={(_, saved) => {
+          if (unit) {
+            setSelected(saved);
+            setTarget(undefined);
+          }
           setEditing(null);
           setNotice("El cuarto o unidad se guardó correctamente.");
-          void load();
-          onChanged();
+          inventory.reload();
+          onChanged?.();
         }}
       />
     );
+  }
+  if (unit || target) {
+    return (
+      <section className="panel">
+        <button className="text-button" onClick={closeDetail}>
+          ← Volver a cuartos y unidades
+        </button>
+        {notice && (
+          <p role="status" className="success-message">
+            {notice}
+          </p>
+        )}
+        {detail.loading && <p role="status">Cargando cuarto…</p>}
+        <ErrorMessage message={detail.error} />
+        {detail.error && (
+          <button className="secondary" onClick={detail.reload}>
+            Reintentar carga del cuarto
+          </button>
+        )}
+        {unit && (
+          <>
+            <div className="page-heading">
+              <h2>
+                {unit.code} · {unit.name}
+              </h2>
+              {canEdit && (
+                <button className="secondary" onClick={() => setEditing(unit)}>
+                  Editar cuarto
+                </button>
+              )}
+            </div>
+            <dl>
+              <dt>Tipo de unidad</dt>
+              <dd>{unitTypes[unit.unit_type] ?? unit.unit_type}</dd>
+              <dt>Habilitación</dt>
+              <dd>
+                <PropertyStatus
+                  state={unit.is_enabled ? "enabled" : "disabled"}
+                />
+              </dd>
+              <dt>Mantenimiento</dt>
+              <dd>
+                <PropertyStatus
+                  state={unit.maintenance ? "maintenance" : "noMaintenance"}
+                />
+              </dd>
+              <dt>Descripción</dt>
+              <dd>{unit.description || "Sin descripción."}</dd>
+              <dt>Observaciones</dt>
+              <dd>{unit.notes || "Sin observaciones."}</dd>
+            </dl>
+          </>
+        )}
+      </section>
+    );
+  }
   return (
     <section className="units-section">
       <div className="page-heading">
-        <div>
-          <h2>Cuartos y unidades</h2>
-          <p className="muted">Organiza los espacios de esta propiedad.</p>
-        </div>
+        <h2>Cuartos y unidades</h2>
         {canEdit && canCreate && (
           <button
             onClick={() => {
               setEditing({});
-              setError("");
               setNotice("");
             }}
           >
@@ -772,9 +962,52 @@ function Units({
           </button>
         )}
       </div>
-      <ErrorMessage message={error} />
-      {error && (
-        <button className="secondary" onClick={() => void load()}>
+      <div className="inventory-filters">
+        <ListSearch
+          label="Buscar cuartos"
+          placeholder="Código o nombre"
+          value={filters.q}
+          onChange={(value) => updateFilter("q", value)}
+        />
+        <Field label="Tipo de unidad">
+          <select
+            value={filters.unit_type}
+            onChange={(event) => updateFilter("unit_type", event.target.value)}
+          >
+            <option value="">Todos los tipos</option>
+            {listMeta?.types.map((type) => (
+              <option key={type} value={type}>
+                {unitTypes[type] ?? type}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Habilitación">
+          <select
+            value={filters.enabled}
+            onChange={(event) => updateFilter("enabled", event.target.value)}
+          >
+            <option value="">Todos los estados</option>
+            <option value="true">Habilitado</option>
+            <option value="false">Deshabilitado</option>
+          </select>
+        </Field>
+        <Field label="Mantenimiento">
+          <select
+            value={filters.maintenance}
+            onChange={(event) =>
+              updateFilter("maintenance", event.target.value)
+            }
+          >
+            <option value="">Todas las unidades</option>
+            <option value="true">En mantenimiento</option>
+            <option value="false">Sin mantenimiento marcado</option>
+          </select>
+        </Field>
+      </div>
+      <ErrorMessage message={inventory.error} />
+      {inventory.error && (
+        <button className="secondary" onClick={inventory.reload}>
           Reintentar carga de cuartos
         </button>
       )}
@@ -783,46 +1016,93 @@ function Units({
           {notice}
         </p>
       )}
-      {loading ? (
-        <p role="status">Cargando cuartos…</p>
-      ) : units.length ? (
-        <div className="record-list">
-          {units.map((unit) => (
-            <article key={unit.id}>
-              <div className="record-main">
-                <h3>
-                  {unit.code} · {unit.name}
-                </h3>
-                <p>
-                  {unit.unit_type} ·{" "}
-                  {unit.is_enabled ? "Habilitado" : "Deshabilitado"} ·{" "}
-                  {unit.maintenance
-                    ? "En mantenimiento"
-                    : "Sin mantenimiento pendiente"}
-                </p>
-                {unit.description && <p>{unit.description}</p>}
-                {unit.notes && <p>{unit.notes}</p>}
-              </div>
-              {canEdit && (
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    setEditing(unit);
-                    setError("");
-                  }}
-                >
-                  Editar cuarto <span className="sr-only">{unit.code}</span>
-                </button>
-              )}
-            </article>
-          ))}
-        </div>
-      ) : (
-        !error && (
-          <div className="empty">
-            Todavía no hay cuartos registrados en esta propiedad.
+      {inventory.loading && <p role="status">Cargando cuartos…</p>}
+      {inventory.data &&
+        (inventory.data.items.length ? (
+          <div
+            className="table-scroll compact-table"
+            role="region"
+            aria-label="Inventario de cuartos y unidades"
+            tabIndex={0}
+          >
+            <table>
+              <caption className="sr-only">
+                Inventario de cuartos y unidades
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Cuarto o unidad</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Habilitación</th>
+                  <th scope="col">Mantenimiento</th>
+                  <th scope="col">Ocupación de hoy</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventory.data.items.map((unit) => (
+                  <tr key={unit.id}>
+                    <th scope="row">
+                      <strong>{unit.code}</strong>
+                      <br />
+                      {unit.name}
+                    </th>
+                    <td>{unitTypes[unit.unit_type] ?? unit.unit_type}</td>
+                    <td>
+                      <PropertyStatus
+                        state={unit.is_enabled ? "enabled" : "disabled"}
+                      />
+                    </td>
+                    <td>
+                      <PropertyStatus
+                        state={
+                          unit.maintenance ? "maintenance" : "noMaintenance"
+                        }
+                      />
+                    </td>
+                    <td>
+                      <PropertyStatus
+                        state={unit.occupied_today ? "occupied" : "unoccupied"}
+                      />
+                    </td>
+                    <td>
+                      <div className="compact-actions">
+                        <button
+                          className="secondary"
+                          onClick={() => setSelected(unit)}
+                        >
+                          Ver detalle{" "}
+                          <span className="sr-only">{unit.code}</span>
+                        </button>
+                        {canEdit && (
+                          <button
+                            className="secondary"
+                            onClick={() => {
+                              setEditing(unit);
+                              setNotice("");
+                            }}
+                          >
+                            Editar cuarto{" "}
+                            <span className="sr-only">{unit.code}</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )
+        ) : (
+          <p>No se encontraron cuartos.</p>
+        ))}
+      {listMeta && (
+        <ListPagination
+          label="inventario"
+          total={listMeta.total}
+          page={Math.min(page, lastPage(listMeta.total))}
+          onPage={setPage}
+        />
       )}
     </section>
   );
@@ -951,6 +1231,9 @@ export function RoomForm({
               name="unit_type"
               defaultValue={initial.unit_type || "cuarto"}
             >
+              {initial.unit_type && !(initial.unit_type in unitTypes) && (
+                <option value={initial.unit_type}>{initial.unit_type}</option>
+              )}
               <option value="cuarto">Cuarto</option>
               <option value="departamento">Departamento</option>
               <option value="local">Local</option>

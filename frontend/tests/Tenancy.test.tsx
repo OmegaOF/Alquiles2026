@@ -60,6 +60,14 @@ const available = {
   property_name: property.name,
   start_date: "2031-01-01",
   end_date: "2031-01-03",
+  total: 1,
+  summary: {
+    available: 1,
+    occupied: 0,
+    reserved: 0,
+    maintenance: 0,
+    disabled: 0,
+  },
   whole: {
     unit_id: null,
     label: "Casa completa",
@@ -358,10 +366,10 @@ test("disponibilidad identifica cada espacio con texto y permite consultar fecha
   const fetcher = setup("owner", "availability");
   await waitFor(() =>
     expect(
-      screen.getByRole("heading", { name: "Casa completa" }),
+      screen.getByRole("heading", { name: "Alquiler de la casa completa" }),
     ).toBeVisible(),
   );
-  expect(screen.getByText("Cuartos disponibles: 1 de 1.")).toBeVisible();
+  expect(screen.getByText("1 disponible")).toBeVisible();
   fireEvent.change(screen.getByLabelText("Consultar desde"), {
     target: { value: "2031-02-01" },
   });
@@ -371,9 +379,11 @@ test("disponibilidad identifica cada espacio con texto y permite consultar fecha
   await userEvent.click(
     screen.getByRole("button", { name: "Consultar disponibilidad" }),
   );
-  expect(
-    fetcher.mock.calls.some(([url]) =>
-      url.endsWith("availability?start=2031-02-01&end=2031-02-28"),
-    ),
-  ).toBe(true);
+  await waitFor(() =>
+    expect(
+      fetcher.mock.calls.some(([url]) =>
+        url.endsWith("availability?start=2031-02-01&end=2031-02-28&page=1"),
+      ),
+    ).toBe(true),
+  );
 });

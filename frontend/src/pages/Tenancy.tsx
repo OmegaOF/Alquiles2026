@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { PropertySelect } from "../components/PropertySelect";
 import type { Person, Property, User } from "../types";
 import { Field, ErrorMessage, errorText } from "../components/Form";
+import {
+  ListPagination,
+  ListSearch,
+  useLocalList,
+} from "../components/RecordList";
 import {
   addDays,
   localToday,
@@ -10,11 +15,19 @@ import {
   showDate,
   stateNames,
 } from "../tenancy";
-import type { Contract, HistoryEntry, Reservation } from "../tenancy";
+import type {
+  AvailabilityAction,
+  AvailabilityQuery,
+  Contract,
+  HistoryEntry,
+  RentalPreset,
+  Reservation,
+} from "../tenancy";
 
 import { ContractWizard } from "./tenancy/ContractWizard";
 import { ReservationForm } from "./tenancy/ReservationForm";
-import { AvailabilityScreen, OccupancyScreen } from "./tenancy/Screens";
+import { OccupancyScreen } from "./tenancy/Screens";
+import { AvailabilityScreen } from "./tenancy/AvailabilityScreen";
 import { History, actionNames } from "./tenancy/Shared";
 
 type View = "contracts" | "reservations" | "availability" | "occupancy";
@@ -28,8 +41,33 @@ type Props = {
   initialContractId?: number;
   initialPropertyId?: number;
   users?: User[];
+  availabilityAction?: AvailabilityAction;
+  availabilityQuery?: AvailabilityQuery;
+  onAvailabilityAction?: (
+    action: AvailabilityAction,
+    query: AvailabilityQuery,
+  ) => void;
 };
-export function Tenancy({
+export function Tenancy(props: Props) {
+  const { view, properties, people } = props;
+  if (view === "availability") {
+    return (
+      <AvailabilityScreen
+        properties={properties}
+        initialPropertyId={props.initialPropertyId}
+        initialQuery={props.availabilityQuery}
+        canWrite={props.user.role !== "owner"}
+        onAction={props.onAvailabilityAction}
+      />
+    );
+  }
+  if (view === "occupancy") {
+    return <OccupancyScreen properties={properties} people={people} />;
+  }
+  return <RentalRecords key={view} {...props} view={view} />;
+}
+
+function RentalRecords({
   view,
   user,
   properties,
@@ -39,10 +77,20 @@ export function Tenancy({
   initialContractId,
   initialPropertyId,
   users,
-}: Props) {
+  availabilityAction,
+}: Props & { view: "contracts" | "reservations" }) {
+  const linkedContract =
+    availabilityAction?.kind === "contract" ? availabilityAction : undefined;
+  const linkedReservation =
+    availabilityAction?.kind === "reservation" ? availabilityAction : undefined;
+  const contractId = linkedContract?.id ?? initialContractId;
+  const preset =
+    availabilityAction?.kind === "createContract" ||
+    availabilityAction?.kind === "reserve"
+      ? availabilityAction.preset
+      : undefined;
   const [contracts, setContracts] = useState<Contract[]>([]),
     [reservations, setReservations] = useState<Reservation[]>([]);
-  const handledInitial = useRef<number | null>(null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -52,11 +100,25 @@ export function Tenancy({
   const [wizard, setWizard] = useState<{
       contract?: Contract;
       reservation?: Reservation;
-    } | null>(null),
+      preset?: RentalPreset;
+    } | null>(
+      user.role !== "owner" && availabilityAction?.kind === "createContract"
+        ? { preset: availabilityAction.preset }
+        : null,
+    ),
     [reservationForm, setReservationForm] =
-      useState<Partial<Reservation> | null>(null);
+      useState<Partial<Reservation> | null>(
+        user.role !== "owner" && availabilityAction?.kind === "reserve"
+          ? availabilityAction.preset
+          : null,
+      );
   const [filter, setFilter] = useState(
-      initialPropertyId ? String(initialPropertyId) : "",
+      String(
+        linkedContract?.propertyId ??
+          preset?.resolved_property_id ??
+          initialPropertyId ??
+          "",
+      ),
     ),
     [action, setAction] = useState(""),
     [busy, setBusy] = useState(false);
@@ -71,16 +133,57 @@ export function Tenancy({
     `Persona registrada n.º ${id}`;
   const propertyName = (id: number) =>
     properties.find((p) => p.id === id)?.name || "Propiedad autorizada";
+  const contractList = useLocalList(
+    contracts.filter(
+      (item) => !filter || item.resolved_property_id === Number(filter),
+    ),
+    (item) =>
+      `${item.id} ${item.target_label} ${propertyName(item.resolved_property_id)} ${personName(item.responsible_person_id)} ${stateNames[item.status]} ${modeNames[item.mode]}`,
+  );
+  const reservationList = useLocalList(
+    reservations.filter(
+      (item) =>
+        linkedReservation ||
+        !filter ||
+        item.resolved_property_id === Number(filter),
+    ),
+    (item) =>
+      `${item.id} ${item.target_label} ${propertyName(item.resolved_property_id)} ${personName(item.person_id)} ${stateNames[item.effective_status]} ${modeNames[item.mode]}`,
+  );
+  const list = view === "contracts" ? contractList : reservationList;
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const [c, r] = await Promise.all([
-        api<Contract[]>("/contracts"),
-        api<Reservation[]>("/reservations"),
+      if (view === "contracts") {
+        setContracts(await api<Contract[]>("/contracts"));
+      } else if (linkedReservation) {
+        setReservations([
+          await api<Reservation>(`/reservations/${linkedReservation.id}`),
+        ]);
+      } else {
+        setReservations(await api<Reservation[]>("/reservations"));
+      }
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function detail(id: number, knownProperty?: number) {
+    setError("");
+    try {
+      const [current, history] = await Promise.all([
+        api<Contract>(`/contracts/${id}`),
+        api<HistoryEntry[]>(`/contracts/${id}/history`),
       ]);
-      setContracts(c);
-      setReservations(r);
+      const contacts = await api<Person[]>(
+        `/properties/${knownProperty ?? current.resolved_property_id}/contacts`,
+      );
+      setSelected(current);
+      setEvents(history);
+      setDetailPeople(contacts);
+      setAction("");
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -88,42 +191,15 @@ export function Tenancy({
     }
   }
   useEffect(() => {
-    void load();
-    setSelected(null);
-    setWizard(null);
-    setReservationForm(null);
-    setNotice("");
-    setAction("");
-  }, [view]);
-  async function detail(contract: Contract) {
-    setError("");
-    try {
-      const [current, history, contacts] = await Promise.all([
-        api<Contract>(`/contracts/${contract.id}`),
-        api<HistoryEntry[]>(`/contracts/${contract.id}/history`),
-        api<Person[]>(`/properties/${contract.resolved_property_id}/contacts`),
-      ]);
-      setSelected(current);
-      setEvents(history);
-      setDetailPeople(contacts);
-      setAction("");
-    } catch (e) {
-      setError(errorText(e));
+    if (view === "contracts" && contractId) {
+      void detail(contractId, linkedContract?.propertyId);
+    } else {
+      void load();
     }
-  }
-  useEffect(() => {
-    if (initialContractId && handledInitial.current !== initialContractId) {
-      const target = contracts.find((c) => c.id === initialContractId);
-      if (target) {
-        handledInitial.current = initialContractId;
-        void detail(target);
-      }
-    }
-  }, [initialContractId, contracts]);
+  }, [view, contractId]);
   async function saved(contract: Contract) {
-    await load();
     await refreshPeople();
-    await detail(contract);
+    await detail(contract.id, contract.resolved_property_id);
     setWizard(null);
     setNotice(
       "El contrato se guardó correctamente. No se generaron deudas ni pagos.",
@@ -152,8 +228,7 @@ export function Tenancy({
           expected_version: selected.version,
         },
       );
-      await load();
-      await detail(result);
+      await detail(result.id, result.resolved_property_id);
       setNotice("El cambio del contrato se registró correctamente.");
     } catch (e) {
       setError(errorText(e));
@@ -193,6 +268,7 @@ export function Tenancy({
         people={people}
         initialPropertyId={Number(filter) || undefined}
         initial={wizard.contract}
+        preset={wizard.preset}
         reservation={wizard.reservation}
         onCancel={() => setWizard(null)}
         onSaved={saved}
@@ -228,6 +304,7 @@ export function Tenancy({
             setSelected(null);
             setAction("");
             setNotice("");
+            void load();
           }}
         >
           ← Volver a {view === "reservations" ? "reservas" : "contratos"}
@@ -508,15 +585,6 @@ export function Tenancy({
         <History events={events} personName={personName} />
       </section>
     );
-  if (view === "availability")
-    return (
-      <AvailabilityScreen
-        properties={properties}
-        initialPropertyId={initialPropertyId}
-      />
-    );
-  if (view === "occupancy")
-    return <OccupancyScreen properties={properties} people={people} />;
   return (
     <section>
       <div className="page-heading">
@@ -529,7 +597,7 @@ export function Tenancy({
               : "Prepara una estancia sin generar pagos ni deudas."}
           </p>
         </div>
-        {canWrite && (
+        {canWrite && !linkedReservation && (
           <button
             onClick={() =>
               view === "contracts"
@@ -549,127 +617,161 @@ export function Tenancy({
           {notice}
         </p>
       )}
-      <PropertySelect
-        label="Filtrar por propiedad"
-        properties={properties}
-        value={filter}
-        onChange={setFilter}
-        hint="Si no eliges una casa, se muestran todas las autorizadas."
-      />
+      {!linkedReservation && (
+        <div className="inventory-filters">
+          <PropertySelect
+            label="Filtrar por propiedad"
+            properties={properties}
+            value={filter}
+            onChange={(value) => {
+              setFilter(value);
+              list.pagination.onPage(1);
+            }}
+            hint="Si no eliges una casa, se muestran todas las autorizadas."
+          />
+          <ListSearch
+            label={
+              view === "contracts" ? "Buscar contratos" : "Buscar reservas"
+            }
+            placeholder="Número, casa, cuarto o persona"
+            {...list.search}
+          />
+        </div>
+      )}
       {loading ? (
         <p role="status">Cargando información…</p>
       ) : error ? (
-        <button onClick={() => void load()}>Volver a cargar</button>
+        <button
+          onClick={() => {
+            if (contractId) {
+              setLoading(true);
+              void detail(contractId, linkedContract?.propertyId);
+            } else {
+              void load();
+            }
+          }}
+        >
+          Volver a cargar
+        </button>
       ) : view === "contracts" ? (
         <div className="record-list">
-          {contracts
-            .filter((c) => !filter || c.resolved_property_id === Number(filter))
-            .map((c) => (
-              <article key={c.id}>
-                <div className="record-main">
-                  <h2>
-                    Contrato {c.id} · {propertyName(c.resolved_property_id)}
-                  </h2>
-                  <p>
-                    {modeNames[c.mode]} · {stateNames[c.status]} ·{" "}
-                    {c.target_label}
-                  </p>
-                  <p>
-                    {showDate(c.start_date)} al{" "}
-                    {showDate(c.actual_end_date || c.end_date)}
-                  </p>
-                  <p>Responsable: {personName(c.responsible_person_id)}</p>
-                </div>
-                <button className="secondary" onClick={() => void detail(c)}>
-                  Ver contrato <span className="sr-only">{c.id}</span>
-                </button>
-              </article>
-            ))}
-          {!contracts.length && (
-            <p className="empty">Todavía no hay contratos para mostrar.</p>
+          {contractList.rows.map((c) => (
+            <article key={c.id}>
+              <div className="record-main">
+                <h2>
+                  Contrato {c.id} · {propertyName(c.resolved_property_id)}
+                </h2>
+                <p>
+                  {modeNames[c.mode]} · {stateNames[c.status]} ·{" "}
+                  {c.target_label}
+                </p>
+                <p>
+                  {showDate(c.start_date)} al{" "}
+                  {showDate(c.actual_end_date || c.end_date)}
+                </p>
+                <p>Responsable: {personName(c.responsible_person_id)}</p>
+              </div>
+              <button
+                className="secondary"
+                onClick={() => void detail(c.id, c.resolved_property_id)}
+              >
+                Ver contrato <span className="sr-only">{c.id}</span>
+              </button>
+            </article>
+          ))}
+          {!contractList.rows.length && (
+            <p className="empty">
+              {contracts.length
+                ? "No se encontraron contratos."
+                : "Todavía no hay contratos para mostrar."}
+            </p>
           )}
         </div>
       ) : (
         <div className="record-list">
-          {reservations
-            .filter((r) => !filter || r.resolved_property_id === Number(filter))
-            .map((r) => (
-              <article key={r.id}>
-                <div className="record-main">
-                  <h2>
-                    Reserva {r.id} · {propertyName(r.resolved_property_id)}
-                  </h2>
+          {reservationList.rows.map((r) => (
+            <article key={r.id}>
+              <div className="record-main">
+                <h2>
+                  Reserva {r.id} · {propertyName(r.resolved_property_id)}
+                </h2>
+                <p>
+                  {modeNames[r.mode]} ·{" "}
+                  <strong>{stateNames[r.effective_status]}</strong> ·{" "}
+                  {r.target_label}
+                </p>
+                <p>
+                  {showDate(r.start_date)} al {showDate(r.end_date)} ·{" "}
+                  {personName(r.person_id)}
+                </p>
+                {r.expires_at && (
                   <p>
-                    {modeNames[r.mode]} ·{" "}
-                    <strong>{stateNames[r.effective_status]}</strong> ·{" "}
-                    {r.target_label}
+                    Vence: {new Date(r.expires_at + "Z").toLocaleString("es")}
                   </p>
-                  <p>
-                    {showDate(r.start_date)} al {showDate(r.end_date)} ·{" "}
-                    {personName(r.person_id)}
-                  </p>
-                  {r.expires_at && (
-                    <p>
-                      Vence: {new Date(r.expires_at + "Z").toLocaleString("es")}
-                    </p>
-                  )}
-                  {r.notes && <p>{r.notes}</p>}
-                  {canWrite && (
-                    <div className="actions">
-                      {["pending", "confirmed"].includes(
-                        r.effective_status,
-                      ) && (
-                        <>
-                          <button
-                            className="secondary"
-                            disabled={busy}
-                            onClick={() => setReservationForm(r)}
-                          >
-                            Modificar reserva {r.id}
-                          </button>
-                          {r.effective_status === "pending" && (
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void reservationAction(r, "confirm")
-                              }
-                            >
-                              Confirmar reserva {r.id}
-                            </button>
-                          )}
-                          <button
-                            className="secondary"
-                            disabled={busy}
-                            onClick={() => void reservationAction(r, "cancel")}
-                          >
-                            Cancelar reserva {r.id}
-                          </button>
-                        </>
-                      )}
-                      {canActivate && r.effective_status === "confirmed" && (
-                        <button onClick={() => setWizard({ reservation: r })}>
-                          Convertir reserva {r.id} en contrato
+                )}
+                {r.notes && <p>{r.notes}</p>}
+                {canWrite && (
+                  <div className="actions">
+                    {["pending", "confirmed"].includes(r.effective_status) && (
+                      <>
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => setReservationForm(r)}
+                        >
+                          Modificar reserva {r.id}
                         </button>
-                      )}
-                      {r.effective_status === "expired" &&
-                        r.status !== "expired" && (
+                        {r.effective_status === "pending" && (
                           <button
-                            className="secondary"
                             disabled={busy}
-                            onClick={() => void reservationAction(r, "expire")}
+                            onClick={() => void reservationAction(r, "confirm")}
                           >
-                            Registrar vencimiento {r.id}
+                            Confirmar reserva {r.id}
                           </button>
                         )}
-                    </div>
-                  )}
-                </div>
-              </article>
-            ))}
-          {!reservations.length && (
-            <p className="empty">Todavía no hay reservas para mostrar.</p>
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => void reservationAction(r, "cancel")}
+                        >
+                          Cancelar reserva {r.id}
+                        </button>
+                      </>
+                    )}
+                    {canActivate && r.effective_status === "confirmed" && (
+                      <button onClick={() => setWizard({ reservation: r })}>
+                        Convertir reserva {r.id} en contrato
+                      </button>
+                    )}
+                    {r.effective_status === "expired" &&
+                      r.status !== "expired" && (
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => void reservationAction(r, "expire")}
+                        >
+                          Registrar vencimiento {r.id}
+                        </button>
+                      )}
+                  </div>
+                )}
+              </div>
+            </article>
+          ))}
+          {!reservationList.rows.length && (
+            <p className="empty">
+              {reservations.length
+                ? "No se encontraron reservas."
+                : "Todavía no hay reservas para mostrar."}
+            </p>
           )}
         </div>
+      )}
+      {!linkedReservation && !loading && !error && (
+        <ListPagination
+          label={view === "contracts" ? "contratos" : "reservas"}
+          {...list.pagination}
+        />
       )}
     </section>
   );
