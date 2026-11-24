@@ -185,6 +185,7 @@ test("reserva desde React, persona sin cuenta, confirmación y conversión en co
   const f = await houseFixture(page);
   await page.goto("/");
   await openSection(page, "Alquileres", "Reservas");
+  await page.getByRole("searchbox", { name: "Buscar reservas" }).fill(f.house.name);
   await page
     .getByRole("button", { name: "Registrar reserva", exact: true })
     .click();
@@ -606,8 +607,8 @@ test("consulta e inventario paginan y enlazan los formularios y los impedimentos
   });
   await expect(inventory.getByRole("row")).toHaveCount(21);
   await page.getByLabel("Tipo de unidad").selectOption("local");
-  await page.getByLabel("Habilitación", { exact: true }).selectOption("true");
-  await page.getByLabel("Mantenimiento", { exact: true }).selectOption("true");
+  await page.getByLabel("Habilitación").selectOption("true");
+  await page.getByLabel("Mantenimiento").selectOption("true");
   const local = inventory.getByRole("row").filter({ hasText: "C-21" });
   await expect(local.getByText("Habilitado", { exact: true })).toBeVisible();
   await expect(

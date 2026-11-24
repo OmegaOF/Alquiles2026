@@ -101,6 +101,6 @@ test("registra propietario, casa y cuarto sin perder los formularios abiertos", 
     .fill("Cuarto desde el listado");
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(
-    page.getByRole("heading", { name: "UX-16 · Cuarto desde el listado" }),
+    page.getByRole("row").filter({ hasText: /UX-16.*Cuarto desde el listado/ }),
   ).toBeVisible();
 });
