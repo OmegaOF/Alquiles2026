@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, checkConnection } from "./api";
 import type { Person, Property, User } from "./types";
 import type { AvailabilityAction, AvailabilityQuery } from "./tenancy";
@@ -24,11 +24,13 @@ import {
 import { WorkspaceNavigation } from "./components/WorkspaceNavigation";
 import type { WorkspacePage } from "./components/WorkspaceNavigation";
 import { WorkspaceHome } from "./pages/WorkspaceHome";
+import { ListPreferences } from "./components/RecordList";
 import "./workspace.css";
 export { PhaseZero } from "./PhaseZero";
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
+  const listPreferences = useMemo(() => new Map<string, unknown>(), [user?.id]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
@@ -71,15 +73,17 @@ export function App() {
       />
     );
   return (
-    <Workspace
-      key={user.id}
-      user={user}
-      onUserChange={setUser}
-      onLogout={() => {
-        setUser(null);
-        setExpired(false);
-      }}
-    />
+    <ListPreferences.Provider value={listPreferences}>
+      <Workspace
+        key={user.id}
+        user={user}
+        onUserChange={setUser}
+        onLogout={() => {
+          setUser(null);
+          setExpired(false);
+        }}
+      />
+    </ListPreferences.Provider>
   );
 }
 

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
+import { useListRequest } from "../components/RecordList";
+import { StatusIndicator } from "../components/StatusIndicator";
+import type { StatusTone } from "../components/StatusIndicator";
 import type { WorkspacePage } from "../components/WorkspaceNavigation";
 import type { ReportData } from "../reports";
 import { money } from "../reports";
@@ -14,106 +15,97 @@ export function WorkspaceHome({
   properties: Property[];
   navigate: (page: WorkspacePage) => void;
 }) {
-  const [report, setReport] =
-    useState<Pick<ReportData, "summary" | "counts">>();
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    if (!properties.length) return;
-    let current = true;
-    api<Pick<ReportData, "summary" | "counts">>("/dashboard/overview")
-      .then((data) => {
-        if (current) setReport(data);
-      })
-      .catch(() => {
-        if (current) setFailed(true);
-      });
-    return () => {
-      current = false;
-    };
-  }, [properties.length]);
+  const overview = useListRequest<Pick<ReportData, "summary" | "counts">>(
+    properties.length ? "/dashboard/overview" : null,
+  );
+  const attention = useListRequest<{ count: number | null }>(
+    properties.length ? "/dashboard/attention" : null,
+  );
+  const report = overview.data;
+  const pending =
+    report?.summary?.filter((row) => Number(row.pending) > 0) ?? [];
+  const awaiting = overview.error ? "Sin datos" : "Consultando…";
+  const rows: {
+    title: string;
+    value: string | number;
+    tone: StatusTone;
+    page: WorkspacePage;
+    action: string;
+  }[] = [
+    {
+      title: "Casas registradas",
+      value: properties.length,
+      tone: "blue",
+      page: "properties",
+      action: "Consultar casas",
+    },
+    {
+      title: "Cuartos disponibles",
+      value:
+        report?.counts?.units_available ?? (properties.length ? awaiting : 0),
+      tone: "green",
+      page: "availability",
+      action: "Consultar disponibilidad",
+    },
+    {
+      title: "Deudas pendientes",
+      value: pending.length
+        ? pending.map((row) => money(row.pending, row.currency)).join(" · ")
+        : report || !properties.length
+          ? "Sin saldos pendientes"
+          : awaiting,
+      tone: pending.length
+        ? "amber"
+        : report || !properties.length
+          ? "green"
+          : "gray",
+      page: "debts",
+      action: "Consultar deudas",
+    },
+    {
+      title: "Contratos próximos a vencer",
+      value:
+        report?.counts?.contracts_ending ?? (properties.length ? awaiting : 0),
+      tone: report?.counts?.contracts_ending ? "amber" : "blue",
+      page: "contracts",
+      action: "Consultar contratos",
+    },
+    {
+      title: "Avisos que requieren atención",
+      value: !properties.length
+        ? 0
+        : (attention.data?.count ??
+          (attention.error || attention.data ? "Sin datos" : "Consultando…")),
+      tone: attention.data?.count ? "amber" : "gray",
+      page: "pending",
+      action: "Ver pendientes",
+    },
+  ];
 
   return (
     <section className="workspace-home">
-      <header className="home-intro">
-        <div>
-          <h1>Inicio</h1>
-          <p>Hola, {user.display_name || user.full_name}.</p>
-        </div>
+      <h1>Inicio</h1>
+      <p>Hola, {user.display_name || user.full_name}.</p>
+      <h2>Resumen</h2>
+      <ul className="home-summary">
+        {rows.map(({ title, value, tone, page, action }) => (
+          <li key={page}>
+            <strong>{title}</strong>
+            <StatusIndicator tone={tone} label={String(value)} />
+            <button className="secondary" onClick={() => navigate(page)}>
+              {action}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="record-row-actions home-links">
+        <button className="secondary" onClick={() => navigate("reminders")}>
+          Ver avisos
+        </button>
         <button className="secondary" onClick={() => navigate("dashboard")}>
           Ver resumen detallado
         </button>
-      </header>
-      <div className="home-cards">
-        <article>
-          <h2>Mis casas</h2>
-          <strong className="home-number">{properties.length}</strong>
-          <p>
-            {properties.length
-              ? "Casas a las que tienes acceso."
-              : "Todavía no tienes casas disponibles."}
-          </p>
-          {report?.counts?.units_available != null && (
-            <p>
-              <strong>{report.counts.units_available}</strong> cuartos
-              disponibles hoy.
-            </p>
-          )}
-          <button className="secondary" onClick={() => navigate("properties")}>
-            Consultar casas
-          </button>
-        </article>
-        <article>
-          <h2>Deudas pendientes</h2>
-          {failed ? (
-            <p role="status">No se pudieron consultar los saldos.</p>
-          ) : !properties.length ? (
-            <p>Aún no hay casas para consultar.</p>
-          ) : !report ? (
-            <p role="status">Consultando saldos…</p>
-          ) : report.summary?.length ? (
-            <ul className="home-balances">
-              {report.summary.map((row) => (
-                <li key={row.currency}>{money(row.pending, row.currency)}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>Sin saldos para mostrar.</p>
-          )}
-          <button className="secondary" onClick={() => navigate("debts")}>
-            Consultar deudas
-          </button>
-        </article>
-        <article>
-          <h2>Avisos</h2>
-          {report?.counts?.contracts_ending != null && (
-            <p>
-              <strong>{report.counts.contracts_ending}</strong> contratos vencen
-              en los próximos 30 días.
-            </p>
-          )}
-          <p>Revisa vencimientos de alquileres, contratos y servicios.</p>
-          <button className="secondary" onClick={() => navigate("reminders")}>
-            Ver avisos
-          </button>
-        </article>
       </div>
-      <section className="panel home-actions" aria-labelledby="home-actions">
-        <h2 id="home-actions">Accesos rápidos</h2>
-        <div className="actions">
-          <button onClick={() => navigate("contracts")}>
-            Consultar contratos
-          </button>
-          <button
-            className="secondary"
-            onClick={() => navigate("availability")}
-          >
-            Consultar disponibilidad
-          </button>
-          <button className="secondary" onClick={() => navigate("pending")}>
-            Ver pendientes
-          </button>
-        </div>
-      </section>
     </section>
   );
 }

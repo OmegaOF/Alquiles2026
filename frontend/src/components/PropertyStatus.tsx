@@ -1,3 +1,5 @@
+import { StatusIndicator } from "./StatusIndicator";
+import type { StatusTone } from "./StatusIndicator";
 import type { Availability, AvailabilityState } from "../tenancy";
 import { stateNames } from "../tenancy";
 
@@ -10,15 +12,19 @@ export const availabilityStates = [
 ] as const;
 
 const states = {
-  available: { icon: "✓", label: stateNames.available },
-  occupied: { icon: "🔒︎", label: stateNames.occupied },
-  reserved: { icon: "▦", label: stateNames.reserved },
-  maintenance: { icon: "⚒", label: stateNames.maintenance },
-  disabled: { icon: "⊘", label: stateNames.disabled },
-  enabled: { icon: "✓", label: "Habilitado" },
-  noMaintenance: { icon: "–", label: "Sin mantenimiento marcado" },
-  unoccupied: { icon: "–", label: "Sin ocupación" },
-};
+  available: { tone: "green", icon: "✓", label: stateNames.available },
+  occupied: { tone: "red", icon: "🔒︎", label: stateNames.occupied },
+  reserved: { tone: "amber", icon: "▦", label: stateNames.reserved },
+  maintenance: { tone: "purple", icon: "⚒", label: stateNames.maintenance },
+  disabled: { tone: "gray", icon: "⊘", label: stateNames.disabled },
+  enabled: { tone: "blue", icon: "✓", label: "Habilitado" },
+  noMaintenance: {
+    tone: "gray",
+    icon: "–",
+    label: "Sin mantenimiento marcado",
+  },
+  unoccupied: { tone: "gray", icon: "–", label: "Sin ocupación" },
+} satisfies Record<string, { tone: StatusTone; icon: string; label: string }>;
 
 export function PropertyStatus({
   state,
@@ -28,10 +34,11 @@ export function PropertyStatus({
   label?: string;
 }) {
   return (
-    <span className={`property-status property-status--${state}`}>
-      <span aria-hidden="true">{states[state].icon}</span>
-      <span>{label ?? states[state].label}</span>
-    </span>
+    <StatusIndicator
+      {...states[state]}
+      label={label ?? states[state].label}
+      className={`property-status property-status--${state}`}
+    />
   );
 }
 

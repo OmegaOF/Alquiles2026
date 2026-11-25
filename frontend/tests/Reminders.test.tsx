@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { api } from "../src/api";
 import { Reminders } from "../src/pages/Reminders";
+import { ListPreferences } from "../src/components/RecordList";
 import { MessageComposer } from "../src/pages/reminders/MessageComposer";
 import { Consents } from "../src/pages/reminders/Consents";
 import type {
@@ -242,7 +243,7 @@ test("el centro muestra el saldo parcial vigente y la fecha de Bolivia enviada p
 test("revisar un aviso conserva la versión y huella del origen sin llamar a pagos", async () => {
   center();
   await userEvent.click(
-    await screen.findByRole("button", { name: /Ver detalle de alquiler/ }),
+    await screen.findByRole("button", { name: /Ver aviso de alquiler/ }),
   );
   await userEvent.click(
     screen.getByRole("button", { name: "Guardar mi revisión del aviso" }),
@@ -266,7 +267,7 @@ test("revisar un aviso conserva la versión y huella del origen sin llamar a pag
 test("el propietario consulta y atiende sus avisos sin controles para preparar mensajes", async () => {
   center("owner");
   await userEvent.click(
-    await screen.findByRole("button", { name: /Ver detalle de alquiler/ }),
+    await screen.findByRole("button", { name: /Ver aviso de alquiler/ }),
   );
   expect(
     screen.queryByRole("button", { name: "Preparar WhatsApp" }),
@@ -518,4 +519,94 @@ test("una dirección ajena al dominio oficial se rechaza antes de registrar aper
       ([, , body]) => body && (body as { action: string }).action === "opened",
     ),
   ).toHaveLength(0);
+});
+
+test("busca avisos de todas las páginas, conserva los criterios y distingue ambos estados", async () => {
+  const items = Array.from(
+    { length: 25 },
+    (_, index): Reminder => ({
+      ...notice,
+      key: `debt:${100 + index}`,
+      concept: index === 24 ? "Inspección eléctrica" : `Alquiler ${index + 1}`,
+      priority: index === 24 ? "overdue" : "upcoming",
+      attention_state: index === 24 ? "snoozed" : "pending",
+      until_on: index === 24 ? "2031-01-02" : null,
+    }),
+  );
+  mocked.mockImplementation(async (path) =>
+    path.endsWith("/contacts") ? people : ({ ...data, items } as never),
+  );
+  const origin = vi.fn();
+  const center = (
+    <Reminders user={user} properties={[property]} onOrigin={origin} />
+  );
+  const preferences = new Map<string, unknown>();
+  const { rerender } = render(
+    <ListPreferences.Provider value={preferences}>
+      {center}
+    </ListPreferences.Provider>,
+  );
+  await screen.findByTestId("debt:100");
+  expect(screen.getAllByRole("article")).toHaveLength(20);
+  await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+  expect(screen.getAllByRole("article")).toHaveLength(5);
+  await userEvent.click(screen.getByRole("button", { name: "Anterior" }));
+
+  const search = screen.getByRole("searchbox", { name: "Buscar avisos" });
+  await userEvent.type(search, "inspeccion electrica");
+  const item = screen.getByTestId("debt:124");
+  expect(item).toBeVisible();
+  expect(
+    within(item).getByText("Vencido").closest("[data-tone]"),
+  ).toHaveAttribute("data-tone", "red");
+  expect(
+    within(item).getByText("Pospuesto").closest("[data-tone]"),
+  ).toHaveAttribute("data-tone", "amber");
+  await userEvent.click(
+    within(item).getByRole("button", { name: /^Ver aviso/ }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Consultar registro de origen" }),
+  );
+  expect(origin).toHaveBeenCalledWith(property.id, notice.origin);
+
+  rerender(<ListPreferences.Provider value={preferences} />);
+  rerender(
+    <ListPreferences.Provider value={preferences}>
+      {center}
+    </ListPreferences.Provider>,
+  );
+  await screen.findByTestId("debt:124");
+  expect(screen.getByRole("searchbox", { name: "Buscar avisos" })).toHaveValue(
+    "inspeccion electrica",
+  );
+});
+
+test("Pendientes empieza por la atención requerida y permite consultar los avisos pospuestos", async () => {
+  mocked.mockImplementation(async (path) =>
+    path.endsWith("/contacts")
+      ? people
+      : ({
+          ...data,
+          items: [
+            notice,
+            { ...notice, key: "debt:21", attention_state: "reviewed" },
+            { ...notice, key: "debt:22", attention_state: "snoozed" },
+          ],
+        } as never),
+  );
+  render(
+    <Reminders
+      pending
+      user={user}
+      properties={[property]}
+      onOrigin={vi.fn()}
+    />,
+  );
+  await screen.findByTestId(notice.key);
+  expect(screen.queryByTestId("debt:21")).toBeNull();
+  expect(screen.queryByTestId("debt:22")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Pospuestos" }));
+  expect(screen.getByTestId("debt:22")).toBeVisible();
+  expect(screen.queryByTestId(notice.key)).toBeNull();
 });

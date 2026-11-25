@@ -154,7 +154,7 @@ export function Preferences({
           <fieldset>
             <legend>Tipos de aviso</legend>
             {prefs.types.map((t, index) => (
-              <div className="utility-space" key={t.kind}>
+              <div className="record-form-row" key={t.kind}>
                 <strong>{reminderKinds[t.kind]}</strong>
                 <label>
                   <input

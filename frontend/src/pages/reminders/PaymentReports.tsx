@@ -1,3 +1,9 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+} from "../../components/RecordList";
+import { RecordStatus } from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { SearchSelect, personOption } from "../../components/SearchSelect";
@@ -270,45 +276,69 @@ export function PaymentReports({
           </div>
         </form>
       )}
-      {items.map((r) => (
-        <article className="panel" key={r.id}>
-          <h3>
-            {r.concept} · {reportStates[r.state]}
-          </h3>
-          <p>
-            Responsable: {personName(r.person_id)} · Informó:{" "}
-            {personName(r.reporting_person_id)}
-          </p>
-          <p>
-            Importe reportado: <strong>{money(r.amount, r.currency)}</strong> ·
-            Fecha comunicada: {showDate(r.reported_on)}
-          </p>
-          <p>Comprobante externo: {r.document_reference}</p>
-          <button
-            className="secondary"
-            onClick={() => {
-              setSelected(r);
-              setCreating(false);
-              setDecision(admin ? "verified" : "pending");
-              requestKey.current = newFinanceKey();
-            }}
-          >
-            Revisar reporte {r.id}
-          </button>
-        </article>
-      ))}
-      {!items.length && <p>No hay pagos reportados en esta casa.</p>}
+      <RecordCollection
+        id={`${base}:reported-payments`}
+        label="pagos reportados"
+        items={items}
+        searchable={(r) =>
+          `${r.id} ${r.concept} ${personName(r.person_id)} ${personName(r.reporting_person_id)} ${r.reported_on} ${money(r.amount, r.currency)} ${r.document_reference} ${reportStates[r.state]}`
+        }
+        filter={{
+          label: "Estado de verificación",
+          value: (r) => reportStates[r.state],
+        }}
+        empty="No hay pagos reportados en esta consulta."
+        render={(r) => (
+          <RecordRow
+            key={r.id}
+            title={r.concept}
+            fields={
+              <>
+                <RecordField label="Responsable">
+                  {personName(r.person_id)}
+                </RecordField>
+                <RecordField label="Informó">
+                  {personName(r.reporting_person_id)}
+                </RecordField>
+                <RecordField label="Importe reportado">
+                  {money(r.amount, r.currency)}
+                </RecordField>
+                <RecordField label="Fecha comunicada">
+                  {showDate(r.reported_on)}
+                </RecordField>
+                <RecordField label="Estado">
+                  <RecordStatus domain="paymentReport" state={r.state} />
+                </RecordField>
+              </>
+            }
+            actions={
+              <button
+                className="secondary"
+                onClick={() => {
+                  setSelected(r);
+                  setCreating(false);
+                  setDecision(admin ? "verified" : "pending");
+                  requestKey.current = newFinanceKey();
+                }}
+              >
+                Revisar reporte {r.id}
+              </button>
+            }
+          />
+        )}
+      />
       {selected && (
         <section className="panel">
           <h3>Revisión del reporte {selected.id}</h3>
           <p>
             {selected.concept} · {money(selected.amount, selected.currency)} ·{" "}
-            {reportStates[selected.state]}
+            <RecordStatus domain="paymentReport" state={selected.state} />
           </p>
           <p>
-            Registró usuario {selected.recorded_by}. Un reporte verificado se
-            vincula a una entrada existente; si esa entrada se anula, vuelve a
-            requerir revisión.
+            Comprobante externo: {selected.document_reference}. Registró usuario{" "}
+            {selected.recorded_by}. Un reporte verificado se vincula a una
+            entrada existente; si esa entrada se anula, vuelve a requerir
+            revisión.
           </p>
           {canWrite &&
             (admin || selected.state === "reported") &&
@@ -374,12 +404,32 @@ export function PaymentReports({
               </form>
             )}
           <h4>Historial de verificación</h4>
-          {selected.decisions.map((d) => (
-            <p key={d.id}>
-              {reportStates[d.kind]} · {d.reason} · Usuario {d.created_by}
-              {d.movement_id && ` · Movimiento real ${d.movement_id}`}
-            </p>
-          ))}
+          <RecordCollection
+            id={`${base}:reported-payments:${selected.id}:decisions`}
+            label="decisiones de verificación"
+            items={selected.decisions}
+            searchable={(d) =>
+              `${reportStates[d.kind]} ${d.reason} ${d.created_by} ${d.movement_id ?? ""}`
+            }
+            render={(d) => (
+              <RecordRow
+                key={d.id}
+                title={<RecordStatus domain="paymentReport" state={d.kind} />}
+                fields={
+                  <>
+                    <RecordField label="Usuario">{d.created_by}</RecordField>
+                    {d.movement_id && (
+                      <RecordField label="Movimiento real">
+                        {d.movement_id}
+                      </RecordField>
+                    )}
+                  </>
+                }
+                detail={<p>{d.reason}</p>}
+                detailLabel="Ver motivo"
+              />
+            )}
+          />
         </section>
       )}
     </section>

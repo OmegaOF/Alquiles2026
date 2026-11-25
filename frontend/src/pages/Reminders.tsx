@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import {
+  ListPagination,
+  ListSearch,
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  useListPreference,
+  useLocalList,
+} from "../components/RecordList";
+import { RecordStatus, StatusIndicator } from "../components/StatusIndicator";
 import { PropertySelect } from "../components/PropertySelect";
 import { SearchSelect, personOption } from "../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../components/Form";
@@ -18,7 +28,6 @@ import {
   reminderKinds,
   priorities,
   attentionNames,
-  reportStates,
 } from "../reminders";
 import { MessageComposer } from "./reminders/MessageComposer";
 import { Consents } from "./reminders/Consents";
@@ -39,12 +48,24 @@ export function Reminders({
   initialTarget?: ReminderTarget | null;
   onOrigin: (propertyId: number, origin: ReminderOrigin) => void;
 }) {
+  const listId = pending ? "pending-reminders" : "reminders";
+  const [savedProperty, setSavedProperty] = useListPreference(
+    `${listId}:house`,
+    0,
+  );
   const [propertyId, setPropertyId] = useState(
-      initialTarget?.propertyId || properties[0]?.id || 0,
-    ),
-    [data, setData] = useState<ReminderData | null>(null),
+    initialTarget?.propertyId ||
+      properties.find((property) => property.id === savedProperty)?.id ||
+      properties[0]?.id ||
+      0,
+  );
+  const criteria = `${listId}:${propertyId}`;
+  const [data, setData] = useState<ReminderData | null>(null),
     [people, setPeople] = useState<Person[]>([]),
-    [view, setView] = useState("all"),
+    [view, setView] = useListPreference(
+      initialTarget ? undefined : `${criteria}:tab`,
+      "all",
+    ),
     [selectedKey, setSelectedKey] = useState<string | null>(
       initialTarget?.noticeKey || null,
     ),
@@ -54,13 +75,31 @@ export function Reminders({
       purpose: string;
     } | null>(null),
     [detailHistory, setDetailHistory] = useState(false),
-    [filterType, setFilterType] = useState(""),
-    [filterPriority, setFilterPriority] = useState(""),
-    [filterPerson, setFilterPerson] = useState(0),
-    [filterUnit, setFilterUnit] = useState(""),
-    [filterState, setFilterState] = useState(""),
-    [from, setFrom] = useState(""),
-    [through, setThrough] = useState(""),
+    [filterType, setFilterType] = useListPreference(
+      `${criteria}:${view}:type`,
+      "",
+    ),
+    [filterPriority, setFilterPriority] = useListPreference(
+      `${criteria}:${view}:priority`,
+      "",
+    ),
+    [filterPerson, setFilterPerson] = useListPreference(
+      `${criteria}:${view}:person`,
+      0,
+    ),
+    [filterUnit, setFilterUnit] = useListPreference(
+      `${criteria}:${view}:unit`,
+      "",
+    ),
+    [filterState, setFilterState] = useListPreference(
+      `${criteria}:${view}:state`,
+      "",
+    ),
+    [from, setFrom] = useListPreference(`${criteria}:${view}:from`, ""),
+    [through, setThrough] = useListPreference(
+      `${criteria}:${view}:through`,
+      "",
+    ),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -103,8 +142,6 @@ export function Reminders({
         : null,
     );
     setNotice("");
-    setFilterPerson(0);
-    setFilterUnit("");
     void load();
     return () => {
       seq.current++;
@@ -120,9 +157,6 @@ export function Reminders({
     setComposer(false);
     setDetailHistory(false);
     setNotice("");
-    setFilterType("");
-    setFilterPriority("");
-    setFilterState("");
   }
   function showDetail(e: Reminder) {
     setSelectedKey(e.key);
@@ -219,7 +253,7 @@ export function Reminders({
       (view === "snoozed" && e.attention_state === "snoozed");
     return (
       tab &&
-      (!pending || view !== "all" || e.requires_attention) &&
+      (!pending || view !== "all" || e.attention_state === "pending") &&
       (!filterType || e.kind === filterType) &&
       (!filterPriority || e.priority === filterPriority) &&
       (!filterPerson || e.person_id === filterPerson) &&
@@ -239,19 +273,39 @@ export function Reminders({
         .map((e) => [e.unit_id!, e.target_label]),
     ).entries(),
   ];
+  const list = useLocalList(
+    (data?.items ?? []).filter(fits),
+    (item) =>
+      [
+        item.property_name,
+        item.target_label,
+        item.kind_label,
+        item.concept,
+        item.period,
+        item.responsible_name,
+        item.due_on,
+        showDate(item.due_on),
+        item.amount,
+        priorities[item.priority],
+        attentionNames[item.attention_state],
+      ].join(" "),
+    `${criteria}:${view}`,
+  );
+  function changeFilter<T>(setFilter: (value: T) => void, value: T) {
+    setFilter(value);
+    list.pagination.onPage(1);
+  }
   return (
-    <section>
-      <p className="eyebrow">AVISOS BASADOS EN SALDOS Y FECHAS REALES</p>
+    <section className="reminders-page">
       <h1>{pending ? "Pendientes" : "Recordatorios"}</h1>
-      <p>
-        Revisa qué requiere atención, quién es responsable y qué comunicación
-        registraste. Los avisos no crean pagos ni deudas.
-      </p>
       <PropertySelect
         label="Casa de los recordatorios"
         properties={properties}
         value={propertyId || ""}
-        onChange={(id) => setPropertyId(Number(id))}
+        onChange={(id) => {
+          setPropertyId(Number(id));
+          setSavedProperty(Number(id));
+        }}
       />
       <div className="form-actions">
         <button
@@ -284,7 +338,7 @@ export function Reminders({
       ) : (
         <>
           <nav
-            className="utility-tabs finance-tabs"
+            className="utility-tabs finance-tabs reminder-tabs"
             aria-label="Consultas de recordatorios"
           >
             {[
@@ -367,8 +421,11 @@ export function Reminders({
               </h2>
               <p>
                 {selected.kind_label} ·{" "}
-                <strong>{priorities[selected.priority]}</strong> ·{" "}
-                {attentionNames[selected.attention_state]}
+                <RecordStatus domain="priority" state={selected.priority} />{" "}
+                <RecordStatus
+                  domain="attention"
+                  state={selected.attention_state}
+                />
               </p>
               {composer ? (
                 <MessageComposer
@@ -452,8 +509,11 @@ export function Reminders({
                     {selected.report_state && (
                       <p>
                         Verificación del pago:{" "}
-                        {reportStates[selected.report_state]}. Un reporte no
-                        confirma un ingreso.
+                        <RecordStatus
+                          domain="paymentReport"
+                          state={selected.report_state}
+                        />
+                        . Un reporte no confirma un ingreso.
                       </p>
                     )}
                     {selected.resolved && <p>{selected.resolution_reason}</p>}
@@ -550,20 +610,40 @@ export function Reminders({
                     </form>
                   )}
                   {selected.attention_history.length > 0 && (
-                    <section className="panel">
+                    <section>
                       <h3>Mi historial de atención</h3>
-                      {selected.attention_history.map((h) => (
-                        <p key={h.id}>
-                          {h.kind === "reopened"
-                            ? "Atención reabierta"
-                            : h.kind === "reviewed"
-                              ? "Aviso revisado"
-                              : "Atención pospuesta"}{" "}
-                          ·{" "}
-                          {new Date(h.created_at + "Z").toLocaleString("es-BO")}
-                          {h.notes && ` · ${h.notes}`}
-                        </p>
-                      ))}
+                      <RecordCollection
+                        id={`${criteria}:${selected.key}:attention-history`}
+                        label="acciones de atención"
+                        items={selected.attention_history}
+                        searchable={(row) =>
+                          `${attentionAction(row.kind)} ${row.created_at} ${row.notes ?? ""}`
+                        }
+                        filter={{
+                          label: "Acción de atención",
+                          value: (row) => attentionAction(row.kind),
+                        }}
+                        render={(row) => (
+                          <RecordRow
+                            key={row.id}
+                            title={
+                              <StatusIndicator
+                                tone={row.kind === "snoozed" ? "amber" : "blue"}
+                                label={attentionAction(row.kind)}
+                              />
+                            }
+                            fields={
+                              <RecordField label="Fecha">
+                                {new Date(row.created_at + "Z").toLocaleString(
+                                  "es-BO",
+                                )}
+                              </RecordField>
+                            }
+                            detail={row.notes && <p>{row.notes}</p>}
+                            detailLabel="Ver observaciones"
+                          />
+                        )}
+                      />
                     </section>
                   )}
                   {detailHistory && (
@@ -578,24 +658,33 @@ export function Reminders({
             </>
           ) : (
             <>
-              <section className="panel">
-                <h2>Resumen de atención</h2>
-                <dl className="finance-values">
+              <section aria-labelledby="attention-summary">
+                <h2 id="attention-summary">Resumen de atención</h2>
+                <dl className="indicator-summary">
                   {["pending", "reviewed", "snoozed", "resolved"].map((k) => (
                     <div key={k}>
-                      <dt>{attentionNames[k]}</dt>
+                      <dt>
+                        <RecordStatus domain="attention" state={k} />
+                      </dt>
                       <dd>{data.summary[k] || 0}</dd>
                     </div>
                   ))}
                 </dl>
               </section>
-              <details className="panel">
-                <summary>Filtrar tipo, persona, cuarto o fechas</summary>
+              <ListSearch
+                label="Buscar avisos"
+                placeholder="Casa, cuarto, concepto o responsable"
+                {...list.search}
+              />
+              <details className="record-toggle">
+                <summary>Filtrar avisos</summary>
                 <div className="form-grid">
                   <Field label="Tipo de recordatorio">
                     <select
                       value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
+                      onChange={(e) =>
+                        changeFilter(setFilterType, e.target.value)
+                      }
                     >
                       <option value="">Todos los tipos</option>
                       {Object.entries(reminderKinds).map(([key, label]) => (
@@ -608,7 +697,9 @@ export function Reminders({
                   <Field label="Prioridad del aviso">
                     <select
                       value={filterPriority}
-                      onChange={(e) => setFilterPriority(e.target.value)}
+                      onChange={(e) =>
+                        changeFilter(setFilterPriority, e.target.value)
+                      }
                     >
                       <option value="">Todas las prioridades</option>
                       {Object.entries(priorities).map(([key, label]) => (
@@ -622,12 +713,12 @@ export function Reminders({
                     label="Responsable del asunto"
                     value={filterPerson || ""}
                     options={people.map(personOption)}
-                    onChange={(id) => setFilterPerson(Number(id))}
+                    onChange={(id) => changeFilter(setFilterPerson, Number(id))}
                   />
                   <SearchSelect
                     label="Casa completa o cuarto"
                     value={filterUnit}
-                    onChange={setFilterUnit}
+                    onChange={(id) => changeFilter(setFilterUnit, id)}
                     options={[
                       { value: "whole", label: "Casa completa" },
                       ...units.map(([id, label]) => ({ value: id, label })),
@@ -636,7 +727,9 @@ export function Reminders({
                   <Field label="Estado de mi atención">
                     <select
                       value={filterState}
-                      onChange={(e) => setFilterState(e.target.value)}
+                      onChange={(e) =>
+                        changeFilter(setFilterState, e.target.value)
+                      }
                     >
                       <option value="">Todos los estados</option>
                       {Object.entries(attentionNames).map(([key, label]) => (
@@ -650,55 +743,97 @@ export function Reminders({
                     <input
                       type="date"
                       value={from}
-                      onChange={(e) => setFrom(e.target.value)}
+                      onChange={(e) => changeFilter(setFrom, e.target.value)}
                     />
                   </Field>
                   <Field label="Vencimientos hasta">
                     <input
                       type="date"
                       value={through}
-                      onChange={(e) => setThrough(e.target.value)}
+                      onChange={(e) => changeFilter(setThrough, e.target.value)}
                     />
                   </Field>
                 </div>
               </details>
-              {data.items.filter(fits).map((e) => (
-                <article className="panel" key={e.key} data-testid={e.key}>
-                  <h2>
-                    {e.property_name} — {e.target_label}
-                  </h2>
-                  <p>
-                    {e.kind_label} · <strong>{priorities[e.priority]}</strong>
-                  </p>
-                  <p>Responsable: {e.responsible_name}</p>
-                  <p>
-                    {e.concept}
-                    {e.period && ` · ${e.period}`}
-                  </p>
-                  {amount(e)}
-                  {due(e)}
-                  <p>
-                    Mi atención: {attentionNames[e.attention_state]}
-                    {e.until_on && ` hasta ${showDate(e.until_on)}`}
-                  </p>
-                  <button
-                    onClick={() => showDetail(e)}
-                    aria-label={`Ver detalle de ${e.kind_label.toLowerCase()} para ${e.responsible_name}`}
-                  >
-                    Ver detalle del aviso
-                  </button>
-                </article>
-              ))}
-              {!data.items.filter(fits).length && (
-                <p>
-                  No hay avisos en esta selección. Actualiza para consultar
-                  cambios en saldos y vencimientos.
-                </p>
+              {list.rows.length ? (
+                <div className="record-rows">
+                  {list.rows.map((item) => (
+                    <RecordRow
+                      key={item.key}
+                      testId={item.key}
+                      title={item.concept}
+                      fields={
+                        <>
+                          <RecordField label="Casa y cuarto">
+                            {item.property_name} · {item.target_label}
+                          </RecordField>
+                          <RecordField label="Tipo">
+                            {item.kind_label}
+                          </RecordField>
+                          <RecordField label="Responsable">
+                            {item.responsible_name}
+                          </RecordField>
+                          <RecordField label="Vencimiento">
+                            {item.due_on ? showDate(item.due_on) : "Sin fecha"}
+                          </RecordField>
+                          {item.amount !== null && (
+                            <RecordField
+                              label={
+                                item.kind === "report"
+                                  ? "Importe reportado"
+                                  : "Pendiente"
+                              }
+                            >
+                              <strong>
+                                {money(item.amount, item.currency || "BOB")}
+                              </strong>
+                            </RecordField>
+                          )}
+                          <RecordField label="Prioridad">
+                            <RecordStatus
+                              domain="priority"
+                              state={item.priority}
+                            />
+                          </RecordField>
+                          <RecordField label="Atención">
+                            <RecordStatus
+                              domain="attention"
+                              state={item.attention_state}
+                            />
+                            {item.until_on &&
+                              ` hasta ${showDate(item.until_on)}`}
+                          </RecordField>
+                        </>
+                      }
+                      actions={
+                        <button
+                          className="secondary"
+                          onClick={() => showDetail(item)}
+                        >
+                          Ver aviso{" "}
+                          <span className="sr-only">
+                            de {item.kind_label.toLowerCase()} para{" "}
+                            {item.responsible_name}
+                          </span>
+                        </button>
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p>No hay avisos en esta selección.</p>
               )}
+              <ListPagination label="avisos" {...list.pagination} />
             </>
           )}
         </>
       )}
     </section>
   );
+}
+
+function attentionAction(kind: string) {
+  if (kind === "reopened") return "Atención reabierta";
+  if (kind === "reviewed") return "Aviso revisado";
+  return "Atención pospuesta";
 }

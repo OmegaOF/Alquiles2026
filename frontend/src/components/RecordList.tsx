@@ -1,7 +1,36 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import type { ReactNode, SetStateAction } from "react";
 import { api } from "../api";
 import { Field, errorText } from "./Form";
 import { normalizeSearch } from "./SearchSelect";
+import "./recordList.css";
+
+export const ListPreferences = createContext<Map<string, unknown> | null>(null);
+
+export function useListPreference<T>(key: string | undefined, initial: T) {
+  const preferences = useContext(ListPreferences);
+  const [local, setLocal] = useState(initial);
+  const value =
+    key && preferences?.has(key) ? (preferences.get(key) as T) : local;
+  const [, invalidate] = useState(0);
+  return [
+    value,
+    (next: SetStateAction<T>) => {
+      if (!key || !preferences) {
+        setLocal(next);
+        return;
+      }
+      const previous = preferences.has(key)
+        ? (preferences.get(key) as T)
+        : value;
+      const result =
+        typeof next === "function" ? (next as (value: T) => T)(previous) : next;
+      if (Object.is(previous, result)) return;
+      preferences.set(key, result);
+      invalidate((version) => version + 1);
+    },
+  ] as const;
+}
 
 export const pageSize = 20;
 
@@ -82,9 +111,16 @@ export function ListPagination({
   );
 }
 
-export function useLocalList<T>(items: T[], searchable: (item: T) => string) {
-  const [query, setQuery] = useState("");
-  const [requestedPage, setPage] = useState(1);
+export function useLocalList<T>(
+  items: T[],
+  searchable: (item: T) => string,
+  listId?: string,
+) {
+  const [query, setQuery] = useListPreference(listId && `${listId}:search`, "");
+  const [requestedPage, setPage] = useListPreference(
+    listId && `${listId}:page`,
+    1,
+  );
   const tokens = normalizeSearch(query).split(/\s+/).filter(Boolean);
   const matches = tokens.length
     ? items.filter((item) => {
@@ -104,6 +140,126 @@ export function useLocalList<T>(items: T[], searchable: (item: T) => string) {
     pagination: { total: matches.length, page, onPage: setPage },
     rows: matches.slice((page - 1) * pageSize, page * pageSize),
   };
+}
+
+export function RecordRow({
+  title,
+  fields,
+  actions,
+  detail,
+  expanded,
+  detailLabel = "Ver detalle",
+  testId,
+}: {
+  title: ReactNode;
+  fields?: ReactNode;
+  actions?: ReactNode;
+  detail?: ReactNode;
+  expanded?: ReactNode;
+  detailLabel?: string;
+  testId?: string;
+}) {
+  const [opened, setOpened] = useState(false);
+  return (
+    <article className="record-row" data-testid={testId}>
+      <div>
+        <h3 className="record-row-title">{title}</h3>
+        {fields && <dl className="record-row-fields">{fields}</dl>}
+      </div>
+      {actions && <div className="record-row-actions">{actions}</div>}
+      {expanded && <div className="record-row-expanded">{expanded}</div>}
+      {detail && (
+        <details
+          className="record-row-detail"
+          onToggle={(event) => {
+            if (event.currentTarget.open) setOpened(true);
+          }}
+        >
+          <summary>{detailLabel}</summary>
+          {opened && detail}
+        </details>
+      )}
+    </article>
+  );
+}
+
+export function RecordField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+export function RecordCollection<T>({
+  id,
+  label,
+  items,
+  searchable,
+  render,
+  filter,
+  empty = "No se encontraron registros.",
+}: {
+  id?: string;
+  label: string;
+  items: T[];
+  searchable: (item: T) => string;
+  render: (item: T) => ReactNode;
+  filter?: { label: string; value: (item: T) => string };
+  empty?: string;
+}) {
+  const [selectedFilter, setFilter] = useListPreference(
+    id && `${id}:filter`,
+    "",
+  );
+  const options = filter
+    ? [...new Set([...items.map(filter.value), selectedFilter])]
+        .filter(Boolean)
+        .sort()
+    : [];
+  const list = useLocalList(
+    filter && selectedFilter
+      ? items.filter((item) => filter.value(item) === selectedFilter)
+      : items,
+    searchable,
+    id,
+  );
+  return (
+    <section aria-label={label}>
+      <div className="record-filters">
+        <ListSearch label={`Buscar ${label}`} {...list.search} />
+        {filter && (selectedFilter || options.length > 1) && (
+          <Field label={filter.label}>
+            <select
+              value={selectedFilter}
+              onChange={(event) => {
+                setFilter(event.target.value);
+                list.pagination.onPage(1);
+              }}
+            >
+              <option value="">Todos</option>
+              {options.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+      </div>
+      {list.rows.length ? (
+        <div className="record-rows">{list.rows.map(render)}</div>
+      ) : (
+        <p className="record-empty">{empty}</p>
+      )}
+      <ListPagination label={label} {...list.pagination} />
+    </section>
+  );
 }
 
 export function useListRequest<T>(

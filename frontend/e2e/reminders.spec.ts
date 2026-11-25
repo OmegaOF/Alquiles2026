@@ -1,3 +1,4 @@
+import { AxeBuilder } from "@axe-core/playwright";
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import {
@@ -149,7 +150,7 @@ async function enter(page: Page, f: Fixture) {
 async function detail(page: Page, f: Fixture, k = `debt:${f.oid}`) {
   await page
     .getByTestId(k)
-    .getByRole("button", { name: /Ver detalle/ })
+    .getByRole("button", { name: /Ver aviso/ })
     .click();
   await expect(
     page.getByRole("button", { name: "Consultar registro de origen" }),
@@ -206,6 +207,29 @@ test("saldo parcial, vencimientos y atención no crean otra deuda", async ({
   await pay(page, f, "1000");
   await enter(page, f);
   await expect(page.getByTestId(`debt:${f.oid}`)).toContainText("500,00");
+  const row = page.getByTestId(`debt:${f.oid}`);
+  const priority = row
+    .locator('[data-tone="amber"]')
+    .filter({ hasText: "Próximo a vencer" });
+  await expect(priority).toBeVisible();
+  await expect(
+    row.locator('[data-tone="amber"]').filter({ hasText: "Requiere atención" }),
+  ).toBeVisible();
+  await expect(priority).toHaveCSS("background-color", "rgb(255, 241, 202)");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(priority).toHaveCSS("background-color", "rgb(70, 52, 0)");
+  const accessibility = await new AxeBuilder({ page })
+    .include(".reminders-page")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(
+    accessibility.violations.map(({ id, nodes }) => ({
+      id,
+      nodes: nodes.map(({ target }) => target),
+    })),
+  ).toEqual([]);
+  await page.emulateMedia({ colorScheme: "light" });
+
   await capture(page, info, "resumen");
   await page.getByRole("button", { name: "Por vencer", exact: true }).click();
   await capture(page, info, "vencimientos");

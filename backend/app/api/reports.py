@@ -1,12 +1,13 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlalchemy.orm import Session
 from app.api.auth import current_user
 from app.db.session import get_db
 from app.models.entities import User
 from app.schemas.reports import ReportFilters, ReportKind
-from app.services import reports
+from app.services import reminder_sources, reports
+from app.services.report_facts import scope_properties
 from app.services.report_pdf import render
 
 router = APIRouter(tags=["Resumen general y reportes internos"])
@@ -45,6 +46,24 @@ def options(
 @router.get("/dashboard/overview")
 def overview(db: Session = Depends(get_db), user: User = Depends(current_user)):
     return reports.overview(db, user)
+
+
+@router.get("/dashboard/attention")
+def attention(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    properties, _ = scope_properties(db, user, ReportFilters())
+    count = 0
+    property_ids = [item.id for item in properties]
+    for property_id in property_ids:
+        try:
+            listing = reminder_sources.listing(db, user, property_id)
+            count += listing["summary"]["pending"]
+        except HTTPException as error:
+            if error.status_code == 403:
+                return {"count": None}
+            raise
+        finally:
+            db.rollback()
+    return {"count": count}
 
 
 @router.get("/dashboard", response_model=ReportResponse)

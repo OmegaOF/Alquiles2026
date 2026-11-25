@@ -1,3 +1,9 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+} from "../../components/RecordList";
+import { StatusIndicator } from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { SearchSelect, personOption } from "../../components/SearchSelect";
@@ -242,79 +248,142 @@ export function Consents({
         </form>
       )}
       <h3>Autorizaciones registradas</h3>
-      {items.map((c) => (
-        <article className="panel" key={c.id}>
-          <h4>
-            {people.find((p) => p.id === c.person_id)?.full_name ||
-              "Persona autorizada"}{" "}
-            · {purposes[c.purpose]}
-          </h4>
-          <p>
-            +{c.number} ·{" "}
-            <strong>{c.is_active ? "Vigente" : "Revocado"}</strong>
-          </p>
-          <p>
-            Aceptado el {showDate(c.accepted_on)} mediante {c.method}. Registró
-            usuario {c.recorded_by}.
-          </p>
-          {!c.matches_current_number && (
-            <p role="alert">
-              El número ya no coincide con el contacto. Se requiere revisar una
-              nueva autorización.
-            </p>
-          )}
-          {c.revoked_at && (
-            <p>
-              Revocación registrada:{" "}
-              {new Date(c.revoked_at + "Z").toLocaleString("es-BO")}.
-            </p>
-          )}
-          <div className="form-actions">
-            <button className="secondary" onClick={() => void showHistory(c)}>
-              Ver historial de autorización {c.id}
-            </button>
-            {admin && c.is_active && (
-              <button
-                className="secondary"
-                onClick={() => {
-                  setRevoke(c.id);
-                  requestKey.current = newFinanceKey();
-                }}
-              >
-                Revocar autorización {c.id}
-              </button>
-            )}
-          </div>
-          {revoke === c.id && (
-            <form onSubmit={(e) => void revokeConsent(e, c)}>
-              <Field label="Motivo de revocación">
-                <textarea
-                  name="reason"
-                  minLength={3}
-                  maxLength={1000}
-                  required
-                />
-              </Field>
-              <button disabled={busy}>Confirmar revocación</button>
-            </form>
-          )}
-        </article>
-      ))}
-      {!items.length && (
-        <p>No hay autorizaciones registradas para esta consulta.</p>
-      )}
+      <RecordCollection
+        id={`${base}:consents`}
+        label="autorizaciones"
+        items={items}
+        searchable={(c) =>
+          `${people.find((p) => p.id === c.person_id)?.full_name ?? ""} ${purposes[c.purpose]} ${c.number} ${c.accepted_on} ${c.method}`
+        }
+        filter={{
+          label: "Estado de la autorización",
+          value: (c) => (c.is_active ? "Vigente" : "Revocado"),
+        }}
+        empty="No hay autorizaciones registradas para esta consulta."
+        render={(c) => (
+          <RecordRow
+            key={c.id}
+            title={
+              people.find((p) => p.id === c.person_id)?.full_name ||
+              "Persona autorizada"
+            }
+            fields={
+              <>
+                <RecordField label="Motivo autorizado">
+                  {purposes[c.purpose]}
+                </RecordField>
+                <RecordField label="Número">+{c.number}</RecordField>
+                <RecordField label="Fecha de aceptación">
+                  {showDate(c.accepted_on)}
+                </RecordField>
+                <RecordField label="Estado">
+                  <StatusIndicator
+                    tone={c.is_active ? "blue" : "gray"}
+                    label={c.is_active ? "Vigente" : "Revocado"}
+                  />
+                </RecordField>
+                {!c.matches_current_number && (
+                  <RecordField label="Contacto">
+                    <StatusIndicator
+                      tone="amber"
+                      label="Número ya no coincide"
+                    />
+                  </RecordField>
+                )}
+              </>
+            }
+            actions={
+              <>
+                <button
+                  className="secondary"
+                  onClick={() => void showHistory(c)}
+                >
+                  Ver historial de autorización {c.id}
+                </button>
+                {admin && c.is_active && (
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setRevoke(c.id);
+                      requestKey.current = newFinanceKey();
+                    }}
+                  >
+                    Revocar autorización {c.id}
+                  </button>
+                )}
+              </>
+            }
+            expanded={
+              revoke === c.id && (
+                <form onSubmit={(e) => void revokeConsent(e, c)}>
+                  <Field label="Motivo de revocación">
+                    <textarea
+                      name="reason"
+                      minLength={3}
+                      maxLength={1000}
+                      required
+                    />
+                  </Field>
+                  <button disabled={busy}>Confirmar revocación</button>
+                </form>
+              )
+            }
+            detail={
+              <>
+                <p>
+                  Aceptado mediante {c.method}. Registró usuario {c.recorded_by}
+                  .
+                </p>
+                {!c.matches_current_number && (
+                  <p role="alert">
+                    El número ya no coincide con el contacto. Se requiere
+                    revisar una nueva autorización.
+                  </p>
+                )}
+                {c.revoked_at && (
+                  <p>
+                    Revocación registrada:{" "}
+                    {new Date(c.revoked_at + "Z").toLocaleString("es-BO")}.
+                  </p>
+                )}
+              </>
+            }
+          />
+        )}
+      />
       {history.length > 0 && (
         <section className="panel">
           <h3>Historial de aceptación y revocación</h3>
-          {history.map((e) => (
-            <p key={e.id}>
-              {e.action === "consent-granted"
-                ? "Aceptación registrada"
-                : "Revocación registrada"}{" "}
-              · Usuario {e.actor_id} ·{" "}
-              {new Date(e.created_at + "Z").toLocaleString("es-BO")}
-            </p>
-          ))}
+          <RecordCollection
+            label="eventos de consentimiento"
+            items={history}
+            searchable={(e) =>
+              `${e.action === "consent-granted" ? "Aceptación" : "Revocación"} ${e.actor_id} ${e.created_at}`
+            }
+            render={(e) => (
+              <RecordRow
+                key={e.id}
+                title={
+                  <StatusIndicator
+                    tone={e.action === "consent-granted" ? "green" : "gray"}
+                    label={
+                      e.action === "consent-granted"
+                        ? "Aceptación registrada"
+                        : "Revocación registrada"
+                    }
+                  />
+                }
+                fields={
+                  <>
+                    <RecordField label="Usuario">{e.actor_id}</RecordField>
+                    <RecordField label="Fecha">
+                      {new Date(e.created_at + "Z").toLocaleString("es-BO")}
+                    </RecordField>
+                  </>
+                }
+              />
+            )}
+          />
         </section>
       )}
     </section>

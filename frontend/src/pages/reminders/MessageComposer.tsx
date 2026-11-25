@@ -1,13 +1,9 @@
+import { RecordStatus } from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { SearchSelect } from "../../components/SearchSelect";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
-import {
-  money,
-  showDate,
-  newFinanceKey,
-  communicationNames,
-} from "../../reminders";
+import { money, showDate, newFinanceKey } from "../../reminders";
 import type {
   Reminder,
   Proposal,
@@ -344,7 +340,10 @@ export function MessageComposer({
             <section className="utility-space">
               <h3>Situación de la comunicación</h3>
               <p>
-                <strong>{communicationNames[communication.state]}</strong>
+                <RecordStatus
+                  domain="communication"
+                  state={communication.state}
+                />
               </p>
               <p>
                 Abrir WhatsApp no demuestra envío, entrega ni lectura. La deuda

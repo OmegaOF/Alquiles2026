@@ -1,3 +1,13 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  useListPreference,
+} from "../../components/RecordList";
+import {
+  RecordStatus,
+  StatusIndicator,
+} from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { Field, ErrorMessage, errorText } from "../../components/Form";
@@ -17,7 +27,10 @@ export function CommunicationHistory({
     [notice, setNotice] = useState(""),
     [correcting, setCorrecting] = useState(false),
     [busy, setBusy] = useState(false),
-    [recipient, setRecipient] = useState(0);
+    [recipient, setRecipient] = useListPreference(
+      `${base}:communications:${noticeKey ?? "all"}:recipient`,
+      0,
+    );
   const requestKey = useRef(newFinanceKey());
   async function load() {
     setItems(
@@ -99,31 +112,49 @@ export function CommunicationHistory({
           ))}
         </select>
       </Field>
-      {items
-        .filter((c) => !recipient || c.recipient_id === recipient)
-        .map((c) => (
-          <article key={c.id} className="panel">
-            <h3>
-              {c.recipient_name} · {communicationNames[c.state]}
-            </h3>
-            <p>
-              {c.event.concept} · {c.event.property_name} · {c.masked_number}
-            </p>
-            <p>
-              Preparó usuario {c.created_by} ·{" "}
-              {new Date(c.created_at + "Z").toLocaleString("es-BO")}
-            </p>
-            {c.source_changed && (
-              <p>El origen cambió después de preparar este texto.</p>
-            )}
-            <button className="secondary" onClick={() => void detail(c.id)}>
-              Ver comunicación {c.id}
-            </button>
-          </article>
-        ))}
-      {!items.length && (
-        <p>No hay comunicaciones registradas en esta consulta.</p>
-      )}
+      <RecordCollection
+        id={`${base}:communications:${noticeKey ?? "all"}`}
+        label="comunicaciones"
+        items={items.filter((c) => !recipient || c.recipient_id === recipient)}
+        searchable={(c) =>
+          `${c.id} ${c.recipient_name} ${c.event.concept} ${c.event.property_name} ${c.masked_number} ${communicationNames[c.state]} ${c.created_at}`
+        }
+        filter={{
+          label: "Estado de la comunicación",
+          value: (c) => communicationNames[c.state],
+        }}
+        empty="No hay comunicaciones registradas en esta consulta."
+        render={(c) => (
+          <RecordRow
+            key={c.id}
+            title={c.recipient_name}
+            fields={
+              <>
+                <RecordField label="Aviso">
+                  {c.event.concept} · {c.event.property_name}
+                </RecordField>
+                <RecordField label="Número">{c.masked_number}</RecordField>
+                <RecordField label="Preparado">
+                  {new Date(c.created_at + "Z").toLocaleString("es-BO")}
+                </RecordField>
+                <RecordField label="Estado">
+                  <RecordStatus domain="communication" state={c.state} />
+                </RecordField>
+                {c.source_changed && (
+                  <RecordField label="Origen">
+                    <StatusIndicator tone="amber" label="Origen actualizado" />
+                  </RecordField>
+                )}
+              </>
+            }
+            actions={
+              <button className="secondary" onClick={() => void detail(c.id)}>
+                Ver comunicación {c.id}
+              </button>
+            }
+          />
+        )}
+      />
       {selected && (
         <section className="panel">
           <h3>Texto e historial de la comunicación</h3>
@@ -131,20 +162,42 @@ export function CommunicationHistory({
             {selected.recipient_name} · +{selected.number}
           </p>
           <p>
-            Situación: <strong>{communicationNames[selected.state]}</strong>
+            Situación:{" "}
+            <RecordStatus domain="communication" state={selected.state} />
           </p>
           <p className="reminder-message">{selected.final_text}</p>
           <p>
             Mensaje preparado por usuario {selected.created_by} el{" "}
             {new Date(selected.created_at + "Z").toLocaleString("es-BO")}.
           </p>
-          {selected.events.map((e) => (
-            <p key={e.id}>
-              {communicationNames[e.kind] || e.kind} · Usuario {e.created_by} ·{" "}
-              {new Date(e.created_at + "Z").toLocaleString("es-BO")}
-              {e.notes && ` · ${e.notes}`}
-            </p>
-          ))}
+          <RecordCollection
+            id={`${base}:communications:${selected.id}:events`}
+            label="eventos de comunicación"
+            items={selected.events}
+            searchable={(e) =>
+              `${communicationNames[e.kind]} ${e.created_by} ${e.created_at} ${e.notes ?? ""}`
+            }
+            filter={{
+              label: "Tipo de evento",
+              value: (e) => communicationNames[e.kind],
+            }}
+            render={(e) => (
+              <RecordRow
+                key={e.id}
+                title={<RecordStatus domain="communication" state={e.kind} />}
+                fields={
+                  <>
+                    <RecordField label="Usuario">{e.created_by}</RecordField>
+                    <RecordField label="Fecha">
+                      {new Date(e.created_at + "Z").toLocaleString("es-BO")}
+                    </RecordField>
+                  </>
+                }
+                detail={e.notes && <p>{e.notes}</p>}
+                detailLabel="Ver observaciones"
+              />
+            )}
+          />
           {selected.can_confirm &&
             ["manual_sent", "not_sent"].includes(selected.state) && (
               <button className="secondary" onClick={() => setCorrecting(true)}>
