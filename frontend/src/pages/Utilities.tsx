@@ -1,11 +1,13 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  useListPreference,
+} from "../components/RecordList";
+import { RecordStatus } from "../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { PropertySelect } from "../components/PropertySelect";
-import {
-  ListPagination,
-  ListSearch,
-  useLocalList,
-} from "../components/RecordList";
 import type { Person, Property, User } from "../types";
 import type { Receipt, ServiceAccount, UtilityType } from "../utilities";
 import { distributionStates, money } from "../utilities";
@@ -35,11 +37,15 @@ export function Utilities({
   initialReceiptId?: number;
 }) {
   const content = useRef<HTMLElement>(null);
+  const [savedProperty, saveProperty] = useListPreference("utilities:house", 0);
   const [propertyId, setPropertyId] = useState(
-      initialPropertyId || properties[0]?.id || 0,
-    ),
-    [tab, setTab] = useState(initialReceiptId ? "receipts" : "services"),
-    [accounts, setAccounts] = useState<ServiceAccount[]>([]),
+    initialPropertyId || savedProperty || properties[0]?.id || 0,
+  );
+  const [tab, setTab] = useListPreference(
+    initialReceiptId ? undefined : `utilities:${propertyId}:tab`,
+    initialReceiptId ? "receipts" : "services",
+  );
+  const [accounts, setAccounts] = useState<ServiceAccount[]>([]),
     [types, setTypes] = useState<UtilityType[]>([]),
     [receipts, setReceipts] = useState<Receipt[]>([]),
     [selected, setSelected] = useState<Receipt | null>(null),
@@ -52,11 +58,6 @@ export function Utilities({
   currentProperty.current = propertyId;
   const property = properties.find((p) => p.id === propertyId),
     data = usePropertyData(propertyId, people, user.role === "general_admin");
-  const receiptList = useLocalList(
-    receipts,
-    (receipt) =>
-      `${receipt.id} ${receipt.account_label} ${receipt.provider} ${receipt.external_reference ?? ""} ${showDate(receipt.issued_on)}`,
-  );
   async function load() {
     if (!propertyId || propertyId !== currentProperty.current) return;
     const request = ++seq.current;
@@ -91,7 +92,6 @@ export function Utilities({
     setReceipts([]);
     setSelected(null);
     setCreating(false);
-    receiptList.search.onChange("");
     void load();
     return () => {
       seq.current++;
@@ -119,7 +119,9 @@ export function Utilities({
         properties={properties}
         value={propertyId || ""}
         onChange={(id) => {
-          if (canLeave()) setPropertyId(Number(id));
+          if (!canLeave()) return;
+          setPropertyId(Number(id));
+          saveProperty(Number(id));
         }}
       />
       <nav className="utility-tabs" aria-label="Secciones de servicios básicos">
@@ -219,51 +221,61 @@ export function Utilities({
                   </button>
                 )}
               </div>
-              <ListSearch
-                label="Buscar recibo"
-                placeholder="Referencia, suministro o proveedor"
-                {...receiptList.search}
-              />
-              <div className="record-list">
-                {receiptList.rows.map((r) => (
-                  <article key={r.id}>
-                    <div className="record-main">
-                      <h3>
-                        {r.account_label}: {money(r.amount, r.currency)}
-                      </h3>
-                      <p>
-                        {r.provider} ·{" "}
-                        {r.external_reference || "Sin referencia externa"}
-                      </p>
-                      <p>
-                        Consumo: {showDate(r.period_start)} al{" "}
-                        {showDate(r.period_end)} · Límite de pago:{" "}
-                        {showDate(r.due_on)}
-                      </p>
-                      <p>
-                        <strong>
-                          {distributionStates[r.distribution_status]}
-                        </strong>{" "}
-                        · Sin pago registrado aquí
-                      </p>
-                    </div>
-                    <button
-                      className="secondary"
-                      onClick={() => setSelected(r)}
-                    >
-                      Ver recibo {r.id} y reparto
-                    </button>
-                  </article>
-                ))}
-                {!receiptList.rows.length && (
-                  <p className="empty">
-                    {receipts.length
-                      ? "No se encontraron recibos."
-                      : "Todavía no hay recibos registrados para esta casa."}
-                  </p>
+              <RecordCollection
+                id={`utilities:${propertyId}:${tab}`}
+                label="recibos"
+                items={receipts}
+                searchable={(r) =>
+                  `${r.id} ${r.account_label} ${r.provider} ${r.external_reference ?? ""} ${showDate(r.issued_on)} ${showDate(r.due_on)} ${distributionStates[r.distribution_status]}`
+                }
+                filter={{
+                  label: "Estado del reparto",
+                  value: (r) => distributionStates[r.distribution_status],
+                }}
+                empty={
+                  receipts.length
+                    ? "No se encontraron recibos."
+                    : "Todavía no hay recibos registrados para esta casa."
+                }
+                render={(r) => (
+                  <RecordRow
+                    key={r.id}
+                    title={`${r.account_label} · ${money(r.amount, r.currency)}`}
+                    fields={
+                      <>
+                        <RecordField label="Proveedor">
+                          {r.provider}
+                        </RecordField>
+                        {r.external_reference && (
+                          <RecordField label="Referencia">
+                            {r.external_reference}
+                          </RecordField>
+                        )}
+                        <RecordField label="Consumo">
+                          {showDate(r.period_start)} al {showDate(r.period_end)}
+                        </RecordField>
+                        <RecordField label="Límite de pago">
+                          {showDate(r.due_on)}
+                        </RecordField>
+                        <RecordField label="Reparto">
+                          <RecordStatus
+                            domain="distribution"
+                            state={r.distribution_status}
+                          />
+                        </RecordField>
+                      </>
+                    }
+                    actions={
+                      <button
+                        className="secondary"
+                        onClick={() => setSelected(r)}
+                      >
+                        Ver recibo {r.id} y reparto
+                      </button>
+                    }
+                  />
                 )}
-              </div>
-              <ListPagination label="recibos" {...receiptList.pagination} />
+              />
             </section>
           )}
         </div>

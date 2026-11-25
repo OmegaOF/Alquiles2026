@@ -201,8 +201,11 @@ test("editar nombre en Personas actualiza la cuenta y conserva su alias", async 
     await screen.findByRole("heading", { name: "Elena Vargas Corregida" }),
   ).toBeVisible();
   expect(
-    screen.getAllByText(`Alias de la cuenta: ${account.display_name}`),
-  ).toHaveLength(2);
+    screen.getByText(`Alias de la cuenta: ${account.display_name}`),
+  ).toBeVisible();
+  expect(
+    screen.getByText(account.display_name!, { exact: true }),
+  ).toBeVisible();
   expect(
     screen.queryByRole("heading", { name: person.full_name }),
   ).not.toBeInTheDocument();

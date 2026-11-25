@@ -1,9 +1,15 @@
+import {
+  RecordStatus,
+  StatusIndicator,
+} from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import {
   ListPagination,
   ListSearch,
   useLocalList,
+  RecordField,
+  RecordRow,
 } from "../../components/RecordList";
 import type { Person } from "../../types";
 import {
@@ -13,7 +19,7 @@ import {
   confirmFormDiscard,
   markFormChanged,
 } from "../../components/Form";
-import { modeNames, showDate, stateNames } from "../../tenancy";
+import { modeNames, showDate } from "../../tenancy";
 import type { HistoryEntry } from "../../tenancy";
 
 export const actionNames: Record<string, string> = {
@@ -31,28 +37,33 @@ export const actionNames: Record<string, string> = {
 export function History({
   events,
   personName,
+  listId,
 }: {
   events: HistoryEntry[];
   personName: (id: number) => string;
+  listId?: string;
 }) {
-  const history = useLocalList(events, (event) =>
-    [
-      actionNames[event.action],
-      showDate(event.created_at),
-      event.details.reason,
-      event.details.before?.responsible_person_id &&
-        personName(event.details.before.responsible_person_id),
-      event.details.after.responsible_person_id &&
-        personName(event.details.after.responsible_person_id),
-      ...(event.details.before?.occupant_ids ?? []).map(personName),
-      ...(event.details.after.occupant_ids ?? []).map(personName),
-    ]
-      .filter(Boolean)
-      .join(" "),
+  const history = useLocalList(
+    events,
+    (event) =>
+      [
+        actionNames[event.action],
+        showDate(event.created_at),
+        event.details.reason,
+        event.details.before?.responsible_person_id &&
+          personName(event.details.before.responsible_person_id),
+        event.details.after.responsible_person_id &&
+          personName(event.details.after.responsible_person_id),
+        ...(event.details.before?.occupant_ids ?? []).map(personName),
+        ...(event.details.after.occupant_ids ?? []).map(personName),
+      ]
+        .filter(Boolean)
+        .join(" "),
+    listId,
   );
   return (
-    <section className="panel">
-      <h2>Historial de cambios</h2>
+    <section aria-label="Historial de cambios">
+      <h3>Historial de cambios</h3>
       {!!events.length && (
         <ListSearch
           label="Buscar cambios del contrato"
@@ -60,81 +71,115 @@ export function History({
           {...history.search}
         />
       )}
-      {history.rows.map((event) => (
-        <article className="history-item" key={event.id}>
-          <h3>
-            {actionNames[event.action] || "Cambio registrado"} ·{" "}
-            {new Date(event.created_at + "Z").toLocaleString("es")}
-          </h3>
-          {event.details.reason && <p>Motivo: {event.details.reason}</p>}
-          {event.details.before && (
-            <p>
-              Antes: {showDate(event.details.before.start_date)} al{" "}
-              {showDate(
-                event.details.before.actual_end_date ||
-                  event.details.before.end_date,
-              )}{" "}
-              · Responsable:{" "}
-              {event.details.before.responsible_person_id
-                ? personName(event.details.before.responsible_person_id)
-                : "Sin responsable"}{" "}
-              · Ocupantes:{" "}
-              {(event.details.before.occupant_ids || [])
-                .map(personName)
-                .join(", ") || "Sin adicionales"}
-            </p>
-          )}
-          {event.details.before && (
-            <p>
-              Acuerdo anterior:{" "}
-              {event.details.before?.mode
-                ? modeNames[event.details.before.mode]
-                : "Sin modalidad"}{" "}
-              ·{" "}
-              {event.details.before?.price
-                ? `${event.details.before.price} ${event.details.before.currency}`
-                : "Sin importe ordinario"}{" "}
-              ·{" "}
-              {event.details.before?.unit_id
-                ? `Unidad n.º ${event.details.before.unit_id}`
-                : "Casa completa"}
-            </p>
-          )}
-          <p>
-            Después: {showDate(event.details.after.start_date)} al{" "}
-            {showDate(
-              event.details.after.actual_end_date ||
-                event.details.after.end_date,
-            )}{" "}
-            · {stateNames[event.details.after.status || ""] || "Registrado"} ·
-            Responsable:{" "}
-            {event.details.after.responsible_person_id
-              ? personName(event.details.after.responsible_person_id)
-              : "Sin responsable"}{" "}
-            · Ocupantes:{" "}
-            {(event.details.after.occupant_ids || [])
-              .map(personName)
-              .join(", ") || "Sin adicionales"}
-          </p>
-          <p>
-            Acuerdo registrado:{" "}
-            {event.details.after.mode
-              ? modeNames[event.details.after.mode]
-              : "Sin modalidad"}{" "}
-            ·{" "}
-            {event.details.after.price
-              ? `${event.details.after.price} ${event.details.after.currency}`
-              : "Sin importe ordinario"}{" "}
-            ·{" "}
-            {event.details.after.unit_id
-              ? `Unidad n.º ${event.details.after.unit_id}`
-              : "Casa completa"}
-          </p>
-          {event.details.after.conditions && (
-            <p>Condiciones: {event.details.after.conditions}</p>
-          )}
-        </article>
-      ))}
+      <div className="record-rows">
+        {history.rows.map((event) => (
+          <RecordRow
+            key={event.id}
+            title={
+              <StatusIndicator
+                tone={
+                  event.action === "cancel"
+                    ? "gray"
+                    : event.action === "finish"
+                      ? "green"
+                      : "blue"
+                }
+                label={actionNames[event.action] || "Cambio registrado"}
+              />
+            }
+            fields={
+              <>
+                <RecordField label="Registrado el">
+                  {new Date(event.created_at + "Z").toLocaleString("es")}
+                </RecordField>
+                {event.details.reason && (
+                  <RecordField label="Motivo">
+                    Motivo: {event.details.reason}
+                  </RecordField>
+                )}
+              </>
+            }
+            detail={
+              <>
+                {event.details.before && (
+                  <p>
+                    Antes: {showDate(event.details.before.start_date)} al{" "}
+                    {showDate(
+                      event.details.before.actual_end_date ||
+                        event.details.before.end_date,
+                    )}{" "}
+                    · Responsable:{" "}
+                    {event.details.before.responsible_person_id
+                      ? personName(event.details.before.responsible_person_id)
+                      : "Sin responsable"}{" "}
+                    · Ocupantes:{" "}
+                    {(event.details.before.occupant_ids || [])
+                      .map(personName)
+                      .join(", ") || "Sin adicionales"}
+                  </p>
+                )}
+                {event.details.before && (
+                  <p>
+                    Acuerdo anterior:{" "}
+                    {event.details.before?.mode
+                      ? modeNames[event.details.before.mode]
+                      : "Sin modalidad"}{" "}
+                    ·{" "}
+                    {event.details.before?.price
+                      ? `${event.details.before.price} ${event.details.before.currency}`
+                      : "Sin importe ordinario"}{" "}
+                    ·{" "}
+                    {event.details.before?.unit_id
+                      ? `Unidad n.º ${event.details.before.unit_id}`
+                      : "Casa completa"}
+                  </p>
+                )}
+                <p>
+                  Después: {showDate(event.details.after.start_date)} al{" "}
+                  {showDate(
+                    event.details.after.actual_end_date ||
+                      event.details.after.end_date,
+                  )}{" "}
+                  ·{" "}
+                  {event.details.after.status ? (
+                    <RecordStatus
+                      domain="contract"
+                      state={event.details.after.status}
+                    />
+                  ) : (
+                    "Registrado"
+                  )}{" "}
+                  · Responsable:{" "}
+                  {event.details.after.responsible_person_id
+                    ? personName(event.details.after.responsible_person_id)
+                    : "Sin responsable"}{" "}
+                  · Ocupantes:{" "}
+                  {(event.details.after.occupant_ids || [])
+                    .map(personName)
+                    .join(", ") || "Sin adicionales"}
+                </p>
+                <p>
+                  Acuerdo registrado:{" "}
+                  {event.details.after.mode
+                    ? modeNames[event.details.after.mode]
+                    : "Sin modalidad"}{" "}
+                  ·{" "}
+                  {event.details.after.price
+                    ? `${event.details.after.price} ${event.details.after.currency}`
+                    : "Sin importe ordinario"}{" "}
+                  ·{" "}
+                  {event.details.after.unit_id
+                    ? `Unidad n.º ${event.details.after.unit_id}`
+                    : "Casa completa"}
+                </p>
+                {event.details.after.conditions && (
+                  <p>Condiciones: {event.details.after.conditions}</p>
+                )}
+              </>
+            }
+          />
+        ))}
+      </div>
       {!history.rows.length && (
         <p>
           {events.length

@@ -1,9 +1,10 @@
-import { useState } from "react";
 import {
-  ListPagination,
-  ListSearch,
-  useLocalList,
+  RecordCollection,
+  RecordField,
+  RecordRow,
 } from "../../components/RecordList";
+import { StatusIndicator } from "../../components/StatusIndicator";
+import { useState } from "react";
 import { api } from "../../api";
 import type { Person, Property, User } from "../../types";
 import type {
@@ -38,12 +39,6 @@ export function Services(props: Props) {
     [typesOpen, setTypesOpen] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const services = useLocalList(
-    accounts,
-    (account) =>
-      `${account.label} ${account.type_name} ${account.provider ?? ""} ${account.account_number ?? ""}`,
-  );
-  const serviceTypes = useLocalList(types, (type) => type.name);
   if (editing)
     return (
       <ServiceForm
@@ -135,85 +130,121 @@ export function Services(props: Props) {
             </Field>
             <button disabled={busy}>Guardar tipo de servicio</button>
           </form>
-          <ListSearch
-            label="Buscar tipos de servicio"
-            {...serviceTypes.search}
-          />
-          <ul>
-            {serviceTypes.rows.map((t) => (
-              <li key={t.id}>
-                {t.name} · {t.is_active ? "Activo" : "Inactivo"}{" "}
-                <button
-                  disabled={busy}
-                  className="text-button"
-                  onClick={() => void changeType(t)}
-                >
-                  {t.is_active ? "Desactivar" : "Activar"} {t.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {!serviceTypes.rows.length && (
-            <p>No se encontraron tipos de servicio.</p>
-          )}
-          <ListPagination
+          <RecordCollection
+            id="utility-types"
             label="tipos de servicio"
-            {...serviceTypes.pagination}
+            items={types}
+            searchable={(t) => t.name}
+            filter={{
+              label: "Estado del tipo de servicio",
+              value: (t) => (t.is_active ? "Activo" : "Inactivo"),
+            }}
+            render={(t) => (
+              <RecordRow
+                key={t.id}
+                title={t.name}
+                fields={
+                  <RecordField label="Estado">
+                    <StatusIndicator
+                      tone={t.is_active ? "blue" : "gray"}
+                      label={t.is_active ? "Activo" : "Inactivo"}
+                    />
+                  </RecordField>
+                }
+                actions={
+                  <button
+                    disabled={busy}
+                    className="secondary"
+                    onClick={() => void changeType(t)}
+                  >
+                    {t.is_active ? "Desactivar" : "Activar"} {t.name}
+                  </button>
+                }
+              />
+            )}
           />
         </section>
       )}
-      <ListSearch
-        label="Buscar suministros"
-        placeholder="Servicio, proveedor o número de cuenta"
-        {...services.search}
-      />
-      <div className="record-list">
-        {services.rows.map((a) => (
-          <article key={a.id}>
-            <div className="record-main">
-              <h3>{a.label}</h3>
-              <p>
-                {a.type_name} · {a.provider} ·{" "}
-                {a.is_active ? "Activo" : "Inactivo"}
-              </p>
-              <p>
-                Cuenta: {a.account_number || "Sin número de suministro"} ·{" "}
-                {a.measurement_kind === "shared" ? "Compartido" : "Individual"}{" "}
-                · Desde {showDate(a.start_date)}
-              </p>
-              <p>
-                Reparto: {methods[a.configuration.method]} ·{" "}
-                {a.configuration.unit_ids.length
-                  ? `${a.configuration.unit_ids.length} cuartos`
-                  : "Casa completa"}
-              </p>
-              {a.measure_unit && <p>Unidad de medida: {a.measure_unit}</p>}
-            </div>
-            {user.role !== "owner" && (
-              <div className="actions">
-                <button className="secondary" onClick={() => setEditing(a)}>
-                  Editar servicio {a.id}
-                </button>
-                <button
-                  className="secondary"
-                  disabled={!a.is_active}
-                  onClick={() => setConfiguring(a)}
-                >
-                  Cambiar reparto {a.id}
-                </button>
-              </div>
-            )}
-          </article>
-        ))}
-        {!services.rows.length && (
-          <p className="empty">
-            {accounts.length
-              ? "No se encontraron servicios."
-              : "Todavía no hay servicios registrados en esta casa."}
-          </p>
+      <RecordCollection
+        id={`supplies:${property.id}`}
+        label="suministros"
+        items={accounts}
+        searchable={(a) =>
+          `${a.label} ${a.type_name} ${a.provider} ${a.account_number ?? ""} ${methods[a.configuration.method]}`
+        }
+        filter={{
+          label: "Estado del suministro",
+          value: (a) => (a.is_active ? "Activo" : "Inactivo"),
+        }}
+        empty={
+          accounts.length
+            ? "No se encontraron servicios."
+            : "Todavía no hay servicios registrados en esta casa."
+        }
+        render={(a) => (
+          <RecordRow
+            key={a.id}
+            title={a.label}
+            fields={
+              <>
+                <RecordField label="Servicio y proveedor">
+                  {a.type_name} · {a.provider}
+                </RecordField>
+                <RecordField label="Cuenta">
+                  {a.account_number || "Sin número"}
+                </RecordField>
+                <RecordField label="Reparto">
+                  {methods[a.configuration.method]}
+                </RecordField>
+                <RecordField label="Estado">
+                  <StatusIndicator
+                    tone={a.is_active ? "blue" : "gray"}
+                    label={a.is_active ? "Activo" : "Inactivo"}
+                  />
+                </RecordField>
+              </>
+            }
+            actions={
+              user.role !== "owner" && (
+                <>
+                  <button className="secondary" onClick={() => setEditing(a)}>
+                    Editar servicio {a.id}
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={!a.is_active}
+                    onClick={() => setConfiguring(a)}
+                  >
+                    Cambiar reparto {a.id}
+                  </button>
+                </>
+              )
+            }
+            detail={
+              <dl className="record-row-fields">
+                <RecordField label="Medición">
+                  {a.measurement_kind === "shared"
+                    ? "Compartido"
+                    : "Individual"}
+                </RecordField>
+                <RecordField label="En servicio desde">
+                  {showDate(a.start_date)}
+                </RecordField>
+                <RecordField label="Cobertura">
+                  {a.configuration.unit_ids.length
+                    ? `${a.configuration.unit_ids.length} cuartos`
+                    : "Casa completa"}
+                </RecordField>
+                {a.measure_unit && (
+                  <RecordField label="Unidad de medida">
+                    {a.measure_unit}
+                  </RecordField>
+                )}
+              </dl>
+            }
+          />
         )}
-      </div>
-      <ListPagination label="suministros" {...services.pagination} />
+      />
     </section>
   );
 }

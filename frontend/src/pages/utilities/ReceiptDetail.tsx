@@ -1,3 +1,12 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+} from "../../components/RecordList";
+import {
+  RecordStatus,
+  StatusIndicator,
+} from "../../components/StatusIndicator";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import type { Person, User } from "../../types";
@@ -356,7 +365,10 @@ export function ReceiptDetail({
       {dist && (
         <>
           <section className="panel">
-            <h3>Resumen del reparto · {distributionStates[dist.status]}</h3>
+            <h3>
+              Resumen del reparto ·{" "}
+              <RecordStatus domain="distribution" state={dist.status} />
+            </h3>
             <p>
               Revisión del recibo: {dist.receipt.revision}. Importe utilizado:{" "}
               <strong>
@@ -389,51 +401,125 @@ export function ReceiptDetail({
             {dist.evidence.manual_resolution && (
               <p>Revisión manual: {dist.evidence.manual_resolution.reason}</p>
             )}
-            <div className="utility-spaces">
-              {dist.allocations.map((a) => (
-                <article className="utility-space" key={a.id}>
-                  <h4>
-                    {a.unit_label}: {money(a.amount, dist.receipt.currency)}
-                  </h4>
-                  {a.responsibilities.map((r) => (
-                    <p key={r.id}>
-                      {r.kind === "occupant"
-                        ? "Ocupante"
-                        : "Propietario o responsable acordado"}
-                      :{" "}
-                      <strong>
-                        {personName(r.person_id)} ·{" "}
-                        {money(r.amount, dist.receipt.currency)}
-                      </strong>
-                      {r.contract_id &&
-                        ` · Contrato ${r.contract_id} · ${r.occupied_days} días`}
-                    </p>
-                  ))}
-                  {!a.responsibilities.length && (
-                    <p>Sin importe asignado a personas en este espacio.</p>
-                  )}
-                  <details>
-                    <summary>Ver días y cálculo de {a.unit_label}</summary>
-                    {dist.evidence.spaces
-                      .find((s) => s.unit_id === a.unit_id)
-                      ?.contracts.map((c) => (
-                        <p key={c.id}>
-                          Contrato {c.id}: {showDate(c.start_date)} al{" "}
-                          {showDate(c.end_date)}, {c.occupied_days} días.{" "}
-                          {c.exempt
-                            ? "Servicios incluidos: sin gasto adicional para el ocupante."
-                            : `Importe teórico: ${money(c.theoretical_amount, dist.receipt.currency)}.`}
+            <RecordCollection
+              id={`utility-distribution:${dist.id}:spaces`}
+              label="espacios del reparto"
+              items={dist.allocations}
+              searchable={(a) =>
+                `${a.unit_label} ${money(a.amount, dist.receipt.currency)} ${a.responsibilities.map((r) => personName(r.person_id)).join(" ")}`
+              }
+              render={(a) => {
+                const contracts =
+                  dist.evidence.spaces.find(
+                    (space) => space.unit_id === a.unit_id,
+                  )?.contracts ?? [];
+                return (
+                  <RecordRow
+                    key={a.id}
+                    title={`${a.unit_label}: ${money(a.amount, dist.receipt.currency)}`}
+                    fields={
+                      <>
+                        <RecordField label="Responsabilidades">
+                          {a.responsibilities.length}
+                        </RecordField>
+                        {a.responsibilities.length === 1 && (
+                          <RecordField label="Responsable">
+                            {personName(a.responsibilities[0].person_id)}
+                          </RecordField>
+                        )}
+                      </>
+                    }
+                    detailLabel={`Ver días y cálculo de ${a.unit_label}`}
+                    detail={
+                      <>
+                        <RecordCollection
+                          id={`utility-distribution:${dist.id}:${a.id}:responsibilities`}
+                          label="responsabilidades del espacio"
+                          items={a.responsibilities}
+                          searchable={(r) =>
+                            `${personName(r.person_id)} ${r.contract_id ?? ""} ${money(r.amount, dist.receipt.currency)}`
+                          }
+                          filter={{
+                            label: "Tipo de responsable",
+                            value: (r) =>
+                              r.kind === "occupant"
+                                ? "Ocupante"
+                                : "Propietario o responsable acordado",
+                          }}
+                          empty="Sin importe asignado a personas en este espacio."
+                          render={(r) => (
+                            <RecordRow
+                              key={r.id}
+                              title={personName(r.person_id)}
+                              fields={
+                                <>
+                                  <RecordField label="Responsabilidad">
+                                    {r.kind === "occupant"
+                                      ? "Ocupante"
+                                      : "Propietario o responsable acordado"}
+                                  </RecordField>
+                                  <RecordField label="Importe">
+                                    {money(r.amount, dist.receipt.currency)}
+                                  </RecordField>
+                                  {r.contract_id && (
+                                    <RecordField label="Contrato y días">
+                                      {r.contract_id} · {r.occupied_days} días
+                                    </RecordField>
+                                  )}
+                                </>
+                              }
+                            />
+                          )}
+                        />
+                        <RecordCollection
+                          id={`utility-distribution:${dist.id}:${a.id}:contracts`}
+                          label="contratos del reparto"
+                          items={contracts}
+                          searchable={(c) =>
+                            `${c.id} ${c.start_date} ${c.end_date}`
+                          }
+                          render={(c) => (
+                            <RecordRow
+                              key={c.id}
+                              title={`Contrato ${c.id}`}
+                              fields={
+                                <>
+                                  <RecordField label="Estancia">
+                                    {showDate(c.start_date)} al{" "}
+                                    {showDate(c.end_date)}
+                                  </RecordField>
+                                  <RecordField label="Días ocupados">
+                                    {c.occupied_days}
+                                  </RecordField>
+                                  <RecordField label="Cálculo">
+                                    {c.exempt ? (
+                                      <StatusIndicator
+                                        tone="blue"
+                                        label="Servicios incluidos"
+                                      />
+                                    ) : (
+                                      money(
+                                        c.theoretical_amount,
+                                        dist.receipt.currency,
+                                      )
+                                    )}
+                                  </RecordField>
+                                </>
+                              }
+                            />
+                          )}
+                        />
+                        <p>
+                          Menos de 15 días: parte del espacio × días ocupados /{" "}
+                          {dist.evidence.period_days}. Desde 15 días: parte
+                          completa, cuando corresponde al ocupante.
                         </p>
-                      )) || null}
-                    <p>
-                      Menos de 15 días: parte del espacio × días ocupados /{" "}
-                      {dist.evidence.period_days}. Desde 15 días: parte
-                      completa, cuando corresponde al ocupante.
-                    </p>
-                  </details>
-                </article>
-              ))}
-            </div>
+                      </>
+                    }
+                  />
+                );
+              }}
+            />
             <p className="utility-total">
               Total asignado:{" "}
               <strong>
@@ -484,37 +570,75 @@ export function ReceiptDetail({
       {history && (
         <section className="panel">
           <h3>Historial del recibo y sus distribuciones</h3>
-          <ul>
-            {history.revisions.map((r) => (
-              <li key={r.id}>
-                Revisión {r.revision}: {money(r.amount, r.currency)} ·{" "}
-                {showDate(r.period_start)} al {showDate(r.period_end)}
-              </li>
-            ))}
-          </ul>
-          {history.distributions.map((d) => (
-            <article className="history-item" key={d.id}>
-              <h4>
-                Reparto {d.id}: {distributionStates[d.status]}
-              </h4>
-              <p>
-                {money(d.receipt.amount, d.receipt.currency)} ·{" "}
-                {d.reason || "Cálculo del recibo"}
-                {d.is_current ? " · Último aprobado" : ""}
-              </p>
-              <button
-                className="text-button"
-                disabled={busy}
-                onClick={() => {
-                  setDist(d);
-                  setCalculating(false);
-                  setNotice("");
-                }}
-              >
-                Ver reparto {d.id}
-              </button>
-            </article>
-          ))}
+          <RecordCollection
+            id={`receipt:${receipt.id}:revisions`}
+            label="revisiones del recibo"
+            items={history.revisions}
+            searchable={(r) =>
+              `${r.revision} ${r.period_start} ${r.period_end} ${money(r.amount, r.currency)}`
+            }
+            render={(r) => (
+              <RecordRow
+                key={r.id}
+                title={`Revisión ${r.revision}: ${money(r.amount, r.currency)}`}
+                fields={
+                  <RecordField label="Consumo">
+                    {showDate(r.period_start)} al {showDate(r.period_end)}
+                  </RecordField>
+                }
+              />
+            )}
+          />
+          <RecordCollection
+            id={`receipt:${receipt.id}:distributions`}
+            label="repartos del recibo"
+            items={history.distributions}
+            searchable={(d) =>
+              `${d.id} ${distributionStates[d.status]} ${money(d.receipt.amount, d.receipt.currency)} ${d.reason ?? ""}`
+            }
+            filter={{
+              label: "Estado del reparto",
+              value: (d) => distributionStates[d.status],
+            }}
+            render={(d) => (
+              <RecordRow
+                key={d.id}
+                title={
+                  <>
+                    Reparto {d.id} ·{" "}
+                    <RecordStatus domain="distribution" state={d.status} />
+                  </>
+                }
+                fields={
+                  <>
+                    <RecordField label="Importe del recibo">
+                      {money(d.receipt.amount, d.receipt.currency)}
+                    </RecordField>
+                    {d.is_current && (
+                      <RecordField label="Vigencia">
+                        <StatusIndicator tone="blue" label="Último aprobado" />
+                      </RecordField>
+                    )}
+                  </>
+                }
+                actions={
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => {
+                      setDist(d);
+                      setCalculating(false);
+                      setNotice("");
+                    }}
+                  >
+                    Ver reparto {d.id}
+                  </button>
+                }
+                detail={d.reason && <p>{d.reason}</p>}
+                detailLabel="Ver motivo"
+              />
+            )}
+          />
         </section>
       )}
     </section>

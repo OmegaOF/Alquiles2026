@@ -1,3 +1,7 @@
+import {
+  RecordStatus,
+  StatusIndicator,
+} from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { PropertySelect } from "../../components/PropertySelect";
@@ -5,6 +9,9 @@ import {
   ListPagination,
   ListSearch,
   useLocalList,
+  useListPreference,
+  RecordField,
+  RecordRow,
 } from "../../components/RecordList";
 import type { Person, Property } from "../../types";
 import { ErrorMessage, errorText } from "../../components/Form";
@@ -22,11 +29,17 @@ export function OccupancyScreen({
   heading?: string;
 }) {
   const requestId = useRef(0);
-  const [propertyId, setPropertyId] = useState(properties[0]?.id || 0),
+  const [propertyId, setPropertyId] = useListPreference(
+      "occupancy:house",
+      properties[0]?.id || 0,
+    ),
     [rows, setRows] = useState<Occupancy[]>([]),
     [contacts, setContacts] = useState<Person[]>([]),
     [error, setError] = useState(""),
-    [current, setCurrent] = useState(false);
+    [current, setCurrent] = useListPreference(
+      `occupancy:${propertyId}:current`,
+      false,
+    );
   async function load() {
     if (!propertyId) return;
     const request = ++requestId.current;
@@ -58,6 +71,7 @@ export function OccupancyScreen({
     rows.filter((row) => !current || row.current),
     (row) =>
       `${row.id} ${row.target_label} ${name(row.responsible_person_id)} ${row.occupant_ids.map(name).join(" ")} ${stateNames[row.status]}`,
+    `occupancy:${propertyId}`,
   );
   return (
     <section>
@@ -72,7 +86,6 @@ export function OccupancyScreen({
         value={propertyId || ""}
         onChange={(id) => {
           setPropertyId(Number(id));
-          listing.pagination.onPage(1);
         }}
       />
       <label className="check">
@@ -95,30 +108,48 @@ export function OccupancyScreen({
       {error && (
         <button onClick={() => void load()}>Volver a cargar historial</button>
       )}
-      <div className="record-list">
-        {listing.rows.map((r) => (
-          <article key={r.id}>
-            <div className="record-main">
-              <h2>
-                Contrato {r.id} · {stateNames[r.status]}
-              </h2>
-              <p>
-                {r.target_label} ·{" "}
-                {r.current ? "Ocupación actual" : "Estancia registrada"} ·{" "}
-                {showDate(r.start_date)} al{" "}
-                {showDate(r.actual_end_date || r.end_date)}
-              </p>
-              <p>Responsable: {name(r.responsible_person_id)}</p>
-              <p>
-                Ocupantes adicionales:{" "}
-                {r.occupant_ids.map(name).join(", ") || "Sin adicionales"}
-              </p>
-              <details>
-                <summary>Ver cambios y ocupantes anteriores</summary>
-                <History events={r.history} personName={name} />
-              </details>
-            </div>
-          </article>
+      <div className="record-rows">
+        {listing.rows.map((row) => (
+          <RecordRow
+            key={row.id}
+            title={`Contrato ${row.id} · ${row.target_label}`}
+            fields={
+              <>
+                <RecordField label="Responsable">
+                  {name(row.responsible_person_id)}
+                </RecordField>
+                <RecordField label="Estancia">
+                  {showDate(row.start_date)} al{" "}
+                  {showDate(row.actual_end_date || row.end_date)}
+                </RecordField>
+                <RecordField label="Contrato">
+                  <RecordStatus domain="contract" state={row.status} />
+                </RecordField>
+                <RecordField label="Ocupación">
+                  <StatusIndicator
+                    tone={row.current ? "blue" : "gray"}
+                    label={
+                      row.current ? "Ocupación actual" : "Estancia registrada"
+                    }
+                  />
+                </RecordField>
+              </>
+            }
+            detailLabel="Ver cambios y ocupantes anteriores"
+            detail={
+              <>
+                <p>
+                  Ocupantes adicionales:{" "}
+                  {row.occupant_ids.map(name).join(", ") || "Sin adicionales"}
+                </p>
+                <History
+                  events={row.history}
+                  personName={name}
+                  listId={`occupancy:${row.id}:history`}
+                />
+              </>
+            }
+          />
         ))}
         {!listing.rows.length && !error && (
           <p className="empty">No hay ocupaciones para esta consulta.</p>

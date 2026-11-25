@@ -185,7 +185,9 @@ test("reserva desde React, persona sin cuenta, confirmación y conversión en co
   const f = await houseFixture(page);
   await page.goto("/");
   await openSection(page, "Alquileres", "Reservas");
-  await page.getByRole("searchbox", { name: "Buscar reservas" }).fill(f.house.name);
+  await page
+    .getByRole("searchbox", { name: "Buscar reservas" })
+    .fill(f.house.name);
   await page
     .getByRole("button", { name: "Registrar reserva", exact: true })
     .click();
@@ -319,20 +321,22 @@ test("finalización anticipada conserva personas e historial y actualiza la vist
     page.getByLabel("Propiedad del historial"),
     String(f.house.id),
   );
-  await expect(
-    page.getByRole("heading", {
-      name: `Contrato ${contract.id} · Finalizado`,
-      exact: true,
+  const occupancy = page.getByRole("article").filter({
+    has: page.getByRole("heading", {
+      name: new RegExp(`^Contrato ${contract.id} ·`),
     }),
-  ).toBeVisible();
+  });
   await expect(
-    page.getByText(`Ocupantes adicionales: ${f.occupant.full_name}`, {
-      exact: true,
-    }),
+    occupancy.getByText("Finalizado", { exact: true }),
   ).toBeVisible();
-  await page
+  await occupancy
     .getByText("Ver cambios y ocupantes anteriores", { exact: true })
     .click();
+  await expect(
+    occupancy.getByText(`Ocupantes adicionales: ${f.occupant.full_name}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByText(
       "Motivo: Salida anticipada registrada con la persona responsable",

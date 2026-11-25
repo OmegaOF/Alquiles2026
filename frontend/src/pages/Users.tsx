@@ -1,3 +1,4 @@
+import { StatusIndicator } from "../components/StatusIndicator";
 import { useState } from "react";
 import type { Person, Property, Role, User } from "../types";
 import { roleNames } from "../types";
@@ -11,6 +12,9 @@ import {
   ListPagination,
   ListSearch,
   useLocalList,
+  RecordCollection,
+  RecordField,
+  RecordRow,
 } from "../components/RecordList";
 import { useRegistrySearch } from "../components/registrySearch";
 import {
@@ -52,11 +56,6 @@ export function Users({
   const access = useLocalList(
     properties,
     (house) => propertyOption(house).label,
-  );
-  const listing = useLocalList(
-    users,
-    (account) =>
-      `${account.full_name} ${account.username} ${account.display_name ?? ""} ${roleNames[account.role]}`,
   );
   function edit(user: Partial<User>) {
     access.search.onChange("");
@@ -340,40 +339,61 @@ export function Users({
         </div>
         <button onClick={() => edit({})}>Registrar usuario</button>
       </div>
-      <ListSearch
-        label="Buscar cuentas"
-        placeholder="Nombre, usuario o rol"
-        {...listing.search}
-      />
       {notice && (
         <p role="status" className="success-message">
           {notice}
         </p>
       )}
-      <div className="record-list">
-        {listing.rows.map((u) => (
-          <article key={u.id}>
-            <div className="record-main">
-              <h2>{u.full_name}</h2>
-              {u.display_name && <p>Alias de la cuenta: {u.display_name}</p>}
-              <p>
-                Usuario: {u.username} · {roleNames[u.role]}
-              </p>
-              <p>
-                {u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"}
-              </p>
-              {(u.role === "property_admin" || u.role === "operator") && (
-                <p>{u.property_ids.length} propiedades autorizadas</p>
-              )}
-            </div>
-            <button className="secondary" onClick={() => edit(u)}>
-              Editar permisos <span className="sr-only">de {u.full_name}</span>
-            </button>
-          </article>
-        ))}
-      </div>
-      {!listing.rows.length && <p>No se encontraron cuentas.</p>}
-      <ListPagination label="cuentas" {...listing.pagination} />
+      <RecordCollection
+        id="users"
+        label="cuentas"
+        items={users}
+        searchable={(u) =>
+          `${u.full_name} ${u.username} ${u.display_name ?? ""} ${roleNames[u.role]} ${u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"}`
+        }
+        filter={{
+          label: "Estado de la cuenta",
+          value: (u) =>
+            u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada",
+        }}
+        empty="No se encontraron cuentas."
+        render={(u) => (
+          <RecordRow
+            key={u.id}
+            title={u.full_name}
+            fields={
+              <>
+                <RecordField label="Usuario">{u.username}</RecordField>
+                <RecordField label="Rol">{roleNames[u.role]}</RecordField>
+                <RecordField label="Estado">
+                  <StatusIndicator
+                    tone={u.is_active ? "blue" : "gray"}
+                    label={
+                      u.is_active ? "Cuenta habilitada" : "Cuenta deshabilitada"
+                    }
+                  />
+                </RecordField>
+                {u.display_name && (
+                  <RecordField label="Alias de la cuenta">
+                    {u.display_name}
+                  </RecordField>
+                )}
+                {(u.role === "property_admin" || u.role === "operator") && (
+                  <RecordField label="Casas autorizadas">
+                    {u.property_ids.length} propiedades autorizadas
+                  </RecordField>
+                )}
+              </>
+            }
+            actions={
+              <button className="secondary" onClick={() => edit(u)}>
+                Editar permisos{" "}
+                <span className="sr-only">de {u.full_name}</span>
+              </button>
+            }
+          />
+        )}
+      />
     </section>
   );
 }

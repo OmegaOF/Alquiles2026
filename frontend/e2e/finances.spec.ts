@@ -280,6 +280,11 @@ test("garantía separada, aplicación autorizada, devolución y gasto pagado par
     .fill("Autorizado por el titular y propietario");
   await submit(page);
   await page
+    .getByText(`Ver aplicaciones e historial del movimiento ${g.id}`, {
+      exact: true,
+    })
+    .click();
+  await page
     .getByRole("button", { name: `Registrar devolución ${g.id}`, exact: true })
     .click();
   await cashUI(page, f, "400", f.owner.id);
@@ -566,7 +571,9 @@ test("gasto y pago al proveedor antes de confirmar reparto, sin duplicar gasto a
   await cashUI(page, f, "300", f.owner.id);
   await submit(page);
   await expect(
-    page.getByText(/Reparto económico pendiente de confirmar o importar/),
+    page
+      .locator('[data-tone="amber"]')
+      .filter({ hasText: "Pendiente de confirmar o importar" }),
   ).toBeVisible();
   await capture(page, info, "proveedor-sin-reparto");
   const d = await request(page, `/utility-receipts/${r.id}/calculate`, {

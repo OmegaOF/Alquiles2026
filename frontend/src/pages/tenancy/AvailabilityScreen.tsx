@@ -13,6 +13,7 @@ import {
   lastPage,
   useListRequest,
   useLocalList,
+  useListPreference,
 } from "../../components/RecordList";
 import { localToday, showDate, stateNames } from "../../tenancy";
 import type {
@@ -37,19 +38,18 @@ export function AvailabilityScreen({
   canWrite: boolean;
   onAction?: (action: AvailabilityAction, query: AvailabilityQuery) => void;
 }) {
-  const [criteria, setCriteria] = useState<AvailabilityQuery>(() => {
-    const today = localToday();
-    return (
-      initialQuery ?? {
-        propertyId: initialPropertyId || properties[0]?.id || 0,
-        start: today,
-        end: today,
-        query: "",
-        state: "",
-        page: 1,
-      }
-    );
-  });
+  const today = localToday();
+  const [criteria, setCriteria] = useListPreference<AvailabilityQuery>(
+    initialQuery || initialPropertyId ? undefined : "availability:criteria",
+    initialQuery ?? {
+      propertyId: initialPropertyId || properties[0]?.id || 0,
+      start: today,
+      end: today,
+      query: "",
+      state: "",
+      page: 1,
+    },
+  );
   const [propertyId, setPropertyId] = useState(criteria.propertyId);
   const [start, setStart] = useState(criteria.start);
   const [end, setEnd] = useState(criteria.end);

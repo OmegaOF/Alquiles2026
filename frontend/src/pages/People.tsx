@@ -3,10 +3,11 @@ import type { Person } from "../types";
 import { api } from "../api";
 import { personOption } from "../components/SearchSelect";
 import {
-  ListPagination,
-  ListSearch,
-  useLocalList,
+  RecordCollection,
+  RecordField,
+  RecordRow,
 } from "../components/RecordList";
+import { StatusIndicator } from "../components/StatusIndicator";
 import {
   Field,
   ErrorMessage,
@@ -27,10 +28,6 @@ export function People({
 }) {
   const [editing, setEditing] = useState<Partial<Person> | null>(null);
   const [notice, setNotice] = useState("");
-  const listing = useLocalList(people, (person) => {
-    const option = personOption(person);
-    return `${option.label} ${option.search ?? ""} ${option.value}`;
-  });
   if (editing)
     return (
       <PersonForm
@@ -71,51 +68,88 @@ export function People({
           {notice}
         </p>
       )}
-      <ListSearch
-        label="Buscar personas"
-        placeholder="Nombre, documento o contacto"
-        {...listing.search}
-      />
-      {people.length === 0 ? (
-        <div className="empty">
-          Todavía no hay personas para mostrar.
-          {canEdit && " Comienza registrando un propietario."}
-        </div>
-      ) : listing.rows.length === 0 ? (
-        <p role="status">No se encontraron personas.</p>
-      ) : (
-        <div className="record-list">
-          {listing.rows.map((person) => (
-            <article key={person.id}>
-              <div className="record-main">
-                <h2>{person.full_name}</h2>
-                <p>
-                  {person.is_owner ? "Propietario/a" : "Persona registrada"}
-                  {person.document ? ` · Documento: ${person.document}` : ""}
-                </p>
-                <p>
+      <RecordCollection
+        id="people"
+        label="personas"
+        items={people}
+        searchable={(person) => {
+          const option = personOption(person);
+          return `${option.label} ${option.search ?? ""} ${option.value} ${person.address ?? ""}`;
+        }}
+        filter={{
+          label: "Tipo de persona",
+          value: (person) =>
+            person.is_owner ? "Propietario/a" : "Persona registrada",
+        }}
+        empty={
+          people.length
+            ? "No se encontraron personas."
+            : "Todavía no hay personas para mostrar."
+        }
+        render={(person) => (
+          <RecordRow
+            key={person.id}
+            title={person.full_name}
+            fields={
+              <>
+                <RecordField label="Tipo">
+                  <StatusIndicator
+                    tone="blue"
+                    label={
+                      person.is_owner ? "Propietario/a" : "Persona registrada"
+                    }
+                  />
+                </RecordField>
+                {person.document && (
+                  <RecordField label="Documento">{person.document}</RecordField>
+                )}
+                <RecordField label="Teléfono">
                   {person.phone || "Sin teléfono"}
-                  {person.whatsapp ? ` · WhatsApp: ${person.whatsapp}` : ""}
-                </p>
-                {person.email && <p>{person.email}</p>}
-                {person.address && <p>{person.address}</p>}
-                {person.notes && <p>{person.notes}</p>}
-              </div>
-              {canEdit && (
+                </RecordField>
+              </>
+            }
+            actions={
+              canEdit && (
                 <button
                   className="secondary"
-                  onClick={() => {
-                    setEditing(person);
-                  }}
+                  onClick={() => setEditing(person)}
                 >
                   Editar <span className="sr-only">a {person.full_name}</span>
                 </button>
-              )}
-            </article>
-          ))}
-        </div>
-      )}
-      <ListPagination label="personas" {...listing.pagination} />
+              )
+            }
+            detail={
+              person.whatsapp ||
+              person.email ||
+              person.address ||
+              person.notes ? (
+                <dl className="record-row-fields">
+                  {person.whatsapp && (
+                    <RecordField label="WhatsApp">
+                      {person.whatsapp}
+                    </RecordField>
+                  )}
+                  {person.email && (
+                    <RecordField label="Correo electrónico">
+                      {person.email}
+                    </RecordField>
+                  )}
+                  {person.address && (
+                    <RecordField label="Dirección">
+                      {person.address}
+                    </RecordField>
+                  )}
+                  {person.notes && (
+                    <RecordField label="Observaciones">
+                      {person.notes}
+                    </RecordField>
+                  )}
+                </dl>
+              ) : undefined
+            }
+          />
+        )}
+      />
     </section>
   );
 }
@@ -162,81 +196,98 @@ export function PersonForm({
     }
   }
   return (
-      <section className="panel">
-        <h1>{asOwner ? "Registrar propietario" : person.id ? "Editar persona" : "Registrar persona"}</h1>
-        <p>
-          Los datos de contacto son opcionales. Ser propietario no requiere una
-          cuenta de acceso.
-        </p>
-        <ErrorMessage message={error} />
-        <form onSubmit={save} data-guard-changes onChange={markFormChanged} key={person.id || "new"}>
-          <div className="form-grid">
-            <Field label="Nombre completo">
+    <section className="panel">
+      <h1>
+        {asOwner
+          ? "Registrar propietario"
+          : person.id
+            ? "Editar persona"
+            : "Registrar persona"}
+      </h1>
+      <p>
+        Los datos de contacto son opcionales. Ser propietario no requiere una
+        cuenta de acceso.
+      </p>
+      <ErrorMessage message={error} />
+      <form
+        onSubmit={save}
+        data-guard-changes
+        onChange={markFormChanged}
+        key={person.id || "new"}
+      >
+        <div className="form-grid">
+          <Field label="Nombre completo">
+            <input
+              name="full_name"
+              defaultValue={person.full_name}
+              maxLength={160}
+              required
+              autoComplete="name"
+            />
+          </Field>
+          <Field
+            label="Documento de identidad (opcional)"
+            hint="Usa el mismo documento para evitar registrar dos veces a una persona."
+          >
+            <input
+              name="document"
+              defaultValue={person.document || ""}
+              maxLength={80}
+            />
+          </Field>
+          <Field label="Teléfono (opcional)">
+            <input
+              name="phone"
+              type="tel"
+              defaultValue={person.phone || ""}
+              maxLength={40}
+              autoComplete="tel"
+            />
+          </Field>
+          <Field label="WhatsApp (opcional)">
+            <input
+              name="whatsapp"
+              type="tel"
+              defaultValue={person.whatsapp || ""}
+              maxLength={40}
+            />
+          </Field>
+          <Field label="Correo electrónico (opcional)">
+            <input
+              name="email"
+              type="email"
+              defaultValue={person.email || ""}
+              maxLength={254}
+              autoComplete="email"
+            />
+          </Field>
+          <Field label="Dirección (opcional)">
+            <input
+              name="address"
+              defaultValue={person.address || ""}
+              maxLength={300}
+            />
+          </Field>
+          {!asOwner && (
+            <label className="check">
               <input
-                name="full_name"
-                defaultValue={person.full_name}
-                maxLength={160}
-                required
-                autoComplete="name"
+                type="checkbox"
+                name="is_owner"
+                defaultChecked={person.is_owner ?? true}
               />
-            </Field>
-            <Field
-              label="Documento de identidad (opcional)"
-              hint="Usa el mismo documento para evitar registrar dos veces a una persona."
-            >
-              <input
-                name="document"
-                defaultValue={person.document || ""}
-                maxLength={80}
-              />
-            </Field>
-            <Field label="Teléfono (opcional)">
-              <input
-                name="phone"
-                type="tel"
-                defaultValue={person.phone || ""}
-                maxLength={40}
-                autoComplete="tel"
-              />
-            </Field>
-            <Field label="WhatsApp (opcional)">
-              <input
-                name="whatsapp"
-                type="tel"
-                defaultValue={person.whatsapp || ""}
-                maxLength={40}
-              />
-            </Field>
-            <Field label="Correo electrónico (opcional)">
-              <input
-                name="email"
-                type="email"
-                defaultValue={person.email || ""}
-                maxLength={254}
-                autoComplete="email"
-              />
-            </Field>
-            <Field label="Dirección (opcional)">
-              <input
-                name="address"
-                defaultValue={person.address || ""}
-                maxLength={300}
-              />
-            </Field>
-            {!asOwner && <label className="check">
-              <input type="checkbox" name="is_owner" defaultChecked={person.is_owner ?? true} />
               Es propietario o propietaria
-            </label>}
-            <Field label="Observaciones (opcional)">
-              <textarea
-                name="notes"
-                defaultValue={person.notes || ""}
-                maxLength={2000}
-              />
-            </Field>
-          </div>
-          <FormActions saving={saving} onCancel={onCancel} />
-        </form>
-      </section>
-    );
+            </label>
+          )}
+          <Field label="Observaciones (opcional)">
+            <textarea
+              name="notes"
+              defaultValue={person.notes || ""}
+              maxLength={2000}
+            />
+          </Field>
+        </div>
+        <FormActions saving={saving} onCancel={onCancel} />
+      </form>
+    </section>
+  );
 }

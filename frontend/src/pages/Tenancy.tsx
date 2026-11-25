@@ -1,3 +1,4 @@
+import { RecordStatus } from "../components/StatusIndicator";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { PropertySelect } from "../components/PropertySelect";
@@ -7,6 +8,10 @@ import {
   ListPagination,
   ListSearch,
   useLocalList,
+  useListPreference,
+  RecordField,
+  RecordRow,
+  RecordCollection,
 } from "../components/RecordList";
 import {
   addDays,
@@ -112,13 +117,20 @@ function RentalRecords({
           ? availabilityAction.preset
           : null,
       );
-  const [filter, setFilter] = useState(
+  const [filter, setFilter] = useListPreference(
+      linkedContract || preset || initialPropertyId
+        ? undefined
+        : `tenancy:${view}:property`,
       String(
         linkedContract?.propertyId ??
           preset?.resolved_property_id ??
           initialPropertyId ??
           "",
       ),
+    ),
+    [statusFilter, setStatusFilter] = useListPreference(
+      `tenancy:${view}:status`,
+      "",
     ),
     [action, setAction] = useState(""),
     [busy, setBusy] = useState(false);
@@ -135,20 +147,24 @@ function RentalRecords({
     properties.find((p) => p.id === id)?.name || "Propiedad autorizada";
   const contractList = useLocalList(
     contracts.filter(
-      (item) => !filter || item.resolved_property_id === Number(filter),
+      (item) =>
+        (!filter || item.resolved_property_id === Number(filter)) &&
+        (!statusFilter || item.status === statusFilter),
     ),
     (item) =>
-      `${item.id} ${item.target_label} ${propertyName(item.resolved_property_id)} ${personName(item.responsible_person_id)} ${stateNames[item.status]} ${modeNames[item.mode]}`,
+      `${item.id} ${item.target_label} ${propertyName(item.resolved_property_id)} ${personName(item.responsible_person_id)} ${stateNames[item.status]} ${modeNames[item.mode]} ${item.start_date} ${item.end_date}`,
+    "tenancy:contracts",
   );
   const reservationList = useLocalList(
     reservations.filter(
       (item) =>
         linkedReservation ||
-        !filter ||
-        item.resolved_property_id === Number(filter),
+        ((!filter || item.resolved_property_id === Number(filter)) &&
+          (!statusFilter || item.effective_status === statusFilter)),
     ),
     (item) =>
-      `${item.id} ${item.target_label} ${propertyName(item.resolved_property_id)} ${personName(item.person_id)} ${stateNames[item.effective_status]} ${modeNames[item.mode]}`,
+      `${item.id} ${item.target_label} ${propertyName(item.resolved_property_id)} ${personName(item.person_id)} ${stateNames[item.effective_status]} ${modeNames[item.mode]} ${item.start_date} ${item.end_date}`,
+    "tenancy:reservations",
   );
   const list = view === "contracts" ? contractList : reservationList;
   async function load() {
@@ -315,7 +331,7 @@ function RentalRecords({
             <h1>{propertyName(selected.resolved_property_id)}</h1>
             <p>
               {selected.target_label} · {modeNames[selected.mode]} ·{" "}
-              <strong>{stateNames[selected.status]}</strong>
+              <RecordStatus domain="contract" state={selected.status} />
             </p>
           </div>
         </div>
@@ -417,38 +433,35 @@ function RentalRecords({
                   ? "Vencimiento según el acuerdo escrito."
                   : `Vencimiento: día ${selected.due_day}, ajustado al último día si el mes es más corto.`}
               </p>
-              <div className="table-scroll">
-                <table>
-                  <caption>
-                    Periodos contractuales · no son recibos ni periodos de
-                    servicios
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>Periodo</th>
-                      <th>Días de estancia</th>
-                      <th>Días reales del periodo</th>
-                      <th>Vencimiento previsto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selected.periods.monthly_periods.map((p) => (
-                      <tr key={p.start}>
-                        <td>
-                          {showDate(p.start)} al {showDate(p.end)}
-                        </td>
-                        <td>{p.occupied_days}</td>
-                        <td>{p.period_days}</td>
-                        <td>
-                          {p.due_date
-                            ? showDate(p.due_date)
+              <RecordCollection
+                id={`contract:${selected.id}:periods`}
+                label="periodos contractuales"
+                items={selected.periods.monthly_periods}
+                searchable={(period) =>
+                  `${period.start} ${period.end} ${period.due_date ?? "Según acuerdo escrito"}`
+                }
+                render={(period) => (
+                  <RecordRow
+                    key={period.start}
+                    title={`${showDate(period.start)} al ${showDate(period.end)}`}
+                    fields={
+                      <>
+                        <RecordField label="Días de estancia">
+                          {period.occupied_days}
+                        </RecordField>
+                        <RecordField label="Días del periodo">
+                          {period.period_days}
+                        </RecordField>
+                        <RecordField label="Vencimiento previsto">
+                          {period.due_date
+                            ? showDate(period.due_date)
                             : "Según acuerdo escrito"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </RecordField>
+                      </>
+                    }
+                  />
+                )}
+              />
             </>
           )}
           {selected.mode === "anticretico" && (
@@ -582,7 +595,11 @@ function RentalRecords({
             </div>
           </form>
         )}
-        <History events={events} personName={personName} />
+        <History
+          events={events}
+          personName={personName}
+          listId={`contract:${selected.id}:history`}
+        />
       </section>
     );
   return (
@@ -629,6 +646,31 @@ function RentalRecords({
             }}
             hint="Si no eliges una casa, se muestran todas las autorizadas."
           />
+          <Field
+            label={
+              view === "contracts"
+                ? "Estado del contrato"
+                : "Estado de la reserva"
+            }
+          >
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                list.pagination.onPage(1);
+              }}
+            >
+              <option value="">Todos los estados</option>
+              {(view === "contracts"
+                ? ["draft", "active", "finished", "cancelled"]
+                : ["pending", "confirmed", "expired", "converted", "cancelled"]
+              ).map((state) => (
+                <option key={state} value={state}>
+                  {stateNames[state]}
+                </option>
+              ))}
+            </select>
+          </Field>
           <ListSearch
             label={
               view === "contracts" ? "Buscar contratos" : "Buscar reservas"
@@ -654,30 +696,38 @@ function RentalRecords({
           Volver a cargar
         </button>
       ) : view === "contracts" ? (
-        <div className="record-list">
+        <div className="record-rows">
           {contractList.rows.map((c) => (
-            <article key={c.id}>
-              <div className="record-main">
-                <h2>
-                  Contrato {c.id} · {propertyName(c.resolved_property_id)}
-                </h2>
-                <p>
-                  {modeNames[c.mode]} · {stateNames[c.status]} ·{" "}
-                  {c.target_label}
-                </p>
-                <p>
-                  {showDate(c.start_date)} al{" "}
-                  {showDate(c.actual_end_date || c.end_date)}
-                </p>
-                <p>Responsable: {personName(c.responsible_person_id)}</p>
-              </div>
-              <button
-                className="secondary"
-                onClick={() => void detail(c.id, c.resolved_property_id)}
-              >
-                Ver contrato <span className="sr-only">{c.id}</span>
-              </button>
-            </article>
+            <RecordRow
+              key={c.id}
+              title={`Contrato ${c.id} · ${propertyName(c.resolved_property_id)}`}
+              fields={
+                <>
+                  <RecordField label="Espacio">{c.target_label}</RecordField>
+                  <RecordField label="Responsable">
+                    {personName(c.responsible_person_id)}
+                  </RecordField>
+                  <RecordField label="Modalidad">
+                    {modeNames[c.mode]}
+                  </RecordField>
+                  <RecordField label="Estancia">
+                    {showDate(c.start_date)} al{" "}
+                    {showDate(c.actual_end_date || c.end_date)}
+                  </RecordField>
+                  <RecordField label="Estado">
+                    <RecordStatus domain="contract" state={c.status} />
+                  </RecordField>
+                </>
+              }
+              actions={
+                <button
+                  className="secondary"
+                  onClick={() => void detail(c.id, c.resolved_property_id)}
+                >
+                  Ver contrato <span className="sr-only">{c.id}</span>
+                </button>
+              }
+            />
           ))}
           {!contractList.rows.length && (
             <p className="empty">
@@ -688,30 +738,47 @@ function RentalRecords({
           )}
         </div>
       ) : (
-        <div className="record-list">
+        <div className="record-rows">
           {reservationList.rows.map((r) => (
-            <article key={r.id}>
-              <div className="record-main">
-                <h2>
-                  Reserva {r.id} · {propertyName(r.resolved_property_id)}
-                </h2>
-                <p>
-                  {modeNames[r.mode]} ·{" "}
-                  <strong>{stateNames[r.effective_status]}</strong> ·{" "}
-                  {r.target_label}
-                </p>
-                <p>
-                  {showDate(r.start_date)} al {showDate(r.end_date)} ·{" "}
-                  {personName(r.person_id)}
-                </p>
-                {r.expires_at && (
-                  <p>
-                    Vence: {new Date(r.expires_at + "Z").toLocaleString("es")}
-                  </p>
-                )}
-                {r.notes && <p>{r.notes}</p>}
-                {canWrite && (
-                  <div className="actions">
+            <RecordRow
+              key={r.id}
+              title={`Reserva ${r.id} · ${propertyName(r.resolved_property_id)}`}
+              fields={
+                <>
+                  <RecordField label="Espacio">{r.target_label}</RecordField>
+                  <RecordField label="Persona">
+                    {personName(r.person_id)}
+                  </RecordField>
+                  <RecordField label="Modalidad">
+                    {modeNames[r.mode]}
+                  </RecordField>
+                  <RecordField label="Estancia">
+                    {showDate(r.start_date)} al {showDate(r.end_date)}
+                  </RecordField>
+                  <RecordField label="Estado">
+                    <RecordStatus
+                      domain="reservation"
+                      state={r.effective_status}
+                    />
+                  </RecordField>
+                </>
+              }
+              detail={
+                r.notes || r.expires_at ? (
+                  <>
+                    {r.expires_at && (
+                      <p>
+                        Vence:{" "}
+                        {new Date(r.expires_at + "Z").toLocaleString("es")}
+                      </p>
+                    )}
+                    {r.notes && <p>{r.notes}</p>}
+                  </>
+                ) : undefined
+              }
+              actions={
+                canWrite && (
+                  <>
                     {["pending", "confirmed"].includes(r.effective_status) && (
                       <>
                         <button
@@ -753,10 +820,10 @@ function RentalRecords({
                           Registrar vencimiento {r.id}
                         </button>
                       )}
-                  </div>
-                )}
-              </div>
-            </article>
+                  </>
+                )
+              }
+            />
           ))}
           {!reservationList.rows.length && (
             <p className="empty">

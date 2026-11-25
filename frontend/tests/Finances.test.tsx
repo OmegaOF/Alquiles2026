@@ -223,7 +223,7 @@ test("propietario consulta resumen y deudas sin controles de gestión", async ()
   await screen.findByRole("heading", { name: "Moneda BOB" });
   await userEvent.click(screen.getByRole("button", { name: "Por cobrar" }));
   expect(
-    await screen.findByText("Alquiler · Luis Inquilino"),
+    await screen.findByRole("heading", { name: "Alquiler" }),
   ).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Generar alquileres" }),

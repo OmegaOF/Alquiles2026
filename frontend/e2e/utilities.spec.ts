@@ -204,28 +204,30 @@ test("servicio, recibo externo, ejemplo 14/15 días y corrección con historial"
   await expect(
     page.getByRole("heading", { name: /Resumen del reparto/ }),
   ).toBeVisible();
-  const first = page.locator(".utility-space").filter({
+  const first = page.getByRole("article").filter({
     has: page.getByRole("heading", {
       name: "A · Cuarto con patio: Bs 150,00",
       exact: true,
     }),
   });
+  await first.getByText(/^Ver días y cálculo/).click();
   await expect(first).toContainText("Bs 70,00");
   await expect(first).toContainText("Bs 80,00");
-  const second = page.locator(".utility-space").filter({
+  const second = page.getByRole("article").filter({
     has: page.getByRole("heading", {
       name: "B · Cuarto con ventana: Bs 150,00",
       exact: true,
     }),
   });
+  await second.getByText(/^Ver días y cálculo/).click();
   await expect(second).toContainText(f.two.full_name);
   await capture(page, info, "reparto");
   await page
     .getByRole("button", { name: "Confirmar distribución", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Distribución confirmada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Distribución confirmada" }),
+  ).toContainText("Distribución confirmada");
   await page
     .getByRole("button", { name: "Corregir recibo registrado", exact: true })
     .click();
@@ -305,7 +307,9 @@ test("lecturas válidas e inválidas, reemplazo y consumo de dos medidores", asy
   await page
     .getByRole("button", { name: "Guardar lectura", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("Lectura guardada");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Lectura guardada" }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Reemplazar este medidor", exact: true })
     .click();
@@ -322,7 +326,9 @@ test("lecturas válidas e inválidas, reemplazo y consumo de dos medidores", asy
   await page
     .getByRole("button", { name: "Guardar lectura", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("Lectura guardada");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Lectura guardada" }),
+  ).toBeVisible();
   await capture(page, info, "lecturas");
   await page
     .getByRole("button", { name: "← Volver a medidores", exact: true })
@@ -417,9 +423,9 @@ test("contratos sucesivos exigen revisión manual antes de confirmar", async ({
   await page
     .getByRole("button", { name: "Confirmar distribución", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Distribución confirmada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Distribución confirmada" }),
+  ).toContainText("Distribución confirmada");
   await capture(page, info, "confirmacion");
 });
 

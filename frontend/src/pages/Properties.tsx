@@ -21,6 +21,9 @@ import {
   lastPage,
   useListRequest,
   useLocalList,
+  useListPreference,
+  RecordField,
+  RecordRow,
 } from "../components/RecordList";
 import {
   Field,
@@ -56,7 +59,8 @@ export function Properties({
 }: Props) {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [newHouses, setNewHouses] = useState<Property[]>([]);
-  const [selected, setSelected] = useState<number | null>(
+  const [selected, setSelected] = useListPreference<number | null>(
+    rooms && !initialRoom ? "inventory:house" : undefined,
     initialRoom?.propertyId ?? null,
   );
   const [editing, setEditing] = useState<Partial<Property> | null>(null);
@@ -72,9 +76,14 @@ export function Properties({
   ];
   const findProperties = useRegistrySearch("properties", houses.length);
   const property = houses.find((p) => p.id === selected);
+  const [houseState, setHouseState] = useListPreference("houses:state", "");
   const listing = useLocalList(
-    houses,
-    (house) => `${propertyOption(house).label} ${house.id}`,
+    houses.filter(
+      (house) => !houseState || house.is_active === (houseState === "enabled"),
+    ),
+    (house) =>
+      `${propertyOption(house).label} ${house.id} ${house.is_active ? "Habilitada" : "Deshabilitada"}`,
+    "houses",
   );
   const [unitTarget, setUnitTarget] = useState(initialRoom?.id);
   if (editing)
@@ -274,11 +283,26 @@ export function Properties({
           {notice}
         </p>
       )}
-      <ListSearch
-        label="Buscar casas"
-        placeholder="Nombre, dirección o zona"
-        {...listing.search}
-      />
+      <div className="record-filters">
+        <ListSearch
+          label="Buscar casas"
+          placeholder="Nombre, dirección o zona"
+          {...listing.search}
+        />
+        <Field label="Estado de la casa">
+          <select
+            value={houseState}
+            onChange={(event) => {
+              setHouseState(event.target.value);
+              listing.pagination.onPage(1);
+            }}
+          >
+            <option value="">Todas</option>
+            <option value="enabled">Habilitadas</option>
+            <option value="disabled">Deshabilitadas</option>
+          </select>
+        </Field>
+      </div>
       {!houses.length ? (
         <div className="empty">
           Todavía no hay propiedades para mostrar.
@@ -289,27 +313,36 @@ export function Properties({
       ) : listing.rows.length === 0 ? (
         <p role="status">No se encontraron casas.</p>
       ) : (
-        <div className="property-grid">
+        <div className="record-rows">
           {listing.rows.map((p) => (
-            <article key={p.id}>
-              <HouseStatus property={p} />
-              <h2>{p.name}</h2>
-              <p>{p.address}</p>
-              <p>{[p.zone, p.city].filter(Boolean).join(" · ")}</p>
-              <p>
-                {p.owners.length}{" "}
-                {p.owners.length === 1 ? "propietario" : "propietarios"}
-              </p>
-              <button
-                className="secondary"
-                onClick={() => {
-                  setSelected(p.id);
-                  setNotice("");
-                }}
-              >
-                Ver propiedad <span className="sr-only">{p.name}</span>
-              </button>
-            </article>
+            <RecordRow
+              key={p.id}
+              title={p.name}
+              fields={
+                <>
+                  <RecordField label="Dirección">
+                    {[p.address, p.zone, p.city].filter(Boolean).join(" · ")}
+                  </RecordField>
+                  <RecordField label="Propietarios">
+                    {p.owners.length}
+                  </RecordField>
+                  <RecordField label="Estado">
+                    <HouseStatus property={p} />
+                  </RecordField>
+                </>
+              }
+              actions={
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setSelected(p.id);
+                    setNotice("");
+                  }}
+                >
+                  Ver propiedad <span className="sr-only">{p.name}</span>
+                </button>
+              }
+            />
           ))}
         </div>
       )}
@@ -351,6 +384,7 @@ function PropertyPeople({
         `Persona ${owner.person_id}`,
     })),
     (owner) => owner.name,
+    `house:${property.id}:owners`,
   );
   const managers = useLocalList(
     property.manager_ids.map((id) => ({
@@ -358,6 +392,7 @@ function PropertyPeople({
       name: users.find((user) => user.id === id)?.full_name ?? `Usuario ${id}`,
     })),
     (manager) => manager.name,
+    `house:${property.id}:managers`,
   );
   return (
     <>
@@ -418,8 +453,14 @@ function PropertyAvailability({
   propertyId: number;
   version: number;
 }) {
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const [query, setQuery] = useListPreference(
+    `house:${propertyId}:today:query`,
+    "",
+  );
+  const [page, setPage] = useListPreference(
+    `house:${propertyId}:today:page`,
+    1,
+  );
   const params = new URLSearchParams({ page: String(page), q: query });
   const { data, previousData, loading, error, reload } =
     useListRequest<Availability>(
@@ -836,13 +877,19 @@ function Units({
   const [target, setTarget] = useState(initialUnitId);
   const [editing, setEditing] = useState<Partial<Unit> | null>(null);
   const [notice, setNotice] = useState("");
-  const [filters, setFilters] = useState({
-    q: "",
-    unit_type: "",
-    enabled: "",
-    maintenance: "",
-  });
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useListPreference(
+    `house:${property.id}:rooms:filters`,
+    {
+      q: "",
+      unit_type: "",
+      enabled: "",
+      maintenance: "",
+    },
+  );
+  const [page, setPage] = useListPreference(
+    `house:${property.id}:rooms:page`,
+    1,
+  );
   const params = new URLSearchParams({ page: String(page) });
   for (const [key, value] of Object.entries(filters)) {
     if (value) params.set(key, value);

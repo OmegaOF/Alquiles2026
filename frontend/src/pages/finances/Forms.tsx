@@ -212,7 +212,7 @@ function AllocationFields({
         concepto.
       </p>
       {obligations.map((o) => (
-        <div className="utility-space" key={o.id}>
+        <div className="record-form-row" key={o.id}>
           <strong>
             {o.concept} · {showDate(o.period_start)} · pendiente{" "}
             {money(o.pending, o.currency)}

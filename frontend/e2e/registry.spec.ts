@@ -107,7 +107,9 @@ test("registrar y editar persona, propiedad y cuartos desde React", async ({
     .getByRole("button", { name: "Guardar cambios", exact: true })
     .click();
   await expect(
-    page.getByRole("row").filter({ hasText: /A-1.*Cuarto con patio/ })
+    page
+      .getByRole("row")
+      .filter({ hasText: /A-1.*Cuarto con patio/ })
       .getByText("En mantenimiento", { exact: true }),
   ).toBeVisible();
   expect(
@@ -240,14 +242,18 @@ test("administrar una cuenta y asignar permisos desde React", async ({
   await page
     .getByLabel("Contraseña", { exact: false })
     .fill(credentials().password);
-  await page.getByRole("searchbox", { name: "Buscar casa para asignar acceso" }).fill(assignedHouse);
+  await page
+    .getByRole("searchbox", { name: "Buscar casa para asignar acceso" })
+    .fill(assignedHouse);
   await page
     .getByRole("checkbox", { name: assignedHouse, exact: true })
     .check();
   await page
     .getByRole("button", { name: "Guardar cambios", exact: true })
     .click();
-  await page.getByRole("searchbox", { name: "Buscar cuentas" }).fill("operator_" + tag);
+  await page
+    .getByRole("searchbox", { name: "Buscar cuentas" })
+    .fill("operator_" + tag);
   await expect(
     page.getByRole("heading", { name: "Operador de prueba " + tag }),
   ).toBeVisible();
@@ -303,7 +309,9 @@ test("el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
   await page
     .getByRole("button", { name: "Guardar cambios", exact: true })
     .click();
-  await page.getByRole("searchbox", { name: "Buscar personas" }).fill(corrected);
+  await page
+    .getByRole("searchbox", { name: "Buscar personas" })
+    .fill(corrected);
   await expect(
     page.getByRole("heading", { name: corrected, exact: true }),
   ).toBeVisible();
@@ -315,10 +323,6 @@ test("el nombre de una persona se actualiza en sus cuentas sin cambiar sus alias
   const accounts = page.getByRole("article").filter({
     has: page.getByRole("heading", { name: corrected, exact: true }),
   });
-  await expect(
-    accounts.getByText("Alias de la cuenta: Alias a", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    accounts.getByText("Alias de la cuenta: Alias b", { exact: true }),
-  ).toBeVisible();
+  await expect(accounts.getByText("Alias a", { exact: true })).toBeVisible();
+  await expect(accounts.getByText("Alias b", { exact: true })).toBeVisible();
 });

@@ -1,3 +1,11 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  useListPreference,
+} from "../components/RecordList";
+import { RecordStatus, StatusIndicator } from "../components/StatusIndicator";
+import { financeStates } from "../finances";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { PropertySelect } from "../components/PropertySelect";
@@ -14,7 +22,7 @@ import {
   money,
   exactCents,
 } from "../anticreticos";
-import { showDate, stateNames, addDays } from "../tenancy";
+import { showDate, addDays } from "../tenancy";
 import { usePropertyData } from "./tenancy/Shared";
 import { ConditionsForm } from "./anticreticos/ConditionsForm";
 import { CapitalForm } from "./anticreticos/CapitalForm";
@@ -46,10 +54,12 @@ export function Anticreticos({
   onContracts?: () => void;
   onFinances?: (propertyId: number) => void;
 }) {
+  const [savedProperty, saveProperty] = useListPreference("capital:house", 0);
   const [propertyId, setPropertyId] = useState(
-      initialTarget?.propertyId || properties[0]?.id || 0,
-    ),
-    [selected, setSelected] = useState<number | null>(
+    initialTarget?.propertyId || savedProperty || properties[0]?.id || 0,
+  );
+  const criteria = `capital:${propertyId}`;
+  const [selected, setSelected] = useState<number | null>(
       initialTarget?.contractId || null,
     ),
     [data, setData] = useState<CapitalData>(empty),
@@ -57,11 +67,20 @@ export function Anticreticos({
       methods: [],
       categories: [],
     }),
-    [view, setView] = useState("list"),
+    [view, setView] = useListPreference(`${criteria}:view`, "list"),
     [detailTab, setDetailTab] = useState("capital"),
-    [filter, setFilter] = useState("all"),
-    [contractFilter, setContractFilter] = useState(""),
-    [horizon, setHorizon] = useState(30),
+    [filter, setFilter] = useListPreference(
+      `${criteria}:${view}:state`,
+      view === "due" ? "upcoming" : "all",
+    ),
+    [contractFilter, setContractFilter] = useListPreference(
+      `${criteria}:${view}:contract`,
+      "",
+    ),
+    [horizon, setHorizon] = useListPreference(
+      `${criteria}:${view}:horizon`,
+      30,
+    ),
     [action, setAction] = useState<Action | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -173,8 +192,8 @@ export function Anticreticos({
         disabled={!!action}
         onChange={(id) => {
           setSelected(null);
-          setContractFilter("");
           setPropertyId(Number(id));
+          saveProperty(Number(id));
         }}
       />
       <div className="form-actions">
@@ -219,9 +238,9 @@ export function Anticreticos({
           </button>
           <h2>Anticrético · {book.contract.target_label}</h2>
           <p>
-            Contrato {book.contract.id} · {capitalStates[book.state]} ·
-            Ocupación:{" "}
-            {stateNames[book.contract.status] || book.contract.status}
+            Contrato {book.contract.id} ·{" "}
+            <RecordStatus domain="capital" state={book.state} /> · Ocupación:{" "}
+            <RecordStatus domain="contract" state={book.contract.status} />
           </p>
           {action?.kind === "conditions" ? (
             <ConditionsForm
@@ -359,9 +378,13 @@ export function Anticreticos({
                     </p>
                     <p>
                       Situación del capital:{" "}
-                      <strong>{capitalStates[book.state]}</strong>. Situación de
-                      ocupación:{" "}
-                      <strong>{stateNames[book.contract.status]}</strong>.
+                      <RecordStatus domain="capital" state={book.state} />.
+                      Situación de ocupación:{" "}
+                      <RecordStatus
+                        domain="contract"
+                        state={book.contract.status}
+                      />
+                      .
                     </p>
                     <p>
                       Servicios por cobrar registrados:{" "}
@@ -394,44 +417,72 @@ export function Anticreticos({
               {detailTab === "parties" && (
                 <>
                   <h3>Titulares con derecho a restitución</h3>
-                  {book.holders.map((h) => (
-                    <article className="panel" key={h.person_id}>
-                      <h4>{name(h.person_id)}</h4>
-                      <p>
-                        Persona autorizada a recibir:{" "}
-                        {name(h.beneficiary_person_id)}
-                      </p>
-                      <p>
-                        Parte acordada:{" "}
-                        {money(h.assigned_amount, book.currency)} · Capital
-                        asignado en entregas:{" "}
-                        {money(h.received || "0", book.currency)}
-                      </p>
-                      <p>
-                        Devuelto: {money(h.returned || "0", book.currency)} ·
-                        Ajustes: {money(h.adjustments || "0", book.currency)} ·
-                        Pendiente:{" "}
-                        <strong>
-                          {money(h.pending || "0", book.currency)}
-                        </strong>
-                      </p>
-                    </article>
-                  ))}
+                  <RecordCollection
+                    id={`capital:${book.contract.id}:holders`}
+                    label="titulares"
+                    items={book.holders}
+                    searchable={(h) =>
+                      `${name(h.person_id)} ${name(h.beneficiary_person_id)}`
+                    }
+                    render={(h) => (
+                      <RecordRow
+                        key={h.person_id}
+                        title={name(h.person_id)}
+                        fields={
+                          <>
+                            <RecordField label="Autorizado a recibir">
+                              {name(h.beneficiary_person_id)}
+                            </RecordField>
+                            <RecordField label="Parte acordada">
+                              {money(h.assigned_amount, book.currency)}
+                            </RecordField>
+                            <RecordField label="Pendiente">
+                              {money(h.pending || "0", book.currency)}
+                            </RecordField>
+                          </>
+                        }
+                        detail={
+                          <dl className="record-row-fields">
+                            <RecordField label="Capital asignado en entregas">
+                              {money(h.received || "0", book.currency)}
+                            </RecordField>
+                            <RecordField label="Devuelto">
+                              {money(h.returned || "0", book.currency)}
+                            </RecordField>
+                            <RecordField label="Ajustes">
+                              {money(h.adjustments || "0", book.currency)}
+                            </RecordField>
+                          </dl>
+                        }
+                      />
+                    )}
+                  />
                   <h3>Responsables contractuales de devolver</h3>
-                  {book.responsibles.map((r) => (
-                    <article className="panel" key={r.person_id}>
-                      <h4>{name(r.person_id)}</h4>
-                      <p>
-                        Parte acordada:{" "}
-                        {money(r.assigned_amount, book.currency)} · Restituido
-                        por su cuenta: {money(r.returned || "0", book.currency)}{" "}
-                        · Pendiente:{" "}
-                        <strong>
-                          {money(r.pending || "0", book.currency)}
-                        </strong>
-                      </p>
-                    </article>
-                  ))}
+                  <RecordCollection
+                    id={`capital:${book.contract.id}:responsibles`}
+                    label="responsables de restitución"
+                    items={book.responsibles}
+                    searchable={(r) => name(r.person_id)}
+                    render={(r) => (
+                      <RecordRow
+                        key={r.person_id}
+                        title={name(r.person_id)}
+                        fields={
+                          <>
+                            <RecordField label="Parte acordada">
+                              {money(r.assigned_amount, book.currency)}
+                            </RecordField>
+                            <RecordField label="Restituido por su cuenta">
+                              {money(r.returned || "0", book.currency)}
+                            </RecordField>
+                            <RecordField label="Pendiente">
+                              {money(r.pending || "0", book.currency)}
+                            </RecordField>
+                          </>
+                        }
+                      />
+                    )}
+                  />
                   <p>
                     Ser ocupante, pagador físico o propietario firmante no
                     asigna automáticamente derechos u obligaciones de capital.
@@ -441,124 +492,271 @@ export function Anticreticos({
               {detailTab === "history" && (
                 <>
                   <h3>Entregas y devoluciones reales</h3>
-                  {book.movements.map((m) => (
-                    <article className="panel" key={m.id}>
-                      <h4>
-                        {m.kind === "delivery"
-                          ? "Entrega de capital"
-                          : "Devolución de capital"}{" "}
-                        · {money(m.amount, book.currency)}
-                      </h4>
-                      <p>
-                        {m.void_operation_id
-                          ? "Movimiento anulado; no integra los saldos"
-                          : "Movimiento válido"}{" "}
-                        · {showDate(m.occurred_on)}
-                      </p>
-                      <p>
-                        Entregó/pagó: {name(m.payer_id)} · Recibió:{" "}
-                        {name(m.beneficiary_person_id)}
-                      </p>
-                      <p>
-                        Método:{" "}
-                        {catalogs.methods.find((x) => x.id === m.method_id)
-                          ?.name || "Registrado"}{" "}
-                        · Referencia: {m.reference || "Sin referencia externa"}
-                      </p>
-                      <p>
-                        Comprobante:{" "}
-                        {m.document_reference || "Sin referencia adicional"} ·
-                        Registró usuario {m.created_by}
-                      </p>
-                      {m.allocations.map((a, i) => (
-                        <p key={i}>
-                          Titular {name(a.holder_id)} · responsabilidad de{" "}
-                          {name(a.responsible_id)}:{" "}
-                          {money(a.amount, book.currency)}
-                        </p>
-                      ))}
-                      {admin && !m.void_operation_id && (
-                        <button
-                          className="secondary"
-                          onClick={() => open("void", m.id)}
-                        >
-                          Anular movimiento {m.id}
-                        </button>
-                      )}
-                    </article>
-                  ))}
-                  {!book.movements.length && (
-                    <p>No se registraron entregas ni devoluciones de dinero.</p>
-                  )}
+                  <RecordCollection
+                    id={`capital:${book.contract.id}:movements`}
+                    label="movimientos de capital"
+                    items={book.movements}
+                    searchable={(m) =>
+                      `${m.id} ${m.kind === "delivery" ? "Entrega" : "Devolución"} ${name(m.payer_id)} ${name(m.beneficiary_person_id)} ${m.occurred_on} ${m.reference ?? ""} ${m.document_reference ?? ""}`
+                    }
+                    filter={{
+                      label: "Tipo de movimiento de capital",
+                      value: (m) =>
+                        m.kind === "delivery" ? "Entrega" : "Devolución",
+                    }}
+                    empty="No se registraron entregas ni devoluciones de dinero."
+                    render={(m) => (
+                      <RecordRow
+                        key={m.id}
+                        title={`${m.kind === "delivery" ? "Entrega de capital" : "Devolución de capital"} · ${money(m.amount, book.currency)}`}
+                        fields={
+                          <>
+                            <RecordField label="Fecha">
+                              {showDate(m.occurred_on)}
+                            </RecordField>
+                            <RecordField label="Entregó o pagó">
+                              {name(m.payer_id)}
+                            </RecordField>
+                            <RecordField label="Recibió">
+                              {name(m.beneficiary_person_id)}
+                            </RecordField>
+                            <RecordField label="Estado">
+                              <StatusIndicator
+                                tone={m.void_operation_id ? "gray" : "green"}
+                                label={
+                                  m.void_operation_id
+                                    ? "Movimiento anulado"
+                                    : "Movimiento válido"
+                                }
+                              />
+                            </RecordField>
+                          </>
+                        }
+                        actions={
+                          admin &&
+                          !m.void_operation_id && (
+                            <button
+                              className="secondary"
+                              onClick={() => open("void", m.id)}
+                            >
+                              Anular movimiento {m.id}
+                            </button>
+                          )
+                        }
+                        detail={
+                          <>
+                            <dl className="record-row-fields">
+                              <RecordField label="Método">
+                                {catalogs.methods.find(
+                                  (x) => x.id === m.method_id,
+                                )?.name || "Registrado"}
+                              </RecordField>
+                              <RecordField label="Referencia">
+                                {m.reference || "Sin referencia externa"}
+                              </RecordField>
+                              <RecordField label="Comprobante">
+                                {m.document_reference ||
+                                  "Sin referencia adicional"}
+                              </RecordField>
+                              <RecordField label="Usuario que registró">
+                                {m.created_by}
+                              </RecordField>
+                            </dl>
+                            <RecordCollection
+                              id={`capital:${book.contract.id}:movements:${m.id}:allocations`}
+                              label="asignaciones de capital"
+                              items={m.allocations}
+                              searchable={(a) =>
+                                `${name(a.holder_id)} ${name(a.responsible_id)} ${money(a.amount, book.currency)}`
+                              }
+                              render={(a) => (
+                                <RecordRow
+                                  key={`${a.holder_id}:${a.responsible_id}`}
+                                  title={name(a.holder_id)}
+                                  fields={
+                                    <>
+                                      <RecordField label="Responsable">
+                                        {name(a.responsible_id)}
+                                      </RecordField>
+                                      <RecordField label="Importe">
+                                        {money(a.amount, book.currency)}
+                                      </RecordField>
+                                    </>
+                                  }
+                                />
+                              )}
+                            />
+                          </>
+                        }
+                      />
+                    )}
+                  />
                   <h3>Acuerdos que modifican la restitución</h3>
-                  {book.adjustments.map((a) => (
-                    <article className="panel" key={a.id}>
-                      <h4>
-                        {adjustmentNames[a.kind]} ·{" "}
-                        {a.void_operation_id
-                          ? "Acuerdo anulado"
-                          : "Acuerdo vigente"}
-                      </h4>
-                      <p>
-                        {showDate(a.effective_on)} · {a.reason} · Respaldo:{" "}
-                        {a.document_reference}
-                      </p>
-                      {a.allocations.map((line, i) => (
-                        <p key={i}>
-                          {name(line.holder_id)} · {name(line.responsible_id)}:{" "}
-                          {money(line.delta, book.currency)}
-                        </p>
-                      ))}
-                      {admin && !a.void_operation_id && (
-                        <button
-                          className="secondary"
-                          onClick={() => open("voidAdjustment", a.id)}
-                        >
-                          Anular acuerdo {a.id}
-                        </button>
-                      )}
-                    </article>
-                  ))}
+                  <RecordCollection
+                    id={`capital:${book.contract.id}:adjustments`}
+                    label="acuerdos de restitución"
+                    items={book.adjustments}
+                    searchable={(a) =>
+                      `${adjustmentNames[a.kind]} ${a.effective_on} ${a.reason} ${a.document_reference}`
+                    }
+                    filter={{
+                      label: "Clase de acuerdo",
+                      value: (a) => adjustmentNames[a.kind],
+                    }}
+                    render={(a) => (
+                      <RecordRow
+                        key={a.id}
+                        title={adjustmentNames[a.kind]}
+                        fields={
+                          <>
+                            <RecordField label="Fecha efectiva">
+                              {showDate(a.effective_on)}
+                            </RecordField>
+                            <RecordField label="Estado">
+                              <StatusIndicator
+                                tone={a.void_operation_id ? "gray" : "blue"}
+                                label={
+                                  a.void_operation_id
+                                    ? "Acuerdo anulado"
+                                    : "Acuerdo vigente"
+                                }
+                              />
+                            </RecordField>
+                          </>
+                        }
+                        actions={
+                          admin &&
+                          !a.void_operation_id && (
+                            <button
+                              className="secondary"
+                              onClick={() => open("voidAdjustment", a.id)}
+                            >
+                              Anular acuerdo {a.id}
+                            </button>
+                          )
+                        }
+                        detail={
+                          <>
+                            <p>
+                              {a.reason} · Respaldo: {a.document_reference}
+                            </p>
+                            <RecordCollection
+                              id={`capital:${book.contract.id}:adjustments:${a.id}:lines`}
+                              label="asignaciones del acuerdo"
+                              items={a.allocations}
+                              searchable={(line) =>
+                                `${name(line.holder_id)} ${name(line.responsible_id)} ${money(line.delta, book.currency)}`
+                              }
+                              render={(line) => (
+                                <RecordRow
+                                  key={`${line.holder_id}:${line.responsible_id}`}
+                                  title={name(line.holder_id)}
+                                  fields={
+                                    <>
+                                      <RecordField label="Responsable">
+                                        {name(line.responsible_id)}
+                                      </RecordField>
+                                      <RecordField label="Ajuste">
+                                        {money(line.delta, book.currency)}
+                                      </RecordField>
+                                    </>
+                                  }
+                                />
+                              )}
+                            />
+                          </>
+                        }
+                      />
+                    )}
+                  />
                   <h3>Versiones de condiciones económicas</h3>
-                  {book.history.map((r) => (
-                    <article className="panel" key={r.id}>
-                      <h4>
-                        Versión {r.revision} · capital acordado{" "}
-                        {money(r.agreed_capital, book.currency)}
-                      </h4>
-                      <p>
-                        Restitución:{" "}
-                        {r.restitution_on
-                          ? showDate(r.restitution_on)
-                          : "Pendiente"}{" "}
-                        · Registró usuario {r.created_by} ·{" "}
-                        {new Date(r.created_at + "Z").toLocaleString("es-BO")}
-                      </p>
-                      <p>
-                        {r.reason || "Registro inicial"} · Documento:{" "}
-                        {r.document_reference || "Sin referencia adicional"}
-                      </p>
-                      <details>
-                        <summary>
-                          Ver personas y condiciones de la versión {r.revision}
-                        </summary>
-                        <p>{r.conditions}</p>
-                        {r.holders.map((h) => (
-                          <p key={h.person_id}>
-                            Titular: {name(h.person_id)} ·{" "}
-                            {money(h.assigned_amount, book.currency)} · recibe{" "}
-                            {name(h.beneficiary_person_id)}
-                          </p>
-                        ))}
-                        {r.responsibles.map((d) => (
-                          <p key={d.person_id}>
-                            Responsable: {name(d.person_id)} ·{" "}
-                            {money(d.assigned_amount, book.currency)}
-                          </p>
-                        ))}
-                      </details>
-                    </article>
-                  ))}
+                  <RecordCollection
+                    id={`capital:${book.contract.id}:versions`}
+                    label="versiones de condiciones"
+                    items={book.history}
+                    searchable={(r) =>
+                      `${r.revision} ${r.restitution_on ?? ""} ${r.created_at} ${r.reason ?? ""} ${r.document_reference ?? ""}`
+                    }
+                    render={(r) => (
+                      <RecordRow
+                        key={r.id}
+                        title={`Versión ${r.revision} · ${money(r.agreed_capital, book.currency)}`}
+                        fields={
+                          <>
+                            <RecordField label="Restitución">
+                              {r.restitution_on
+                                ? showDate(r.restitution_on)
+                                : "Pendiente"}
+                            </RecordField>
+                            <RecordField label="Registro">
+                              {new Date(r.created_at + "Z").toLocaleString(
+                                "es-BO",
+                              )}
+                            </RecordField>
+                            <RecordField label="Usuario">
+                              {r.created_by}
+                            </RecordField>
+                          </>
+                        }
+                        detailLabel={`Ver personas y condiciones de la versión ${r.revision}`}
+                        detail={
+                          <>
+                            <p>
+                              {r.reason || "Registro inicial"} · Documento:{" "}
+                              {r.document_reference ||
+                                "Sin referencia adicional"}
+                            </p>
+                            <p>{r.conditions}</p>
+                            <RecordCollection
+                              id={`capital:${book.contract.id}:versions:${r.id}:parties`}
+                              label="personas de esta versión"
+                              items={[
+                                ...r.holders.map((h) => ({
+                                  ...h,
+                                  role: "Titular",
+                                })),
+                                ...r.responsibles.map((d) => ({
+                                  ...d,
+                                  role: "Responsable",
+                                })),
+                              ]}
+                              searchable={(party) =>
+                                `${party.role} ${name(party.person_id)} ${name(party.beneficiary_person_id)}`
+                              }
+                              filter={{
+                                label: "Participación",
+                                value: (party) => party.role,
+                              }}
+                              render={(party) => (
+                                <RecordRow
+                                  key={`${party.role}:${party.person_id}`}
+                                  title={name(party.person_id)}
+                                  fields={
+                                    <>
+                                      <RecordField label="Participación">
+                                        {party.role}
+                                      </RecordField>
+                                      <RecordField label="Parte acordada">
+                                        {money(
+                                          party.assigned_amount,
+                                          book.currency,
+                                        )}
+                                      </RecordField>
+                                      {party.role === "Titular" && (
+                                        <RecordField label="Autorizado a recibir">
+                                          {name(party.beneficiary_person_id)}
+                                        </RecordField>
+                                      )}
+                                    </>
+                                  }
+                                />
+                              )}
+                            />
+                          </>
+                        }
+                      />
+                    )}
+                  />
                 </>
               )}
               {detailTab === "services" && (
@@ -569,25 +767,42 @@ export function Anticreticos({
                     pagos se registran en Pagos y gastos. No se descuentan
                     automáticamente del capital.
                   </p>
-                  {book.service_obligations.map((o) => (
-                    <article className="panel" key={o.id}>
-                      <h4>
-                        {o.concept} · {name(o.person_id)}
-                      </h4>
-                      <p>
-                        {showDate(o.period_start)} al{" "}
-                        {showDate(o.effective_period_end)} · pendiente{" "}
-                        {money(o.pending, o.currency)}
-                      </p>
-                    </article>
-                  ))}
-                  {!book.service_obligations.length && (
-                    <p>
-                      No hay importes de servicios registrados por cobrar para
-                      este contrato. Esto no confirma que todos sus recibos
-                      hayan sido distribuidos.
-                    </p>
-                  )}
+                  <RecordCollection
+                    id={`capital:${book.contract.id}:services`}
+                    label="obligaciones de servicios"
+                    items={book.service_obligations}
+                    searchable={(o) =>
+                      `${o.concept} ${name(o.person_id)} ${o.period_start} ${financeStates[o.state]}`
+                    }
+                    filter={{
+                      label: "Estado de la obligación",
+                      value: (o) => financeStates[o.state] || o.state,
+                    }}
+                    empty="No hay importes de servicios registrados por cobrar para este contrato."
+                    render={(o) => (
+                      <RecordRow
+                        key={o.id}
+                        title={o.concept}
+                        fields={
+                          <>
+                            <RecordField label="Titular">
+                              {name(o.person_id)}
+                            </RecordField>
+                            <RecordField label="Periodo">
+                              {showDate(o.period_start)} al{" "}
+                              {showDate(o.effective_period_end)}
+                            </RecordField>
+                            <RecordField label="Pendiente">
+                              {money(o.pending, o.currency)}
+                            </RecordField>
+                            <RecordField label="Estado">
+                              <RecordStatus domain="finance" state={o.state} />
+                            </RecordField>
+                          </>
+                        }
+                      />
+                    )}
+                  />
                   {onFinances && (
                     <button onClick={() => onFinances(propertyId)}>
                       Abrir pagos de servicios
@@ -613,11 +828,7 @@ export function Anticreticos({
                 key={id}
                 className={view === id ? "" : "secondary"}
                 aria-current={view === id ? "page" : undefined}
-                onClick={() => {
-                  setView(id);
-                  if (id === "due") setFilter("upcoming");
-                  else setFilter("all");
-                }}
+                onClick={() => setView(id)}
               >
                 {label}
               </button>
@@ -626,23 +837,50 @@ export function Anticreticos({
           {view === "summary" ? (
             <>
               <h2>Resumen del capital por moneda</h2>
-              {data.summary.map((s) => (
-                <section className="panel" key={s.currency}>
-                  <h3>Capital en {s.currency}</h3>
-                  <p>
-                    Anticréticos: {s.count} · con condiciones pendientes:{" "}
-                    {s.pending_conditions}
-                  </p>
-                  <dl className="finance-values">
-                    {capitalFields.map((key) => (
-                      <div key={key}>
-                        <dt>{capitalLabels[key]}</dt>
-                        <dd>{money(s[key], s.currency)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              ))}
+              <RecordCollection
+                id={`${criteria}:balances`}
+                label="saldos de capital por moneda"
+                items={data.summary}
+                searchable={(s) => s.currency}
+                render={(s) => (
+                  <RecordRow
+                    key={s.currency}
+                    title={`Capital en ${s.currency}`}
+                    fields={
+                      <>
+                        <RecordField label="Anticréticos">
+                          {s.count}
+                        </RecordField>
+                        <RecordField label="Condiciones pendientes">
+                          {s.pending_conditions}
+                        </RecordField>
+                        <RecordField label={capitalLabels.capital_received}>
+                          {money(s.capital_received, s.currency)}
+                        </RecordField>
+                        <RecordField label={capitalLabels.capital_pending}>
+                          {money(s.capital_pending, s.currency)}
+                        </RecordField>
+                      </>
+                    }
+                    detail={
+                      <dl className="record-row-fields">
+                        {capitalFields
+                          .filter(
+                            (key) =>
+                              key !== "capital_received" &&
+                              key !== "capital_pending",
+                          )
+                          .map((key) => (
+                            <RecordField key={key} label={capitalLabels[key]}>
+                              {money(s[key], s.currency)}
+                            </RecordField>
+                          ))}
+                      </dl>
+                    }
+                    detailLabel="Ver desglose del capital"
+                  />
+                )}
+              />
             </>
           ) : (
             <>
@@ -694,59 +932,61 @@ export function Anticreticos({
                   </p>
                 </>
               )}
-              {data.items
-                .filter(
+              <RecordCollection
+                id={`capital:${propertyId}:${view}`}
+                label="anticréticos"
+                items={data.items.filter(
                   (item) =>
                     matches(item) &&
                     (!contractFilter ||
                       String(item.contract.id) === contractFilter),
-                )
-                .map((b) => (
-                  <article className="panel" key={b.contract.id}>
-                    <h2>Anticrético · {b.contract.target_label}</h2>
-                    <p>
-                      {name(b.contract.responsible_person_id)} · Contrato{" "}
-                      {b.contract.id} · {capitalStates[b.state]}
-                    </p>
-                    <p>
-                      Capital acordado: {money(b.capital_agreed, b.currency)} ·
-                      Recibido: {money(b.capital_received, b.currency)} ·
-                      Devuelto: {money(b.capital_returned, b.currency)}
-                    </p>
-                    <p>
-                      <strong>
-                        Pendiente de devolución:{" "}
-                        {money(b.capital_pending, b.currency)}
-                      </strong>
-                    </p>
-                    <p>
-                      Final de ocupación pactado:{" "}
-                      {showDate(b.contract.end_date)} · Restitución:{" "}
-                      {b.conditions?.restitution_on
-                        ? showDate(b.conditions.restitution_on)
-                        : "Información pendiente"}
-                    </p>
-                    <button
-                      onClick={() => {
-                        setSelected(b.contract.id);
-                        setDetailTab("capital");
-                      }}
-                    >
-                      Ver capital del contrato {b.contract.id}
-                    </button>
-                  </article>
-                ))}
-              {!data.items.filter(
-                (item) =>
-                  matches(item) &&
-                  (!contractFilter ||
-                    String(item.contract.id) === contractFilter),
-              ).length && (
-                <p>
-                  No hay anticréticos en esta selección. Los contratos se
-                  registran desde Contratos, sin duplicar la ocupación aquí.
-                </p>
-              )}
+                )}
+                searchable={(b) =>
+                  `${b.contract.id} ${b.contract.target_label} ${name(b.contract.responsible_person_id)} ${capitalStates[b.state]} ${b.conditions?.restitution_on ?? ""} ${money(b.capital_pending, b.currency)}`
+                }
+                empty="No hay anticréticos en esta selección."
+                render={(b) => (
+                  <RecordRow
+                    key={b.contract.id}
+                    title={`Anticrético · ${b.contract.target_label}`}
+                    fields={
+                      <>
+                        <RecordField label="Contrato y responsable">
+                          {b.contract.id} ·{" "}
+                          {name(b.contract.responsible_person_id)}
+                        </RecordField>
+                        <RecordField label="Capital">
+                          <RecordStatus domain="capital" state={b.state} />
+                        </RecordField>
+                        <RecordField label="Pendiente de devolución">
+                          <strong>
+                            {money(b.capital_pending, b.currency)}
+                          </strong>
+                        </RecordField>
+                        <RecordField label="Final pactado">
+                          {showDate(b.contract.end_date)}
+                        </RecordField>
+                        <RecordField label="Restitución">
+                          {b.conditions?.restitution_on
+                            ? showDate(b.conditions.restitution_on)
+                            : "Sin fecha"}
+                        </RecordField>
+                      </>
+                    }
+                    actions={
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setSelected(b.contract.id);
+                          setDetailTab("capital");
+                        }}
+                      >
+                        Ver capital del contrato {b.contract.id}
+                      </button>
+                    }
+                  />
+                )}
+              />
             </>
           )}
         </>

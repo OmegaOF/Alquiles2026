@@ -81,13 +81,20 @@ test("propietario no ve acciones para registrar ni gestionar usuarios", async ()
   const owner = { ...user, role: "owner" };
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) =>
-      url.endsWith("/auth/me")
-        ? response(owner)
-        : url.endsWith("/properties")
-          ? response([property])
-          : response([person]),
-    ),
+    vi.fn(async (url: string) => {
+      if (url.endsWith("/auth/me")) return response(owner);
+      if (url.endsWith("/properties")) return response([property]);
+      if (url.includes("/unit-inventory?")) {
+        return response({
+          items: [],
+          types: [],
+          total: 0,
+          page: 1,
+          page_size: 20,
+        });
+      }
+      return response([person]);
+    }),
   );
   render(<App />);
   expect(await screen.findByRole("heading", { name: "Inicio" })).toBeVisible();

@@ -1,3 +1,10 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  useListPreference,
+} from "../components/RecordList";
+import { RecordStatus, StatusIndicator } from "../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { PropertySelect } from "../components/PropertySelect";
@@ -22,7 +29,12 @@ import {
   exactCents,
   exactAmount,
 } from "../finances";
-import type { FinanceData, FinanceCatalogs, Catalog } from "../finances";
+import type {
+  FinanceData,
+  FinanceCatalogs,
+  Catalog,
+  Expense,
+} from "../finances";
 
 const tabs = [
   ["summary", "Resumen económico"],
@@ -64,12 +76,18 @@ export function Finances({
   onCapital?: (propertyId: number) => void;
   onReminders?: (propertyId: number) => void;
 }) {
+  const listId = `finances:${section ?? "all"}`;
   const activeForm = useRef<HTMLDivElement>(null);
+  const [savedProperty, saveProperty] = useListPreference(`${listId}:house`, 0);
   const [propertyId, setPropertyId] = useState(
-      initialPropertyId || properties[0]?.id || 0,
-    ),
-    [tab, setTab] = useState(section ?? "summary"),
-    [data, setData] = useState<FinanceData>(empty),
+    initialPropertyId || savedProperty || properties[0]?.id || 0,
+  );
+  const criteria = `${listId}:${propertyId}`;
+  const [tab, setTab] = useListPreference(
+    initialObligationId ? undefined : `${criteria}:tab`,
+    section ?? "summary",
+  );
+  const [data, setData] = useState<FinanceData>(empty),
     [catalogs, setCatalogs] = useState<FinanceCatalogs>({
       methods: [],
       categories: [],
@@ -80,16 +98,35 @@ export function Finances({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
-    [personFilter, setPersonFilter] = useState(0),
-    [obligationFilter, setObligationFilter] = useState(
+    [personFilter, setPersonFilter] = useListPreference(
+      `${criteria}:personFilter`,
+      0,
+    ),
+    [obligationFilter, setObligationFilter] = useListPreference(
+      initialObligationId ? undefined : `${criteria}:obligation`,
       initialObligationId || 0,
     ),
-    [unitFilter, setUnitFilter] = useState(""),
-    [contractFilter, setContractFilter] = useState(0),
-    [conceptFilter, setConceptFilter] = useState(""),
-    [currencyFilter, setCurrencyFilter] = useState(""),
-    [fromFilter, setFromFilter] = useState(""),
-    [toFilter, setToFilter] = useState("");
+    [unitFilter, setUnitFilter] = useListPreference(
+      `${criteria}:unitFilter`,
+      "",
+    ),
+    [contractFilter, setContractFilter] = useListPreference(
+      `${criteria}:contractFilter`,
+      0,
+    ),
+    [conceptFilter, setConceptFilter] = useListPreference(
+      `${criteria}:conceptFilter`,
+      "",
+    ),
+    [currencyFilter, setCurrencyFilter] = useListPreference(
+      `${criteria}:currencyFilter`,
+      "",
+    ),
+    [fromFilter, setFromFilter] = useListPreference(
+      `${criteria}:fromFilter`,
+      "",
+    ),
+    [toFilter, setToFilter] = useListPreference(`${criteria}:toFilter`, "");
   const seq = useRef(0),
     current = useRef(propertyId);
   current.current = propertyId;
@@ -129,13 +166,6 @@ export function Finances({
     setData(empty);
     setAction(null);
     setNotice("");
-    setPersonFilter(0);
-    setUnitFilter("");
-    setContractFilter(0);
-    setConceptFilter("");
-    setCurrencyFilter("");
-    setFromFilter("");
-    setToFilter("");
     void load();
     return () => {
       seq.current++;
@@ -176,131 +206,184 @@ export function Finances({
       (!fromFilter || o.effective_period_end >= fromFilter) &&
       (!toFilter || o.period_start <= toFilter),
   );
-  function obligationCards(debts = false) {
+  function obligationRows(debts = false) {
     return (
-      <div className="record-list">
-        {obligations
-          .filter((o) => !debts || exactCents(o.pending) > 0n)
-          .map((o) => (
-            <article className="panel history-item" key={o.id}>
-              <h3>
-                {o.concept} · {name(o.person_id)}
-              </h3>
-              <p>
-                {unit(o.unit_id)} · Contrato {o.contract_id} ·{" "}
-                {showDate(o.period_start)} al {showDate(o.effective_period_end)}
-              </p>
-              <p>
-                <strong>{financeStates[o.state] || o.state}</strong> · vence{" "}
-                {showDate(o.effective_due_on)}
-              </p>
-              <dl className="finance-values">
-                <div>
-                  <dt>Importe original</dt>
-                  <dd>{money(o.original_amount, o.currency)}</dd>
-                </div>
-                <div>
-                  <dt>Ajustes</dt>
-                  <dd>{money(o.adjustments, o.currency)}</dd>
-                </div>
-                <div>
-                  <dt>Total exigible</dt>
-                  <dd>{money(o.total, o.currency)}</dd>
-                </div>
-                <div>
-                  <dt>Pagos y saldos aplicados</dt>
-                  <dd>{money(o.applied, o.currency)}</dd>
-                </div>
-                <div>
-                  <dt>Saldo aplicado posteriormente</dt>
-                  <dd>{money(o.credit_applied, o.currency)}</dd>
-                </div>
-                <div>
-                  <dt>Deuda pendiente</dt>
-                  <dd>
-                    <strong>{money(o.pending, o.currency)}</strong>
-                  </dd>
-                </div>
-              </dl>
-              {canWrite && exactCents(o.pending) > 0n && (
-                <button
-                  onClick={() => {
-                    setPersonFilter(o.person_id);
-                    open("receive", o.id);
-                  }}
-                >
-                  Registrar cobro
-                </button>
-              )}
-              {admin && (
-                <button
-                  className="secondary"
-                  onClick={() => open("adjust", o.id)}
-                >
-                  Ajustar importe {o.id}
-                </button>
-              )}
-            </article>
-          ))}
-        {!obligations.length && (
-          <p>No hay importes por cobrar para esta selección.</p>
+      <RecordCollection
+        id={`${criteria}:${tab}`}
+        label={debts ? "deudas" : "importes por cobrar"}
+        items={obligations.filter((o) => !debts || exactCents(o.pending) > 0n)}
+        searchable={(o) =>
+          `${o.id} ${o.concept} ${name(o.person_id)} ${unit(o.unit_id)} contrato ${o.contract_id} ${financeStates[o.state]} ${o.effective_due_on} ${money(o.pending, o.currency)}`
+        }
+        filter={{
+          label: "Estado del importe",
+          value: (o) => financeStates[o.state] || o.state,
+        }}
+        empty="No hay importes por cobrar para esta selección."
+        render={(o) => (
+          <RecordRow
+            key={o.id}
+            title={o.concept}
+            fields={
+              <>
+                <RecordField label="Titular">{name(o.person_id)}</RecordField>
+                <RecordField label="Espacio">{unit(o.unit_id)}</RecordField>
+                <RecordField label="Vencimiento">
+                  {showDate(o.effective_due_on)}
+                </RecordField>
+                <RecordField label="Total exigible">
+                  {money(o.total, o.currency)}
+                </RecordField>
+                {exactCents(o.applied) > 0n && (
+                  <RecordField label="Pagos y saldos aplicados">
+                    {money(o.applied, o.currency)}
+                  </RecordField>
+                )}
+                <RecordField label="Deuda pendiente">
+                  <strong>{money(o.pending, o.currency)}</strong>
+                </RecordField>
+                <RecordField label="Estado">
+                  <RecordStatus domain="finance" state={o.state} />
+                </RecordField>
+              </>
+            }
+            actions={
+              <>
+                {canWrite && exactCents(o.pending) > 0n && (
+                  <button onClick={() => open("receive", o.id)}>
+                    Registrar cobro
+                  </button>
+                )}
+              </>
+            }
+            detail={
+              <>
+                <dl className="record-row-fields">
+                  <RecordField label="Contrato">{o.contract_id}</RecordField>
+                  <RecordField label="Periodo">
+                    {showDate(o.period_start)} al{" "}
+                    {showDate(o.effective_period_end)}
+                  </RecordField>
+                  <RecordField label="Importe original">
+                    {money(o.original_amount, o.currency)}
+                  </RecordField>
+                  <RecordField label="Ajustes">
+                    {money(o.adjustments, o.currency)}
+                  </RecordField>
+                  <RecordField label="Saldo aplicado posteriormente">
+                    {money(o.credit_applied, o.currency)}
+                  </RecordField>
+                </dl>
+                {admin && (
+                  <button
+                    className="secondary"
+                    onClick={() => open("adjust", o.id)}
+                  >
+                    Ajustar importe {o.id}
+                  </button>
+                )}
+              </>
+            }
+          />
         )}
-      </div>
+      />
     );
   }
-  function movementCards(kind: string[]) {
-    const list = data.movements.filter(
-      (m) =>
-        kind.includes(m.kind) &&
-        (!personFilter || m.person_id === personFilter),
-    );
+
+  function movementRows(kinds: string[]) {
     return (
-      <div className="record-list">
-        {list.map((m) => (
-          <article className="panel history-item" key={m.id}>
-            <h3>
-              {movementNames[m.kind]} · {money(m.amount, m.currency)}
-            </h3>
-            <p>
-              {financeStates[m.state] || m.state} · {showDate(m.occurred_on)} ·
-              Titular: {name(m.person_id)}
-            </p>
-            <p>
-              Entregó/pagó: {name(m.payer_id)} · Recibió:{" "}
-              {m.beneficiary_label || name(m.beneficiary_person_id)}
-            </p>
-            <p>
-              Método:{" "}
-              {catalogs.methods.find((x) => x.id === m.method_id)?.name ||
-                "Registrado"}{" "}
-              · Referencia: {m.reference || "Sin referencia externa"}
-            </p>
-            {m.document_reference && (
-              <p>Comprobante externo: {m.document_reference}</p>
-            )}
-            {["received", "advance", "guarantee", "provider_direct"].includes(
-              m.kind,
-            ) && (
-              <p>
-                Aplicado: {money(m.applied, m.currency)} ·{" "}
-                {m.kind === "provider_direct"
-                  ? "Pendiente de devolución externa"
-                  : "Disponible"}
-                : <strong>{money(m.available, m.currency)}</strong>
-              </p>
-            )}
-            {m.conditions && <p>Condiciones: {m.conditions}</p>}
-            {!m.void_operation_id &&
-              canWrite &&
-              ["received", "advance", "guarantee"].includes(m.kind) &&
-              exactCents(m.available) > 0n && (
-                <div className="form-actions">
-                  {(m.kind !== "guarantee" || admin) && (
-                    <button onClick={() => open("apply", m.id)}>
-                      Aplicar saldo {m.id}
-                    </button>
+      <RecordCollection
+        id={`${criteria}:${tab}`}
+        label="movimientos"
+        items={data.movements.filter(
+          (m) =>
+            kinds.includes(m.kind) &&
+            (!personFilter || m.person_id === personFilter),
+        )}
+        searchable={(m) =>
+          `${m.id} ${movementNames[m.kind]} ${name(m.person_id)} ${name(m.payer_id)} ${m.beneficiary_label || name(m.beneficiary_person_id)} ${m.occurred_on} ${m.reference ?? ""} ${m.document_reference ?? ""} ${money(m.amount, m.currency)} ${financeStates[m.state]}`
+        }
+        filter={{
+          label: "Estado del movimiento",
+          value: (m) => financeStates[m.state] || m.state,
+        }}
+        empty="No hay movimientos registrados en esta sección."
+        render={(m) => {
+          const holdsBalance = [
+            "received",
+            "advance",
+            "guarantee",
+            "provider_direct",
+          ].includes(m.kind);
+          const canApply =
+            !m.void_operation_id &&
+            canWrite &&
+            ["received", "advance", "guarantee"].includes(m.kind) &&
+            exactCents(m.available) > 0n;
+          return (
+            <RecordRow
+              key={m.id}
+              title={`${movementNames[m.kind]} · ${money(m.amount, m.currency)}`}
+              fields={
+                <>
+                  <RecordField label="Titular">{name(m.person_id)}</RecordField>
+                  <RecordField label="Fecha">
+                    {showDate(m.occurred_on)}
+                  </RecordField>
+                  {holdsBalance && (
+                    <RecordField
+                      label={
+                        m.kind === "provider_direct"
+                          ? "Devolución externa pendiente"
+                          : "Disponible"
+                      }
+                    >
+                      {money(m.available, m.currency)}
+                    </RecordField>
                   )}
-                  {admin && (
+                  <RecordField label="Estado">
+                    <RecordStatus domain="movement" state={m.state} />
+                  </RecordField>
+                </>
+              }
+              actions={
+                canApply &&
+                (m.kind !== "guarantee" || admin) && (
+                  <button onClick={() => open("apply", m.id)}>
+                    Aplicar saldo {m.id}
+                  </button>
+                )
+              }
+              detailLabel={`Ver aplicaciones e historial del movimiento ${m.id}`}
+              detail={
+                <>
+                  <dl className="record-row-fields">
+                    <RecordField label="Entregó o pagó">
+                      {name(m.payer_id)}
+                    </RecordField>
+                    <RecordField label="Recibió">
+                      {m.beneficiary_label || name(m.beneficiary_person_id)}
+                    </RecordField>
+                    <RecordField label="Método">
+                      {catalogs.methods.find((x) => x.id === m.method_id)
+                        ?.name || "Registrado"}
+                    </RecordField>
+                    <RecordField label="Referencia">
+                      {m.reference || "Sin referencia externa"}
+                    </RecordField>
+                    {m.document_reference && (
+                      <RecordField label="Comprobante externo">
+                        {m.document_reference}
+                      </RecordField>
+                    )}
+                    {holdsBalance && (
+                      <RecordField label="Aplicado">
+                        {money(m.applied, m.currency)}
+                      </RecordField>
+                    )}
+                  </dl>
+                  {m.conditions && <p>Condiciones: {m.conditions}</p>}
+                  {canApply && admin && (
                     <button
                       className="secondary"
                       onClick={() => open("refund", m.id)}
@@ -308,7 +391,7 @@ export function Finances({
                       Registrar devolución {m.id}
                     </button>
                   )}
-                  {m.kind === "guarantee" && admin && (
+                  {canApply && m.kind === "guarantee" && admin && (
                     <button
                       className="secondary"
                       onClick={() => open("retain", m.id)}
@@ -316,41 +399,150 @@ export function Finances({
                       Retener garantía {m.id}
                     </button>
                   )}
-                </div>
-              )}
-            {!m.void_operation_id && admin && (
-              <button className="secondary" onClick={() => open("void", m.id)}>
-                Anular para corregir {m.id}
-              </button>
-            )}
-            <details>
-              <summary>
-                Ver aplicaciones e historial del movimiento {m.id}
-              </summary>
-              {m.applications.map((a) => (
-                <p key={a.id}>
-                  Concepto {a.obligation_id}: {money(a.amount, m.currency)} ·{" "}
-                  {a.void_operation_id
-                    ? "Aplicación anulada"
-                    : "Aplicación vigente"}
-                  {admin && !a.void_operation_id && !m.void_operation_id && (
+                  {!m.void_operation_id && admin && (
                     <button
-                      className="text-button"
-                      onClick={() => open("applicationVoid", a.id)}
+                      className="secondary"
+                      onClick={() => open("void", m.id)}
                     >
-                      Corregir aplicación {a.id}
+                      Anular para corregir {m.id}
                     </button>
                   )}
-                </p>
-              ))}
-              {!m.applications.length && (
-                <p>Sin aplicaciones a obligaciones.</p>
-              )}
-            </details>
-          </article>
-        ))}
-        {!list.length && <p>No hay movimientos registrados en esta sección.</p>}
-      </div>
+                  <RecordCollection
+                    id={`${criteria}:${tab}:applications:${m.id}`}
+                    label="aplicaciones"
+                    items={m.applications}
+                    searchable={(a) =>
+                      `${a.obligation_id} ${money(a.amount, m.currency)} ${a.void_operation_id ? "Anulada" : "Vigente"}`
+                    }
+                    filter={{
+                      label: "Estado de aplicación",
+                      value: (a) =>
+                        a.void_operation_id ? "Anulada" : "Vigente",
+                    }}
+                    empty="Sin aplicaciones a obligaciones."
+                    render={(a) => (
+                      <RecordRow
+                        key={a.id}
+                        title={`Concepto ${a.obligation_id} · ${money(a.amount, m.currency)}`}
+                        fields={
+                          <RecordField label="Estado">
+                            <StatusIndicator
+                              tone={a.void_operation_id ? "gray" : "blue"}
+                              label={
+                                a.void_operation_id
+                                  ? "Aplicación anulada"
+                                  : "Aplicación vigente"
+                              }
+                            />
+                          </RecordField>
+                        }
+                        actions={
+                          admin &&
+                          !a.void_operation_id &&
+                          !m.void_operation_id && (
+                            <button
+                              className="secondary"
+                              onClick={() => open("applicationVoid", a.id)}
+                            >
+                              Corregir aplicación {a.id}
+                            </button>
+                          )
+                        }
+                      />
+                    )}
+                  />
+                </>
+              }
+            />
+          );
+        }}
+      />
+    );
+  }
+
+  function expenseSearch(e: Expense) {
+    return `${e.id} ${e.description} ${name(e.person_id)} ${unit(e.unit_id)} ${e.recorded_on} ${financeStates[e.state]} ${money(e.pending, e.currency)} ${catalogs.categories.find((c) => c.id === e.category_id)?.name ?? ""}`;
+  }
+
+  function expenseRows() {
+    return (
+      <RecordCollection
+        id={`${criteria}:expenses`}
+        label="gastos"
+        items={data.expenses}
+        searchable={expenseSearch}
+        filter={{
+          label: "Estado del gasto",
+          value: (e) => financeStates[e.state] || e.state,
+        }}
+        empty="No hay gastos registrados."
+        render={(e) => (
+          <RecordRow
+            key={e.id}
+            title={e.description}
+            fields={
+              <>
+                <RecordField label="Titular">{name(e.person_id)}</RecordField>
+                <RecordField label="Fecha">
+                  {showDate(e.recorded_on)}
+                </RecordField>
+                <RecordField label="Total registrado">
+                  {money(e.total, e.currency)}
+                </RecordField>
+                <RecordField label="Pagado realmente">
+                  {money(e.paid, e.currency)}
+                </RecordField>
+                <RecordField label="Por pagar">
+                  <strong>{money(e.pending, e.currency)}</strong>
+                </RecordField>
+                <RecordField label="Estado">
+                  <RecordStatus domain="finance" state={e.state} />
+                </RecordField>
+                {exactCents(e.provider_refund_pending) > 0n && (
+                  <RecordField label="Devolución pendiente del proveedor">
+                    {money(e.provider_refund_pending, e.currency)}
+                  </RecordField>
+                )}
+              </>
+            }
+            actions={
+              !e.void_operation_id &&
+              canWrite &&
+              exactCents(e.pending) > 0n && (
+                <button onClick={() => open("pay", e.id)}>
+                  Registrar pago del gasto {e.id}
+                </button>
+              )
+            }
+            detail={
+              <>
+                <dl className="record-row-fields">
+                  <RecordField label="Espacio">{unit(e.unit_id)}</RecordField>
+                  <RecordField label="Original">
+                    {money(e.original_amount, e.currency)}
+                  </RecordField>
+                </dl>
+                {!e.void_operation_id && admin && (
+                  <>
+                    <button
+                      className="secondary"
+                      onClick={() => open("expenseAdjust", e.id)}
+                    >
+                      Ajustar gasto {e.id}
+                    </button>
+                    <button
+                      className="secondary"
+                      onClick={() => open("expenseVoid", e.id)}
+                    >
+                      Anular gasto {e.id}
+                    </button>
+                  </>
+                )}
+              </>
+            }
+          />
+        )}
+      />
     );
   }
   return (
@@ -368,7 +560,8 @@ export function Finances({
         value={propertyId || ""}
         onChange={(id) => {
           setPropertyId(Number(id));
-          setObligationFilter(0);
+          saveProperty(Number(id));
+          if (initialObligationId) setObligationFilter(0);
           onPropertyChange?.(Number(id));
         }}
       />
@@ -442,7 +635,12 @@ export function Finances({
             propertyId={propertyId}
             onContactAdded={() => void related.reload()}
             admin={admin}
-            initialPersonId={personFilter}
+            initialPersonId={
+              data.obligations.find(
+                (obligation) =>
+                  action.kind === "receive" && obligation.id === action.id,
+              )?.person_id ?? personFilter
+            }
             onSaved={saved}
             onCancel={() => setAction(null)}
           />
@@ -488,22 +686,55 @@ export function Finances({
                 los gastos registrados no prueban que se haya recibido o pagado
                 dinero.
               </p>
-              {data.summary.map((s) => (
-                <section key={s.currency} className="panel">
-                  <h3>Moneda {s.currency}</h3>
-                  <dl className="finance-values">
-                    {Object.entries(summaryLabels).map(([key, label]) => (
-                      <div key={key}>
-                        <dt>{label}</dt>
-                        <dd>{money(s[key] || "0", s.currency)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              ))}
-              {!data.summary.length && (
-                <p>No hay operaciones económicas en esta casa.</p>
-              )}
+              <RecordCollection
+                id={`${criteria}:balances`}
+                label="saldos por moneda"
+                items={data.summary}
+                searchable={(s) => s.currency}
+                empty="No hay operaciones económicas en esta casa."
+                render={(s) => (
+                  <RecordRow
+                    key={s.currency}
+                    title={`Moneda ${s.currency}`}
+                    fields={
+                      <>
+                        <RecordField label={summaryLabels.pending}>
+                          {money(s.pending || "0", s.currency)}
+                        </RecordField>
+                        <RecordField label={summaryLabels.received}>
+                          {money(s.received || "0", s.currency)}
+                        </RecordField>
+                        <RecordField label={summaryLabels.expenses_registered}>
+                          {money(s.expenses_registered || "0", s.currency)}
+                        </RecordField>
+                        <RecordField label={summaryLabels.disbursed}>
+                          {money(s.disbursed || "0", s.currency)}
+                        </RecordField>
+                      </>
+                    }
+                    detail={
+                      <dl className="record-row-fields">
+                        {Object.entries(summaryLabels)
+                          .filter(
+                            ([key]) =>
+                              ![
+                                "pending",
+                                "received",
+                                "expenses_registered",
+                                "disbursed",
+                              ].includes(key),
+                          )
+                          .map(([key, label]) => (
+                            <RecordField key={key} label={label}>
+                              {money(s[key] || "0", s.currency)}
+                            </RecordField>
+                          ))}
+                      </dl>
+                    }
+                    detailLabel="Ver desglose de la moneda"
+                  />
+                )}
+              />
               {user.role === "general_admin" && (
                 <button className="secondary" onClick={() => open("catalog")}>
                   Métodos y categorías
@@ -511,33 +742,60 @@ export function Finances({
               )}
               <details>
                 <summary>Historial de registros, ajustes y anulaciones</summary>
-                {data.history.map((h) => {
-                  const labels: Record<string, string> = {
-                    receive: "Pago recibido",
-                    guarantee: "Garantía recibida",
-                    expense: "Gasto registrado",
-                    disburse: "Pago realizado",
-                    refund: "Devolución",
-                    void: "Anulación de movimiento",
-                    apply: "Aplicación de saldo",
-                    rent: "Importes de alquiler",
-                    utility: "Reparto de servicio importado",
-                    adjust: "Ajuste por cobrar",
-                    "expense-adjust": "Ajuste de gasto",
-                    "expense-void": "Anulación de gasto",
-                    "application-void": "Corrección de aplicación",
-                    retain: "Garantía retenida",
-                  };
-                  const result = JSON.parse(h.result);
-                  return (
-                    <p key={h.id}>
-                      {labels[h.action.split(":")[0]] || "Operación registrada"}{" "}
-                      · {new Date(h.created_at + "Z").toLocaleString("es-BO")} ·
-                      Usuario {h.created_by}
-                      {result.reason ? ` · Motivo: ${result.reason}` : ""}
-                    </p>
-                  );
-                })}
+                <RecordCollection
+                  id={`${criteria}:audit`}
+                  label="operaciones del historial"
+                  items={data.history.map((h) => {
+                    const labels: Record<string, string> = {
+                      receive: "Pago recibido",
+                      guarantee: "Garantía recibida",
+                      expense: "Gasto registrado",
+                      disburse: "Pago realizado",
+                      refund: "Devolución",
+                      void: "Anulación de movimiento",
+                      apply: "Aplicación de saldo",
+                      rent: "Importes de alquiler",
+                      utility: "Reparto de servicio importado",
+                      adjust: "Ajuste por cobrar",
+                      "expense-adjust": "Ajuste de gasto",
+                      "expense-void": "Anulación de gasto",
+                      "application-void": "Corrección de aplicación",
+                      retain: "Garantía retenida",
+                    };
+                    const result = JSON.parse(h.result);
+                    return {
+                      ...h,
+                      reason: result.reason as string | undefined,
+                      label:
+                        labels[h.action.split(":")[0]] ||
+                        "Operación registrada",
+                    };
+                  })}
+                  searchable={(h) =>
+                    `${h.label} ${h.created_at} usuario ${h.created_by} ${h.reason ?? ""}`
+                  }
+                  filter={{ label: "Tipo de operación", value: (h) => h.label }}
+                  render={(h) => (
+                    <RecordRow
+                      key={h.id}
+                      title={h.label}
+                      fields={
+                        <>
+                          <RecordField label="Fecha">
+                            {new Date(h.created_at + "Z").toLocaleString(
+                              "es-BO",
+                            )}
+                          </RecordField>
+                          <RecordField label="Usuario">
+                            {h.created_by}
+                          </RecordField>
+                        </>
+                      }
+                      detail={h.reason && <p>{h.reason}</p>}
+                      detailLabel="Ver motivo"
+                    />
+                  )}
+                />
               </details>
             </>
           )}
@@ -632,7 +890,7 @@ export function Finances({
                   </button>
                 </div>
               )}
-              {obligationCards(tab === "debts")}
+              {obligationRows(tab === "debts")}
             </>
           )}
           {tab === "receive" && (
@@ -654,7 +912,7 @@ export function Finances({
                   Registrar pago recibido
                 </button>
               )}
-              {movementCards(["received", "advance", "refund"])}
+              {movementRows(["received", "advance", "refund"])}
             </>
           )}
           {tab === "advances" && (
@@ -669,7 +927,7 @@ export function Finances({
                   Registrar anticipo
                 </button>
               )}
-              {movementCards(["advance", "received"])}
+              {movementRows(["advance", "received"])}
             </>
           )}
           {tab === "guarantees" && (
@@ -684,7 +942,7 @@ export function Finances({
                   Registrar garantía
                 </button>
               )}
-              {movementCards(["guarantee"])}
+              {movementRows(["guarantee"])}
             </>
           )}
           {tab === "expenses" && (
@@ -693,60 +951,13 @@ export function Finances({
               {canWrite && (
                 <button onClick={() => open("expense")}>Registrar gasto</button>
               )}
-              {data.expenses.map((e) => (
-                <article className="panel" key={e.id}>
-                  <h3>{e.description}</h3>
-                  <p>
-                    {name(e.person_id)} · {unit(e.unit_id)} ·{" "}
-                    {showDate(e.recorded_on)} · {financeStates[e.state]}
-                  </p>
-                  <p>
-                    Original {money(e.original_amount, e.currency)} · Total
-                    registrado {money(e.total, e.currency)} · Pagado realmente{" "}
-                    {money(e.paid, e.currency)} · Por pagar{" "}
-                    <strong>{money(e.pending, e.currency)}</strong>
-                  </p>
-                  {exactCents(e.provider_refund_pending) > 0n && (
-                    <p>
-                      Devolución pendiente del proveedor:{" "}
-                      {money(e.provider_refund_pending, e.currency)}. No se ha
-                      registrado dinero devuelto.
-                    </p>
-                  )}
-                  {!e.void_operation_id && (
-                    <div className="form-actions">
-                      {canWrite && exactCents(e.pending) > 0n && (
-                        <button onClick={() => open("pay", e.id)}>
-                          Registrar pago del gasto {e.id}
-                        </button>
-                      )}
-                      {admin && (
-                        <>
-                          <button
-                            className="secondary"
-                            onClick={() => open("expenseAdjust", e.id)}
-                          >
-                            Ajustar gasto {e.id}
-                          </button>
-                          <button
-                            className="secondary"
-                            onClick={() => open("expenseVoid", e.id)}
-                          >
-                            Anular gasto {e.id}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </article>
-              ))}
-              {!data.expenses.length && <p>No hay gastos registrados.</p>}
+              {expenseRows()}
             </>
           )}
           {tab === "disbursements" && (
             <>
               <h2>Pagos realizados y devoluciones</h2>
-              {movementCards(["disbursed", "provider_direct", "refund"])}
+              {movementRows(["disbursed", "provider_direct", "refund"])}
             </>
           )}
           {tab === "services" && (
@@ -765,70 +976,127 @@ export function Finances({
                   </button>
                 </div>
               )}
-              {data.expenses
-                .filter((e) => e.receipt_id)
-                .map((e) => {
-                  const obs = data.obligations.filter(
+              <RecordCollection
+                id={`${criteria}:recovery`}
+                label="recuperaciones de servicios"
+                items={data.expenses.filter((e) => e.receipt_id)}
+                searchable={expenseSearch}
+                filter={{
+                  label: "Estado del gasto de servicio",
+                  value: (e) => financeStates[e.state] || e.state,
+                }}
+                render={(e) => {
+                  const obligations = data.obligations.filter(
                     (o) => o.receipt_id === e.receipt_id,
                   );
-                  const applied = obs.reduce(
-                    (a, o) => a + exactCents(o.applied),
+                  const applied = obligations.reduce(
+                    (total, o) => total + exactCents(o.applied),
                     0n,
                   );
-                  const total = obs.reduce(
-                    (a, o) => a + exactCents(o.total),
+                  const total = obligations.reduce(
+                    (total, o) => total + exactCents(o.total),
                     0n,
                   );
                   return (
-                    <article className="panel" key={e.id}>
-                      <h3>{e.description}</h3>
-                      <p>
-                        Recibo registrado: {money(e.total, e.currency)} · Pagado
-                        al proveedor: {money(e.paid, e.currency)}
-                      </p>
-                      {e.imported_distribution_id ? (
-                        <p>
-                          Parte económica del propietario:{" "}
-                          {money(e.owner_service_amount || "0", e.currency)}
-                        </p>
-                      ) : (
-                        <p>
-                          Reparto económico pendiente de confirmar o importar.
-                          No se generaron deudas de inquilinos en el registro
-                          del gasto.
-                        </p>
-                      )}
-                      {e.pending_distribution_change && (
-                        <p role="alert">
-                          Existe un reparto confirmado más reciente pendiente de
-                          importar. Este resumen conserva la última importación
-                          financiera.
-                        </p>
-                      )}
-                      <p>
-                        Responsabilidades por cobrar a ocupantes:{" "}
-                        {money(exactAmount(total), e.currency)} · Cubierto por
-                        pagos o saldos:{" "}
-                        {money(exactAmount(applied), e.currency)}
-                      </p>
-                      <p>
-                        Los pagos directos de inquilinos y las recuperaciones en
-                        caja se distinguen en el resumen y el historial.
-                      </p>
-                      {obs.map((o) => (
-                        <p key={o.id}>
-                          {name(o.person_id)} · {unit(o.unit_id)}: pendiente{" "}
-                          {money(o.pending, o.currency)}
-                        </p>
-                      ))}
-                      {canWrite && exactCents(e.pending) > 0n && (
-                        <button onClick={() => open("pay", e.id)}>
-                          Registrar pago al proveedor {e.id}
-                        </button>
-                      )}
-                    </article>
+                    <RecordRow
+                      key={e.id}
+                      title={e.description}
+                      fields={
+                        <>
+                          <RecordField label="Recibo registrado">
+                            {money(e.total, e.currency)}
+                          </RecordField>
+                          <RecordField label="Pagado al proveedor">
+                            {money(e.paid, e.currency)}
+                          </RecordField>
+                          <RecordField label="Reparto">
+                            <StatusIndicator
+                              tone={
+                                e.pending_distribution_change ||
+                                !e.imported_distribution_id
+                                  ? "amber"
+                                  : "green"
+                              }
+                              label={
+                                e.pending_distribution_change
+                                  ? "Reparto actualizado pendiente de importar"
+                                  : e.imported_distribution_id
+                                    ? "Importado"
+                                    : "Pendiente de confirmar o importar"
+                              }
+                            />
+                          </RecordField>
+                          <RecordField label="Estado del gasto">
+                            <RecordStatus domain="finance" state={e.state} />
+                          </RecordField>
+                        </>
+                      }
+                      actions={
+                        canWrite &&
+                        exactCents(e.pending) > 0n && (
+                          <button onClick={() => open("pay", e.id)}>
+                            Registrar pago al proveedor {e.id}
+                          </button>
+                        )
+                      }
+                      detail={
+                        <>
+                          <dl className="record-row-fields">
+                            {e.imported_distribution_id && (
+                              <RecordField label="Parte económica del propietario">
+                                {money(
+                                  e.owner_service_amount || "0",
+                                  e.currency,
+                                )}
+                              </RecordField>
+                            )}
+                            <RecordField label="Por cobrar a ocupantes">
+                              {money(exactAmount(total), e.currency)}
+                            </RecordField>
+                            <RecordField label="Cubierto por pagos o saldos">
+                              {money(exactAmount(applied), e.currency)}
+                            </RecordField>
+                          </dl>
+                          <RecordCollection
+                            id={`${criteria}:recovery:${e.id}:debts`}
+                            label="responsabilidades de ocupantes"
+                            items={obligations}
+                            searchable={(o) =>
+                              `${name(o.person_id)} ${unit(o.unit_id)} ${financeStates[o.state]}`
+                            }
+                            filter={{
+                              label: "Estado de la obligación",
+                              value: (o) => financeStates[o.state] || o.state,
+                            }}
+                            render={(o) => (
+                              <RecordRow
+                                key={o.id}
+                                title={name(o.person_id)}
+                                fields={
+                                  <>
+                                    <RecordField label="Espacio">
+                                      {unit(o.unit_id)}
+                                    </RecordField>
+                                    <RecordField label="Pendiente">
+                                      {money(o.pending, o.currency)}
+                                    </RecordField>
+                                    <RecordField label="Estado">
+                                      <RecordStatus
+                                        domain="finance"
+                                        state={o.state}
+                                      />
+                                    </RecordField>
+                                  </>
+                                }
+                              />
+                            )}
+                          />
+                        </>
+                      }
+                    />
                   );
-                })}
+                }}
+              />
             </>
           )}
         </>
@@ -902,18 +1170,41 @@ function CatalogForm({
           <h3>
             {kind === "methods" ? "Métodos de pago" : "Categorías de gasto"}
           </h3>
-          {catalogs[kind].map((c) => (
-            <p key={c.id}>
-              {c.name} · {c.is_active ? "Habilitado" : "Deshabilitado"}{" "}
-              <button
-                className="text-button"
-                disabled={busy}
-                onClick={() => void toggle(kind, c)}
-              >
-                {c.is_active ? "Deshabilitar" : "Habilitar"} {c.name}
-              </button>
-            </p>
-          ))}
+          <RecordCollection
+            id={`finance-catalog:${kind}`}
+            label={
+              kind === "methods" ? "métodos de pago" : "categorías de gasto"
+            }
+            items={catalogs[kind]}
+            searchable={(c) => c.name}
+            filter={{
+              label: "Estado del catálogo",
+              value: (c) => (c.is_active ? "Habilitado" : "Deshabilitado"),
+            }}
+            render={(c) => (
+              <RecordRow
+                key={c.id}
+                title={c.name}
+                fields={
+                  <RecordField label="Estado">
+                    <StatusIndicator
+                      tone={c.is_active ? "blue" : "gray"}
+                      label={c.is_active ? "Habilitado" : "Deshabilitado"}
+                    />
+                  </RecordField>
+                }
+                actions={
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => void toggle(kind, c)}
+                  >
+                    {c.is_active ? "Deshabilitar" : "Habilitar"} {c.name}
+                  </button>
+                }
+              />
+            )}
+          />
         </section>
       ))}
       <button className="secondary" onClick={onCancel}>

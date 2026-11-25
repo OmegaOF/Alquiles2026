@@ -1,3 +1,10 @@
+import {
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  useListPreference,
+} from "../../components/RecordList";
+import { StatusIndicator } from "../../components/StatusIndicator";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { SearchSelect } from "../../components/SearchSelect";
@@ -18,7 +25,10 @@ export function Meters({
   user: User;
   reload: () => Promise<void>;
 }) {
-  const [accountId, setAccountId] = useState(accounts[0]?.id || 0),
+  const [accountId, setAccountId] = useListPreference(
+      `meters:${accounts[0]?.property_id ?? "none"}:account`,
+      accounts[0]?.id || 0,
+    ),
     [meters, setMeters] = useState<Meter[]>([]),
     [selected, setSelected] = useState<Meter | null>(null),
     [readings, setReadings] = useState<Reading[]>([]),
@@ -199,36 +209,55 @@ export function Meters({
               Registrar medidor
             </button>
           )}
-          <div className="record-list">
-            {meters.map((m) => (
-              <article key={m.id}>
-                <div className="record-main">
-                  <h3>
-                    Medidor {m.serial} · {m.unit_label}
-                  </h3>
-                  <p>
-                    Desde {showDate(m.installed_on)}
-                    {m.retired_on
-                      ? ` hasta ${showDate(m.retired_on)}`
-                      : " · Sin retiro registrado"}{" "}
-                    · {m.measure_unit}
-                  </p>
-                  {m.replaces_id && (
-                    <p>
-                      Reemplaza al medidor n.º {m.replaces_id}; sus lecturas
-                      anteriores se conservan.
-                    </p>
-                  )}
-                </div>
-                <button className="secondary" onClick={() => void detail(m)}>
-                  Ver lecturas de {m.serial}
-                </button>
-              </article>
-            ))}
-            {!meters.length && (
-              <p className="empty">No hay medidores en este servicio.</p>
+          <RecordCollection
+            id={`meters:${accountId}`}
+            label="medidores"
+            items={meters}
+            searchable={(m) =>
+              `${m.id} ${m.serial} ${m.unit_label} ${m.measure_unit} ${m.installed_on} ${m.retired_on ?? ""}`
+            }
+            filter={{
+              label: "Estado del medidor",
+              value: (m) => (m.retired_on ? "Retirado" : "Instalado"),
+            }}
+            empty="No hay medidores en este servicio."
+            render={(m) => (
+              <RecordRow
+                key={m.id}
+                title={`Medidor ${m.serial}`}
+                fields={
+                  <>
+                    <RecordField label="Espacio">{m.unit_label}</RecordField>
+                    <RecordField label="Unidad">{m.measure_unit}</RecordField>
+                    <RecordField label="Instalación">
+                      {showDate(m.installed_on)}
+                    </RecordField>
+                    {m.retired_on && (
+                      <RecordField label="Fecha de retiro">
+                        {showDate(m.retired_on)}
+                      </RecordField>
+                    )}
+                    <RecordField label="Estado">
+                      <StatusIndicator
+                        tone={m.retired_on ? "gray" : "blue"}
+                        label={m.retired_on ? "Retirado" : "Instalado"}
+                      />
+                    </RecordField>
+                  </>
+                }
+                actions={
+                  <button className="secondary" onClick={() => void detail(m)}>
+                    Ver lecturas de {m.serial}
+                  </button>
+                }
+                detail={
+                  m.replaces_id ? (
+                    <p>Reemplaza al medidor n.º {m.replaces_id}.</p>
+                  ) : undefined
+                }
+              />
             )}
-          </div>
+          />
         </>
       ) : (
         <>
@@ -292,43 +321,41 @@ export function Meters({
               <button disabled={busy}>Guardar retiro</button>
             </form>
           )}
-          <div className="table-scroll">
-            <table>
-              <caption>
-                Lecturas conservadas y consumo desde la lectura anterior
-              </caption>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Lectura</th>
-                  <th>Consumo</th>
-                  {canCorrect && <th>Acciones</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {readings.map((r) => (
-                  <tr key={r.id}>
-                    <td>{showDate(r.recorded_on)}</td>
-                    <td>{r.value}</td>
-                    <td>{r.consumption_since_previous ?? "Lectura inicial"}</td>
-                    {canCorrect && (
-                      <td>
-                        <button
-                          className="text-button"
-                          onClick={() => {
-                            setCorrection(r);
-                            setNotice("");
-                          }}
-                        >
-                          Corregir lectura del {showDate(r.recorded_on)}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <RecordCollection
+            id={`meters:${selected.id}:readings`}
+            label="lecturas"
+            items={readings}
+            searchable={(r) =>
+              `${r.recorded_on} ${showDate(r.recorded_on)} ${r.value} ${r.consumption_since_previous ?? "Lectura inicial"}`
+            }
+            render={(r) => (
+              <RecordRow
+                key={r.id}
+                title={showDate(r.recorded_on)}
+                fields={
+                  <>
+                    <RecordField label="Lectura">{r.value}</RecordField>
+                    <RecordField label="Consumo">
+                      {r.consumption_since_previous ?? "Lectura inicial"}
+                    </RecordField>
+                  </>
+                }
+                actions={
+                  canCorrect && (
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setCorrection(r);
+                        setNotice("");
+                      }}
+                    >
+                      Corregir lectura del {showDate(r.recorded_on)}
+                    </button>
+                  )
+                }
+              />
+            )}
+          />
           {canWrite && (
             <form
               className="panel"

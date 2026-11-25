@@ -229,16 +229,16 @@ test("historial descarta una respuesta tardía de la casa consultada anteriormen
     />,
   );
   await selectRecord(screen.getByLabelText("Propiedad del historial"), "2");
-  await screen.findByRole("heading", { name: "Contrato 2 · Finalizado" });
+  await screen.findByRole("heading", { name: "Contrato 2 · Casa completa" });
   await act(async () => {
     resolveFirst([row(1)]);
     await first;
   });
   expect(
-    screen.getByRole("heading", { name: "Contrato 2 · Finalizado" }),
+    screen.getByRole("heading", { name: "Contrato 2 · Casa completa" }),
   ).toBeVisible();
   expect(
-    screen.queryByRole("heading", { name: "Contrato 1 · Finalizado" }),
+    screen.queryByRole("heading", { name: "Contrato 1 · Casa completa" }),
   ).not.toBeInTheDocument();
 });
 
