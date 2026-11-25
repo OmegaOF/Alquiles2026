@@ -224,9 +224,9 @@ def project(db, user, property_id):
         ]
         result.append(event)
 
-    financial = f.state(db, user, property_id)
-    expenses = {e["receipt_id"]: e for e in financial["expenses"] if e["receipt_id"]}
-    for o in financial["obligations"]:
+    _, obligations, expense_rows = f.property_amounts(db, user, property_id)
+    expenses = {e["receipt_id"]: e for e in expense_rows if e["receipt_id"]}
+    for o in obligations:
         recovery = False
         expense = expenses.get(o["receipt_id"])
         if expense:
@@ -331,7 +331,7 @@ def project(db, user, property_id):
                 "receipt_id": receipt.id,
             },
         )
-    for e in financial["expenses"]:
+    for e in expense_rows:
         if e["receipt_id"]:
             continue
         add(

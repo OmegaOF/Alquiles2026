@@ -1135,7 +1135,7 @@ def movement_dict(db, obj):
     }
 
 
-def state(db, user, property_id):
+def property_amounts(db, user, property_id):
     # La consulta también toma lecturas FOR UPDATE: debe respetar el mismo
     # orden propiedad -> fuentes que las escrituras y los recordatorios.
     lock_property(db, user, property_id)
@@ -1219,6 +1219,11 @@ def state(db, user, property_id):
                 ),
             }
         )
+    return accounts, obligations, expenses
+
+
+def state(db, user, property_id):
+    accounts, obligations, expenses = property_amounts(db, user, property_id)
     operations = rows(db, m.FinanceOperation, property_id=property_id)
     movement_rows = u.rows(
         db,
