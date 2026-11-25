@@ -366,6 +366,9 @@ test("resumen separa monedas y vencimientos son una consulta sin mensajes", asyn
   expect(screen.getByRole("heading", { name: "Capital en BOB" })).toBeVisible();
   expect(screen.getByRole("heading", { name: "Capital en USD" })).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Vencimientos" }));
+  expect(
+    screen.getByLabelText("Filtrar situación del anticrético"),
+  ).toHaveValue("upcoming");
   expect(screen.getByText(/Esta pantalla consulta fechas/)).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /WhatsApp|Enviar/ }),

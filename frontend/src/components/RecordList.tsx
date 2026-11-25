@@ -9,25 +9,32 @@ export const ListPreferences = createContext<Map<string, unknown> | null>(null);
 
 export function useListPreference<T>(key: string | undefined, initial: T) {
   const preferences = useContext(ListPreferences);
-  const [local, setLocal] = useState(initial);
+  const [local, setLocal] = useState({ key, value: initial });
   const value =
-    key && preferences?.has(key) ? (preferences.get(key) as T) : local;
-  const [, invalidate] = useState(0);
+    key && preferences?.has(key)
+      ? (preferences.get(key) as T)
+      : local.key === key
+        ? local.value
+        : initial;
   return [
     value,
     (next: SetStateAction<T>) => {
+      const resolve = (previous: T) =>
+        typeof next === "function" ? (next as (value: T) => T)(previous) : next;
       if (!key || !preferences) {
-        setLocal(next);
+        setLocal((current) => ({
+          key,
+          value: resolve(current.key === key ? current.value : initial),
+        }));
         return;
       }
       const previous = preferences.has(key)
         ? (preferences.get(key) as T)
         : value;
-      const result =
-        typeof next === "function" ? (next as (value: T) => T)(previous) : next;
+      const result = resolve(previous);
       if (Object.is(previous, result)) return;
       preferences.set(key, result);
-      invalidate((version) => version + 1);
+      setLocal({ key, value: result });
     },
   ] as const;
 }
