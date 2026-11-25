@@ -18,6 +18,7 @@ from reportlab.platypus import (
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.graphics.shapes import Drawing, String
 from reportlab.graphics.charts.barcharts import VerticalBarChart
+from app.services.reports import STATE_LABELS
 
 METRICS = {
     "charges_recorded": "Cargos registrados en el periodo",
@@ -83,30 +84,6 @@ CHARTS = [
         ["ordinary_received", "charges_recorded", "pending"],
     ),
 ]
-STATE_LABELS = {
-    "active": "Activo",
-    "finished": "Finalizado",
-    "draft": "Borrador",
-    "cancelled": "Cancelado",
-    "pending": "Pendiente",
-    "partial": "Pago parcial",
-    "paid": "Cubierto",
-    "overdue": "Vencido",
-    "adjusted": "Ajustado",
-    "voided": "Anulado",
-    "daily": "Diario",
-    "weekly": "Semanal",
-    "monthly": "Mensual",
-    "anticretico": "Anticrético",
-    "mixed": "Mixto",
-    "collection": "Cobro",
-    "advance": "Anticipo",
-    "guarantee": "Garantía",
-    "disbursement": "Desembolso propio",
-    "provider_direct": "Pago directo al proveedor",
-    "refund": "Devolución de fondos",
-}
-
 
 class NumberedCanvas(Canvas):
     def __init__(self, *args, **kwargs):

@@ -48,5 +48,8 @@ test("sin datos muestra explicación y no dibuja un cero", () => {
       series={[{ name: "Saldo", values: [null] }]}
     />,
   );
-  expect(screen.getByRole("status")).toHaveTextContent("No hay datos");
+  expect(screen.getByText("No hay datos para este periodo.")).toHaveAttribute(
+    "role",
+    "status",
+  );
 });

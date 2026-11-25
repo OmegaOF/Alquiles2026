@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlalchemy.orm import Session
 from app.api.auth import current_user
-from app.db.session import get_db
+from app.db.session import get_db, nonlocking_projection
 from app.models.entities import User
 from app.schemas.reports import ReportFilters, ReportKind
 from app.services import reminder_sources, reports
@@ -52,17 +52,15 @@ def overview(db: Session = Depends(get_db), user: User = Depends(current_user)):
 def attention(db: Session = Depends(get_db), user: User = Depends(current_user)):
     properties, _ = scope_properties(db, user, ReportFilters())
     count = 0
-    property_ids = [item.id for item in properties]
-    for property_id in property_ids:
-        try:
-            listing = reminder_sources.listing(db, user, property_id)
-            count += listing["summary"]["pending"]
-        except HTTPException as error:
-            if error.status_code == 403:
-                return {"count": None}
-            raise
-        finally:
-            db.rollback()
+    with nonlocking_projection(db):
+        for item in properties:
+            try:
+                events, _, _ = reminder_sources.project(db, user, item.id)
+                count += sum(event["attention_state"] == "pending" for event in events)
+            except HTTPException as error:
+                if error.status_code == 403:
+                    return {"count": None}
+                raise
     return {"count": count}
 
 

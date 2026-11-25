@@ -30,7 +30,7 @@ from app.services.tenancy import (
 
 
 def rows(db, query, locked=False):
-    if locked:
+    if locked and not db.info.get("nonlocking_projection"):
         query = query.with_for_update().execution_options(populate_existing=True)
     return list(db.scalars(query))
 
@@ -41,19 +41,17 @@ def fresh(db, model, id):
         cached = snapshot.get(model, id)
         if cached is not None:
             return cached
-    return db.scalar(
-        select(model)
-        .where(model.id == id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    query = select(model).where(model.id == id).execution_options(populate_existing=True)
+    if not db.info.get("nonlocking_projection"):
+        query = query.with_for_update()
+    return db.scalar(query)
 
 
 def current_distribution(db, receipt_id, locked=False):
     query = select(UtilityCurrentDistribution).where(
         UtilityCurrentDistribution.receipt_id == receipt_id
     )
-    if locked:
+    if locked and not db.info.get("nonlocking_projection"):
         query = query.with_for_update().execution_options(populate_existing=True)
     return db.scalar(query)
 

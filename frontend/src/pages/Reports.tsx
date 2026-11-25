@@ -1,3 +1,14 @@
+import {
+  ListPagination,
+  ListSearch,
+  RecordCollection,
+  RecordField,
+  RecordRow,
+  lastPage,
+  pageSize,
+  useListPreference,
+} from "../components/RecordList";
+import { RecordStatus, StatusIndicator } from "../components/StatusIndicator";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import { SearchSelect } from "../components/SearchSelect";
@@ -71,6 +82,8 @@ const labels: Record<string, string> = {
   units_registered: "Cuartos registrados",
   voided_on: "Anulado el",
   contract_id: "Contrato",
+  receipt_id: "Recibo",
+  description: "Descripción",
   contract_state: "Estado actual de ocupación",
   filtered_person: "Persona vinculada consultada",
   agreement_scope: "Alcance del capital acordado",
@@ -146,6 +159,28 @@ function ChoiceField({
   );
 }
 
+function reportTitle(row: ReportRow) {
+  return String(
+    row.description ||
+      row.service ||
+      row.owner ||
+      (row.mode && row.contract_id
+        ? `Contrato ${row.contract_id}`
+        : row.concept ||
+          (row.kind && stateNames[String(row.kind)]) ||
+          row.unit ||
+          row.property ||
+          "Registro"),
+  );
+}
+
+function reportSearch(row: ReportRow) {
+  return Object.values(row)
+    .filter((value) => typeof value === "string" || typeof value === "number")
+    .map((value) => stateNames[String(value)] || String(value))
+    .join(" ");
+}
+
 function RowDetail({
   row,
   onProperty,
@@ -153,14 +188,53 @@ function RowDetail({
   row: ReportRow;
   onProperty: (id: number) => void;
 }) {
-  const title = String(
-    row.description ||
-      row.service ||
-      row.owner ||
-      (row.mode && row.contract_id
-        ? `Contrato ${row.contract_id}`
-        : row.property || row.unit || row.concept || "Registro"),
-  );
+  const title = reportTitle(row);
+  const state = String(row.state ?? "");
+  const stateDomain = row.mode
+    ? "contract"
+    : row.contract_state
+      ? "capital"
+      : "finance";
+  const capitalState =
+    {
+      paid: "returned",
+      adjusted: "settled_by_agreement",
+      pending: "pending_receipt",
+      partial: "partial_return",
+      overdue: "overdue",
+    }[state] ?? state;
+  const summaryFields = row.mode
+    ? ["property", "unit", "person", "state", "start_date", "end_date"]
+    : row.service
+      ? ["property", "amount", "provider_paid", "pending", "due_on"]
+      : row.contract_state
+        ? [
+            "property",
+            "unit",
+            "state",
+            "contract_state",
+            "pending",
+            "restitution_on",
+          ]
+        : row.kind
+          ? ["property", "person", "occurred_on", "amount", "kind"]
+          : row.state
+            ? [
+                "property",
+                "unit",
+                "person",
+                "state",
+                "total",
+                "pending",
+                "due_on",
+              ]
+            : [
+                "property",
+                "unit",
+                "units_registered",
+                "cash_received",
+                "pending",
+              ];
   const fields = Object.entries(row).filter(
     ([key, value]) =>
       (labels[key] || measureNames[key]) &&
@@ -168,119 +242,222 @@ function RowDetail({
         typeof value === "number" ||
         value === null),
   );
+  const field = ([key, value]: [string, unknown]) => (
+    <RecordField
+      key={key}
+      label={
+        key === "amount" && row.kind
+          ? "Importe"
+          : labels[key] || measureNames[key]
+      }
+    >
+      {key === "state" && state ? (
+        <RecordStatus
+          domain={stateDomain}
+          state={stateDomain === "capital" ? capitalState : state}
+          label={
+            stateDomain === "capital" && state === "pending"
+              ? "Capital pendiente"
+              : undefined
+          }
+        />
+      ) : key === "contract_state" && typeof value === "string" ? (
+        <RecordStatus domain="contract" state={value} />
+      ) : economic.has(key) || measureNames[key] ? (
+        money(value, row.currency)
+      ) : value === null ? (
+        "Sin información"
+      ) : (
+        stateNames[String(value)] || String(value)
+      )}
+    </RecordField>
+  );
   return (
-    <article className="report-record">
-      <h3>{title}</h3>
-      {row.pending_financial_import === true && (
-        <p className="permission-note">
-          Este reparto confirmado todavía no se importó a Pagos y gastos. Los
-          cargos conservan el último registro financiero; consultar este reporte
-          no crea deudas.
-        </p>
-      )}
-      <dl className="report-values">
-        {fields.map(([key, value]) => (
-          <div key={key}>
-            <dt>{labels[key] || measureNames[key]}</dt>
-            <dd>
-              {economic.has(key) || measureNames[key]
-                ? money(value, row.currency)
-                : value === null
-                  ? "Sin información"
-                  : stateNames[String(value)] || String(value)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {Array.isArray(row.occupants) && (
-        <p>
-          Ocupantes: {row.occupants.join(", ") || "Sin ocupantes adicionales"}
-        </p>
-      )}
-      {Array.isArray(row.owners) && (
-        <p>
-          Firmantes propietarios: {row.owners.join(", ") || "Sin información"}
-        </p>
-      )}
-      {Array.isArray(row.holders) && (
-        <p>
-          Titulares:{" "}
-          {row.holders.map((h: Record<string, unknown>) => h.person).join(", ")}
-        </p>
-      )}
-      {Array.isArray(row.responsibles) && (
-        <p>
-          Responsables de restitución:{" "}
-          {row.responsibles
-            .map((h: Record<string, unknown>) => h.person)
-            .join(", ")}
-        </p>
-      )}
-      {Array.isArray(row.contracts) && (
-        <details>
-          <summary>Ver contratos y periodos de esta unidad</summary>
-          {(row.contracts as ReportRow[]).map((c) => (
-            <p key={String(c.id)}>
-              Contrato {String(c.id)} ·{" "}
-              {stateNames[String(c.mode)] || String(c.mode)} ·{" "}
-              {String(c.start_date)} a {String(c.end_date)} ·{" "}
-              {stateNames[String(c.state)] || String(c.state)}
+    <RecordRow
+      title={title}
+      fields={
+        <>
+          {fields
+            .filter(
+              ([key, value]) => summaryFields.includes(key) && value !== title,
+            )
+            .map(field)}
+          {typeof row.pending_financial_import === "boolean" && (
+            <RecordField label="Reparto">
+              <StatusIndicator
+                tone={row.pending_financial_import ? "amber" : "green"}
+                label={
+                  row.pending_financial_import
+                    ? "Pendiente de importar"
+                    : "Importado"
+                }
+              />
+            </RecordField>
+          )}
+        </>
+      }
+      detail={
+        <>
+          {row.pending_financial_import === true && (
+            <p className="permission-note">
+              Este reparto confirmado todavía no se importó a Pagos y gastos.
+              Los cargos conservan el último registro financiero; consultar este
+              reporte no crea deudas.
             </p>
-          ))}
-        </details>
-      )}
-      {Array.isArray(row.summary) && (
-        <details>
-          <summary>Ver importes de este contrato</summary>
-          {(row.summary as Record<string, string>[]).map((s) => (
-            <dl key={s.currency} className="report-values">
-              {Object.entries(measureNames).map(([key, label]) => (
-                <div key={key}>
-                  <dt>{label}</dt>
-                  <dd>{money(s[key], s.currency)}</dd>
-                </div>
+          )}
+          <dl className="record-row-fields">
+            {fields.filter(([key]) => !summaryFields.includes(key)).map(field)}
+          </dl>
+          {Array.isArray(row.occupants) && (
+            <p>
+              Ocupantes:{" "}
+              {row.occupants.join(", ") || "Sin ocupantes adicionales"}
+            </p>
+          )}
+          {Array.isArray(row.owners) && (
+            <p>
+              Firmantes propietarios:{" "}
+              {row.owners.join(", ") || "Sin información"}
+            </p>
+          )}
+          {Array.isArray(row.holders) && (
+            <p>
+              Titulares:{" "}
+              {row.holders
+                .map((h: Record<string, unknown>) => h.person)
+                .join(", ")}
+            </p>
+          )}
+          {Array.isArray(row.responsibles) && (
+            <p>
+              Responsables de restitución:{" "}
+              {row.responsibles
+                .map((h: Record<string, unknown>) => h.person)
+                .join(", ")}
+            </p>
+          )}
+          {Array.isArray(row.contracts) && row.contracts.length > 0 && (
+            <details>
+              <summary>Ver contratos y periodos de esta unidad</summary>
+              <RecordCollection
+                id={`report-unit:${row.unit_id}:contracts`}
+                label="contratos de la unidad"
+                items={row.contracts as ReportRow[]}
+                searchable={reportSearch}
+                render={(contract) => (
+                  <RecordRow
+                    key={String(contract.id)}
+                    title={`Contrato ${contract.id}`}
+                    fields={
+                      <>
+                        <RecordField label="Modalidad">
+                          {stateNames[String(contract.mode)]}
+                        </RecordField>
+                        <RecordField label="Estancia">
+                          {String(contract.start_date)} al{" "}
+                          {String(contract.end_date)}
+                        </RecordField>
+                        <RecordField label="Estado">
+                          <RecordStatus
+                            domain="contract"
+                            state={String(contract.state)}
+                          />
+                        </RecordField>
+                      </>
+                    }
+                  />
+                )}
+              />
+            </details>
+          )}
+          {Array.isArray(row.summary) && (
+            <details>
+              <summary>Ver importes de este contrato</summary>
+              {(row.summary as Record<string, string>[]).map((s) => (
+                <dl key={s.currency} className="report-values">
+                  {Object.entries(measureNames).map(([key, label]) => (
+                    <div key={key}>
+                      <dt>{label}</dt>
+                      <dd>{money(s[key], s.currency)}</dd>
+                    </div>
+                  ))}
+                </dl>
               ))}
-            </dl>
-          ))}
-        </details>
-      )}
-      {Array.isArray(row.obligations) && row.obligations.length > 0 && (
-        <details>
-          <summary>Ver cargos e historial económico</summary>
-          {(row.obligations as ReportRow[]).map((o) => (
-            <RowDetail key={String(o.id)} row={o} onProperty={onProperty} />
-          ))}
-        </details>
-      )}
-      {Array.isArray(row.adjustments) && row.adjustments.length > 0 && (
-        <details>
-          <summary>Ver ajustes registrados</summary>
-          {(row.adjustments as ReportRow[]).map((a) => (
-            <p key={String(a.id)}>
-              {String(a.date)} · Cambio: {money(a.delta, row.currency)}
-            </p>
-          ))}
-        </details>
-      )}
-      {Array.isArray(row.applications) && row.applications.length > 0 && (
-        <details>
-          <summary>Ver aplicaciones de pagos</summary>
-          {(row.applications as ReportRow[]).map((a) => (
-            <p key={String(a.id)}>
-              {String(a.date || "")} · Aplicado: {money(a.amount, row.currency)}
-            </p>
-          ))}
-        </details>
-      )}
-      {typeof row.property_id === "number" && (
-        <button
-          className="secondary"
-          onClick={() => onProperty(row.property_id as number)}
-        >
-          Ver contratos de esta propiedad
-        </button>
-      )}
-    </article>
+            </details>
+          )}
+          {Array.isArray(row.obligations) && row.obligations.length > 0 && (
+            <details>
+              <summary>Ver cargos e historial económico</summary>
+              <RecordCollection
+                id={`report-contract:${row.contract_id}:obligations`}
+                label="cargos del contrato"
+                items={row.obligations as ReportRow[]}
+                searchable={reportSearch}
+                render={(o) => (
+                  <RowDetail
+                    key={String(o.id)}
+                    row={o}
+                    onProperty={onProperty}
+                  />
+                )}
+              />
+            </details>
+          )}
+          {Array.isArray(row.adjustments) && row.adjustments.length > 0 && (
+            <details>
+              <summary>Ver ajustes registrados</summary>
+              <RecordCollection
+                id={`report:${row.record_type || row.concept || row.description}:${row.id}:adjustments`}
+                label="ajustes registrados"
+                items={row.adjustments as ReportRow[]}
+                searchable={reportSearch}
+                render={(entry) => (
+                  <RecordRow
+                    key={String(entry.id)}
+                    title={String(entry.date || "Sin fecha")}
+                    fields={
+                      <RecordField label="Cambio">
+                        {money(entry.delta, row.currency)}
+                      </RecordField>
+                    }
+                  />
+                )}
+              />
+            </details>
+          )}
+          {Array.isArray(row.applications) && row.applications.length > 0 && (
+            <details>
+              <summary>Ver aplicaciones de pagos</summary>
+              <RecordCollection
+                id={`report:${row.record_type || row.concept || row.description}:${row.id}:applications`}
+                label="aplicaciones de pagos"
+                items={row.applications as ReportRow[]}
+                searchable={reportSearch}
+                render={(entry) => (
+                  <RecordRow
+                    key={String(entry.id)}
+                    title={String(entry.date || "Sin fecha")}
+                    fields={
+                      <RecordField label="Aplicado">
+                        {money(entry.amount, row.currency)}
+                      </RecordField>
+                    }
+                  />
+                )}
+              />
+            </details>
+          )}
+          {typeof row.property_id === "number" && (
+            <button
+              className="secondary"
+              onClick={() => onProperty(row.property_id as number)}
+            >
+              Ver contratos de esta propiedad
+            </button>
+          )}
+        </>
+      }
+    />
   );
 }
 
@@ -301,14 +478,19 @@ export function Reports({
           : undefined;
   const initialKind = section === "history" ? "collections" : "economic";
   const [options, setOptions] = useState<ReportOptions | null>(null);
-  const [draft, setDraft] = useState<Filters>({});
-  const [kind, setKind] = useState<ReportKind>(initialKind);
-  const [applied, setApplied] = useState({
+  const listId = `report:${view}:${section ?? "general"}`;
+  const [draft, setDraft] = useListPreference<Filters>(`${listId}:draft`, {});
+  const [kind, setKind] = useListPreference<ReportKind>(
+    `${listId}:kind`,
+    initialKind,
+  );
+  const [applied, setApplied] = useListPreference(`${listId}:applied`, {
     filters: {} as Filters,
     kind: initialKind as ReportKind,
   });
+  const [detailQuery, setDetailQuery] = useListPreference(`${listId}:q`, "");
   const [data, setData] = useState<ReportData | null>(null);
-  const [currency, setCurrency] = useState("");
+  const [currency, setCurrency] = useListPreference(`${listId}:currency`, "");
   const [busy, setBusy] = useState(true),
     [error, setError] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false),
@@ -345,9 +527,19 @@ export function Reports({
       view === "dashboard" && applied.kind === "economic"
         ? "/dashboard"
         : `/reports/${applied.kind}`;
-    api<ReportData>(path + query(applied.filters))
+    api<ReportData>(
+      path + query({ ...applied.filters, page_size: String(pageSize) }),
+    )
       .then((value) => {
         if (current !== version.current) return;
+        const last = lastPage(value.total_rows);
+        if (value.page > last) {
+          setApplied((old) => ({
+            ...old,
+            filters: { ...old.filters, page: String(last) },
+          }));
+          return;
+        }
         setData(value);
         setCurrency((c) =>
           value.summary.some((s) => s.currency === c)
@@ -517,7 +709,10 @@ export function Reports({
         className="panel report-filter"
         onSubmit={(e) => {
           e.preventDefault();
-          setApplied({ filters: { ...draft, page: "1" }, kind });
+          setApplied({
+            filters: { ...draft, q: detailQuery, page: "1" },
+            kind,
+          });
         }}
       >
         <h2>¿Qué deseas consultar?</h2>
@@ -745,6 +940,7 @@ export function Reports({
             className="secondary"
             onClick={() => {
               setDraft(options ? presetDates("month", options.today) : {});
+              setDetailQuery("");
               setApplied({ filters: {}, kind });
             }}
           >
@@ -802,9 +998,9 @@ export function Reports({
               <p className="permission-note">No hay datos para este periodo.</p>
             )}
             {view === "dashboard" && (
-              <div className="report-cards">
+              <div className="report-metrics">
                 {Object.entries(countNames).map(([k, v]) => (
-                  <article key={k} aria-label={v} className="report-card">
+                  <article key={k} aria-label={v} className="report-metric">
                     <span>{v}</span>
                     <strong>
                       {data.counts[k] ?? "Sin información histórica"}
@@ -827,10 +1023,10 @@ export function Reports({
             )}
             {selected && (
               <>
-                <div className="report-cards">
+                <div className="report-metrics">
                   {mainMetrics.map((k) => (
                     <article
-                      className="report-card"
+                      className="report-metric"
                       aria-label={measureNames[k]}
                       key={k}
                     >
@@ -944,64 +1140,77 @@ export function Reports({
               </Suspense>
             </section>
           )}
-          <section aria-label="Detalle del reporte" id="report-history">
-            <h2>Revisar los registros</h2>
-            <p>
-              {data.total_rows} registros · Página {data.page}
-            </p>
+        </>
+      )}
+      <section
+        aria-label="Detalle del reporte"
+        id="report-history"
+        aria-busy={busy}
+      >
+        <h2>Revisar los registros</h2>
+        <form
+          className="record-filters report-search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setApplied((old) => ({
+              ...old,
+              filters: { ...old.filters, q: detailQuery, page: "1" },
+            }));
+          }}
+        >
+          <ListSearch
+            label="Buscar en el detalle del reporte"
+            value={detailQuery}
+            onChange={setDetailQuery}
+          />
+          <button type="submit" className="secondary" disabled={busy}>
+            Buscar registros
+          </button>
+        </form>
+        {data && (
+          <>
             {!data.rows.length && (
               <p>No hay registros de detalle para estos filtros.</p>
             )}
-            {data.rows.map((row, i) => (
-              <RowDetail
-                key={
-                  String(row.id || row.contract_id || row.unit_id || i) +
-                  String(i)
-                }
-                row={row}
-                onProperty={(id) => {
-                  const next = {
-                    ...applied.filters,
-                    property_id: String(id),
-                    unit_id: "",
-                    contract_id: "",
-                    page: "1",
-                  };
-                  setDraft(next);
-                  setKind("contracts");
-                  setApplied({ filters: next, kind: "contracts" });
-                }}
-              />
-            ))}
-            <div className="report-quick">
-              <button
-                className="secondary"
-                disabled={data.page <= 1}
-                onClick={() =>
-                  setApplied((old) => ({
-                    ...old,
-                    filters: { ...old.filters, page: String(data.page - 1) },
-                  }))
-                }
-              >
-                Página anterior
-              </button>
-              <button
-                className="secondary"
-                disabled={data.page * data.page_size >= data.total_rows}
-                onClick={() =>
-                  setApplied((old) => ({
-                    ...old,
-                    filters: { ...old.filters, page: String(data.page + 1) },
-                  }))
-                }
-              >
-                Página siguiente
-              </button>
+            <div className="record-rows">
+              {data.rows.map((row, i) => (
+                <RowDetail
+                  key={
+                    String(row.id || row.contract_id || row.unit_id || i) +
+                    String(i)
+                  }
+                  row={row}
+                  onProperty={(id) => {
+                    const next = {
+                      ...applied.filters,
+                      property_id: String(id),
+                      unit_id: "",
+                      contract_id: "",
+                      q: "",
+                      page: "1",
+                    };
+                    setDraft(next);
+                    setDetailQuery("");
+                    setKind("contracts");
+                    setApplied({ filters: next, kind: "contracts" });
+                  }}
+                />
+              ))}
             </div>
-          </section>
-        </>
-      )}
+            <ListPagination
+              label="registros del reporte"
+              total={data.total_rows}
+              page={data.page}
+              onPage={(next) =>
+                setApplied((old) => ({
+                  ...old,
+                  filters: { ...old.filters, page: String(next) },
+                }))
+              }
+            />
+          </>
+        )}
+      </section>
     </section>
   );
 }

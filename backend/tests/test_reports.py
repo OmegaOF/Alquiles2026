@@ -941,3 +941,44 @@ def test_home_overview_reuses_report_amounts_without_locks(admin, fin, clock, db
     unauthorized = admin.get("/api/v1/dashboard/overview").json()
     assert unauthorized["summary"] == []
     assert unauthorized["counts"]["properties_registered"] == 0
+
+
+def test_searches_all_authorized_report_rows_before_paginating(admin, fin, clock):
+    house = fin["property"]
+    for i in range(22):
+        post(
+            admin,
+            f"/properties/{house['id']}/units",
+            {"code": f"UX-{i:02}", "name": f"Habitación de prueba {i:02}", "unit_type": "cuarto"},
+        )
+    first = report(admin, fin, "units", page_size=20)
+    assert len(first["rows"]) == 20
+    assert not any("prueba 21" in row["unit"] for row in first["rows"])
+    second = report(admin, fin, "units", page_size=20, page=2)
+    assert any("prueba 21" in row["unit"] for row in second["rows"])
+    matched = report(admin, fin, "units", page_size=20, q="habitacion prueba ux-21")
+    assert matched["total_rows"] == 1
+    assert "prueba 21" in matched["rows"][0]["unit"]
+    assert matched["summary"] == first["summary"]
+    assert matched["series"] == first["series"]
+
+
+def test_home_attention_uses_pending_notice_count_and_authorized_scope(admin, fin, clock, db):
+    rental(admin, fin)
+    property_id = fin["property"]["id"]
+    expected = admin.get(f"/api/v1/properties/{property_id}/reminders").json()
+    assert expected["summary"]["pending"] > 0
+    statements = []
+
+    def collect(connection, cursor, statement, parameters, context, many):
+        statements.append(statement)
+
+    event.listen(db, "before_cursor_execute", collect)
+    try:
+        response = admin.get("/api/v1/dashboard/attention")
+    finally:
+        event.remove(db, "before_cursor_execute", collect)
+    assert response.json() == {"count": expected["summary"]["pending"]}
+    assert not any("FOR UPDATE" in statement.upper() for statement in statements)
+    login_as(admin, user(admin, "operator"))
+    assert admin.get("/api/v1/dashboard/attention").json() == {"count": 0}

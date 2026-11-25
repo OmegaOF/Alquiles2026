@@ -62,6 +62,8 @@ def scope(query, model, db, user):
 
 
 def lock_property(db, user, property_id):
+    if db.info.get("nonlocking_projection"):
+        return read_property(db, user, property_id)
     query = (
         visible_properties(db, user)
         .where(Property.id == property_id)

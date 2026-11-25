@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { ListPagination, ListSearch, useLocalList } from "./RecordList";
 import { init, use, type EChartsCoreOption } from "echarts/core";
 import { BarChart, LineChart } from "echarts/charts";
 import {
@@ -33,6 +34,12 @@ export default function ReportChart({
   unit: string;
   line?: boolean;
 }) {
+  const values = useLocalList(
+    months.map((month, index) => ({ month, index })),
+    ({ month, index }) =>
+      [month, ...series.map((entry) => entry.values[index])].join(" "),
+    `chart:${title}`,
+  );
   const element = useRef<HTMLDivElement>(null);
   const instance = useRef<ReturnType<typeof init> | null>(null);
   useEffect(() => {
@@ -132,6 +139,11 @@ export default function ReportChart({
       />
       <details>
         <summary>Ver cifras del gráfico</summary>
+        <ListSearch
+          label={`Buscar cifras de ${title}`}
+          placeholder="Mes o importe"
+          {...values.search}
+        />
         <div className="report-scroll">
           <table>
             <caption>
@@ -146,17 +158,18 @@ export default function ReportChart({
               </tr>
             </thead>
             <tbody>
-              {months.map((m, i) => (
-                <tr key={m}>
-                  <th>{m}</th>
+              {values.rows.map(({ month, index }) => (
+                <tr key={month}>
+                  <th scope="row">{month}</th>
                   {series.map((s) => (
-                    <td key={s.name}>{s.values[i] ?? "Sin información"}</td>
+                    <td key={s.name}>{s.values[index] ?? "Sin información"}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <ListPagination label={`cifras de ${title}`} {...values.pagination} />
       </details>
     </section>
   );

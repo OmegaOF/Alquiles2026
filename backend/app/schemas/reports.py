@@ -49,6 +49,7 @@ class ReportFilters(BaseModel):
         ]
         | None
     ) = None
+    q: str | None = Field(None, max_length=200)
     page: int = Field(1, ge=1, le=100000)
     page_size: int = Field(50, ge=1, le=200)
     paper: Literal["A4", "letter"] = "A4"

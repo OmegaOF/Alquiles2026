@@ -40,6 +40,67 @@ TITLES = {
 }
 
 
+STATE_LABELS = {
+    "active": "Activo",
+    "finished": "Finalizado",
+    "draft": "Borrador",
+    "cancelled": "Cancelado",
+    "pending": "Pendiente",
+    "partial": "Pago parcial",
+    "paid": "Cubierto",
+    "overdue": "Vencido",
+    "adjusted": "Ajustado",
+    "voided": "Anulado",
+    "daily": "Diario",
+    "weekly": "Semanal",
+    "monthly": "Mensual",
+    "anticretico": "Anticrético",
+    "mixed": "Mixto",
+    "collection": "Cobro",
+    "advance": "Anticipo",
+    "guarantee": "Garantía",
+    "disbursement": "Desembolso propio",
+    "provider_direct": "Pago directo al proveedor",
+    "refund": "Devolución de fondos",
+}
+
+
+def search_rows(rows, query):
+    terms = tenancy.search_text(query or "").split()
+    if not terms:
+        return rows
+
+    def matches(row):
+        values = [
+            str(value)
+            for value in row.values()
+            if isinstance(value, (str, int, Decimal, date))
+        ]
+        values.extend(
+            STATE_LABELS.get(row.get(key), "")
+            for key in ("state", "contract_state", "mode", "kind")
+        )
+        values.extend(
+            f"{label} {row[key]}"
+            for key, label in [("contract_id", "Contrato"), ("receipt_id", "Recibo")]
+            if row.get(key) is not None
+        )
+        if row.get("state") == "paid":
+            values.append("Pagado")
+        if row.get("state") == "active":
+            values.append("Vigente")
+        if row.get("pending_financial_import") is not None:
+            values.append(
+                "Pendiente de importar"
+                if row["pending_financial_import"]
+                else "Importado"
+            )
+        text = tenancy.search_text(" ".join(values))
+        return all(term in text for term in terms)
+
+    return [row for row in rows if matches(row)]
+
+
 def plain(value):
     if isinstance(value, Decimal):
         return decimal_text(value)
@@ -512,6 +573,8 @@ def build(db, user, filters, kind="economic", export=False):
                 x.name for x in facts.properties if x.id == row["property_id"]
             )
     amounts = p.summaries()
+    has_data = bool(amounts or rows)
+    rows = search_rows(rows, filters.q)
     timeline, occupation = series(facts, filters, p.start, p.end, p.cut)
     limits = [
         "Flujos: fechas de negocio del periodo. Saldos: hechos registrados y conocidos a la fecha de corte, incluyendo anulaciones y ajustes conocidos entonces.",
@@ -565,7 +628,7 @@ def build(db, user, filters, kind="economic", export=False):
         movements=p.movements,
         limitations=limits,
         total_rows=len(rows),
-        has_data=bool(amounts or rows),
+        has_data=has_data,
     )
     clean = plain(full)
     fingerprint = hashlib.sha256(
